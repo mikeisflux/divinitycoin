@@ -16,7 +16,17 @@
 - [ ] Configure Prettier
 - [ ] Set up Vitest for testing
 
-### 1.2 Dependencies to Install
+### 1.2 Brand Identity
+- [ ] Choose neutral domain name (e.g., creatorcredits.com, fundingcredits.com)
+- [ ] Clean, generic fintech aesthetic
+- [ ] No reference to adult content, NSFW, or specific content types
+- [ ] Minimal reference to IndieCrowdfund (just "Redeem on partner platforms")
+- [ ] Tagline options: "Fuel Your Favorite Creators" / "The Universal Creator Currency" / "Support Creators. Seamlessly."
+- [ ] Professional but approachable brand voice
+- [ ] Creator-focused language
+- [ ] Trust-building through transparency
+
+### 1.3 Dependencies to Install
 - [ ] Install Prisma 5.x ORM
 - [ ] Install Stripe SDK (latest)
 - [ ] Install Tailwind CSS 3.x
@@ -26,7 +36,7 @@
 - [ ] Install bcrypt (for password hashing)
 - [ ] Install crypto (built-in, for code generation)
 
-### 1.3 Environment Variables
+### 1.4 Environment Variables
 - [ ] `DATABASE_URL` - PostgreSQL connection string
 - [ ] `NEXT_PUBLIC_BASE_URL` - Public site URL
 - [ ] `STRIPE_SECRET_KEY` - Stripe API secret key
@@ -175,11 +185,20 @@
 ## 7. Stripe Integration
 
 ### 7.1 Checkout Flow (`app/api/checkout/route.ts`)
-- [ ] Validate amount (MIN: $5, MAX: $500)
-- [ ] Validate email format
+- [ ] Define preset amounts constant: [10, 25, 50, 100, 250]
+- [ ] Define MIN_AMOUNT: $5
+- [ ] Define MAX_AMOUNT: $500
+- [ ] Validate amount within range
+- [ ] Validate email format (regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/)
 - [ ] Generate gift card code (not activated)
 - [ ] Create pending gift card record
 - [ ] Create Stripe checkout session
+  - [ ] payment_method_types: ['card']
+  - [ ] mode: 'payment'
+  - [ ] success_url with session_id
+  - [ ] cancel_url
+  - [ ] customer_email
+  - [ ] metadata with giftCardId and giftCardCode
 - [ ] Store code in Stripe metadata
 - [ ] Update gift card with session ID
 - [ ] Create transaction record
@@ -239,9 +258,14 @@
 ### 9.3 Caddy Configuration
 - [ ] Create `/etc/caddy/Caddyfile`
 - [ ] Configure reverse proxy to localhost:3000
-- [ ] Add security headers
-- [ ] Block `/internal/*` from public access
-- [ ] Configure logging
+- [ ] Add security headers:
+  - [ ] X-Content-Type-Options: nosniff
+  - [ ] X-Frame-Options: DENY
+  - [ ] X-XSS-Protection: "1; mode=block"
+  - [ ] Referrer-Policy: strict-origin-when-cross-origin
+  - [ ] Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+- [ ] Block `/internal/*` from public access (respond 404)
+- [ ] Configure JSON logging to `/var/log/caddy/access.log`
 
 ### 9.4 Internal API Server (`server.ts`)
 - [ ] Create Express server for internal API
@@ -643,15 +667,15 @@
 
 | Category | Items |
 |----------|-------|
-| Project Setup | 19 |
+| Project Setup & Brand Identity | 27 |
 | Database Schema | 27 |
 | Gift Card Library | 7 |
 | Credit Hold Library | 4 |
 | Rate Limiting | 4 |
 | API Endpoints | 16 |
-| Stripe Integration | 9 |
+| Stripe Integration | 17 |
 | Email System | 17 |
-| Server Configuration | 24 |
+| Server Configuration | 30 |
 | Frontend Website | 58 |
 | Admin Panel | 55 |
 | Legal Pages | 43 |
@@ -660,7 +684,7 @@
 | Appendix A (Error Codes) | 10 |
 | Appendix B (Indexes) | 4 |
 | Appendix C (Glossary) | 5 |
-| **TOTAL** | **~343 items** |
+| **TOTAL** | **~371 items** |
 
 ---
 
