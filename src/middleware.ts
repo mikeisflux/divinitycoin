@@ -26,8 +26,15 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Create response
-  const response = NextResponse.next();
+  // Create response with pathname header for layout detection
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', pathname);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 
   // Add security headers to all responses
   const securityHeaders: Record<string, string> = {
