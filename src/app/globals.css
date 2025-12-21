@@ -1,0 +1,40 @@
+/* app/globals.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary-50: 240 247 255;
+    --color-primary-100: 224 239 254;
+    --color-primary-200: 186 224 253;
+    --color-primary-300: 124 200 251;
+    --color-primary-400: 54 170 245;
+    --color-primary-500: 12 142 231;
+    --color-primary-600: 0 112 204;
+    --color-primary-700: 1 89 166;
+    --color-primary-800: 6 75 136;
+    --color-primary-900: 10 63 112;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-neutral-900 antialiased;
+  }
+}
+
+@layer components {
+  .container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

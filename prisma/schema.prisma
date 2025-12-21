@@ -1,0 +1,580 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+
+  // Profile
+  firstName     String?
+  lastName      String?
+
+  // Stripe
+  stripeCustomerId String? @unique
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  purchasedCards GiftCard[]     @relation("PurchasedCards")
+  redeemedCards  GiftCard[]     @relation("RedeemedCards")
+  creditBalance  CreditBalance?
+  transactions   Transaction[]
+  sessions       Session[]
+
+  @@index([email])
+  @@index([stripeCustomerId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  // Session metadata
+  ipAddress    String?
+  userAgent    String?
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ============================================
+// GIFT CARD SYSTEM
+// ============================================
+
+model GiftCard {
+  id            String         @id @default(cuid())
+
+  // Code (stored as SHA-256 hash)
+  codeHash      String         @unique
+  codeLast4     String         // Last 4 chars for display
+
+  // Value
+  amount        Decimal        @db.Decimal(10, 2)
+  currency      String         @default("USD")
+
+  // Status
+  status        GiftCardStatus @default(ACTIVE)
+
+  // Purchase info
+  purchaserId   String?
+  purchaser     User?          @relation("PurchasedCards", fields: [purchaserId], references: [id])
+  purchaseEmail String?        // For guest purchases
+
+  // Stripe
+  stripePaymentIntentId String? @unique
+  stripeCheckoutSessionId String? @unique
+
+  // Redemption info
+  redeemedById  String?
+  redeemedBy    User?          @relation("RedeemedCards", fields: [redeemedById], references: [id])
+  redeemedAt    DateTime?
+  redeemedOnPlatform String?   // Which platform redeemed it
+
+  // Validity
+  expiresAt     DateTime?
+
+  // Timestamps
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([codeHash])
+  @@index([status])
+  @@index([purchaserId])
+  @@index([stripePaymentIntentId])
+}
+
+enum GiftCardStatus {
+  PENDING    // Created but payment not confirmed
+  ACTIVE     // Paid and ready to redeem
+  REDEEMED   // Already used
+  EXPIRED    // Past expiration date
+  REVOKED    // Manually revoked (refund, fraud, etc.)
+}
+
+// ============================================
+// CREDIT BALANCE SYSTEM
+// ============================================
+
+model CreditBalance {
+  id              String   @id @default(cuid())
+
+  // User (linked via platform user ID)
+  platformUserId  String   @unique  // User ID from IndieCrowdfund
+
+  // Or local user for account linking
+  userId          String?  @unique
+  user            User?    @relation(fields: [userId], references: [id])
+
+  // Balance
+  availableBalance Decimal @db.Decimal(10, 2) @default(0)
+  heldBalance      Decimal @db.Decimal(10, 2) @default(0)
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  holds           CreditHold[]
+  ledgerEntries   CreditLedger[]
+
+  @@index([platformUserId])
+}
+
+model CreditHold {
+  id              String          @id @default(cuid())
+
+  // Balance reference
+  creditBalanceId String
+  creditBalance   CreditBalance   @relation(fields: [creditBalanceId], references: [id])
+
+  // Hold details
+  amount          Decimal         @db.Decimal(10, 2)
+  pledgeId        String          @unique  // IndieCrowdfund pledge ID
+  projectId       String          // IndieCrowdfund project ID
+
+  // Status
+  status          HoldStatus      @default(ACTIVE)
+
+  // Timestamps
+  createdAt       DateTime        @default(now())
+  expiresAt       DateTime?       // Auto-release if project deadline passes
+  capturedAt      DateTime?
+  releasedAt      DateTime?
+
+  @@index([pledgeId])
+  @@index([creditBalanceId])
+  @@index([status])
+}
+
+enum HoldStatus {
+  ACTIVE     // Credits held for pending pledge
+  CAPTURED   // Project funded, credits transferred
+  RELEASED   // Project failed or pledge cancelled
+  EXPIRED    // Hold expired without action
+}
+
+model CreditLedger {
+  id              String           @id @default(cuid())
+
+  // Balance reference
+  creditBalanceId String
+  creditBalance   CreditBalance    @relation(fields: [creditBalanceId], references: [id])
+
+  // Transaction details
+  type            LedgerEntryType
+  amount          Decimal          @db.Decimal(10, 2) // Positive = credit, Negative = debit
+
+  // Running balance after this entry
+  balanceAfter    Decimal          @db.Decimal(10, 2)
+
+  // References
+  giftCardId      String?
+  holdId          String?
+  description     String
+
+  // Metadata
+  metadata        Json?
+
+  // Timestamps
+  createdAt       DateTime         @default(now())
+
+  @@index([creditBalanceId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum LedgerEntryType {
+  REDEMPTION       // Gift card redeemed, credits added
+  HOLD_PLACED      // Credits held for pledge
+  HOLD_RELEASED    // Held credits returned (project failed)
+  HOLD_CAPTURED    // Held credits transferred to creator
+  ADJUSTMENT       // Manual adjustment
+  REFUND           // Refund processed
+}
+
+// ============================================
+// TRANSACTIONS & AUDIT
+// ============================================
+
+model Transaction {
+  id              String            @id @default(cuid())
+
+  // User (optional for guest purchases)
+  userId          String?
+  user            User?             @relation(fields: [userId], references: [id])
+  guestEmail      String?
+
+  // Transaction details
+  type            TransactionType
+  amount          Decimal           @db.Decimal(10, 2)
+  currency        String            @default("USD")
+  status          TransactionStatus @default(PENDING)
+
+  // Stripe references
+  stripePaymentIntentId    String?
+  stripeCheckoutSessionId  String?
+  stripeRefundId           String?
+
+  // Related gift card
+  giftCardId      String?
+
+  // Metadata
+  metadata        Json?
+  failureReason   String?
+
+  // Timestamps
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  completedAt     DateTime?
+
+  @@index([userId])
+  @@index([stripePaymentIntentId])
+  @@index([status])
+}
+
+enum TransactionType {
+  PURCHASE    // Gift card purchase
+  REFUND      // Refund issued
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ============================================
+// RATE LIMITING & SECURITY
+// ============================================
+
+model RedemptionAttempt {
+  id          String   @id @default(cuid())
+
+  // Attempt details
+  codeHashAttempt String   // Hash of attempted code
+  ipAddress       String
+  userAgent       String?
+  platformUserId  String?
+
+  // Result
+  success     Boolean
+  failureReason String?
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+
+  @@index([ipAddress, createdAt])
+  @@index([platformUserId, createdAt])
+  @@index([codeHashAttempt])
+}
+
+// ============================================
+// SYSTEM CONFIGURATION
+// ============================================
+
+model SystemConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// ADMIN SYSTEM
+// ============================================
+
+model AdminUser {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+
+  // Profile
+  firstName     String
+  lastName      String
+
+  // Role & Permissions
+  role          AdminRole @default(ADMIN)
+  permissions   Json?     // Granular permissions override
+
+  // Security
+  mfaEnabled    Boolean   @default(false)
+  mfaSecret     String?
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+  failedAttempts Int      @default(0)
+  lockedUntil   DateTime?
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  sessions      AdminSession[]
+  auditLogs     AdminAuditLog[]
+
+  @@index([email])
+}
+
+enum AdminRole {
+  SUPER_ADMIN   // Full access to everything
+  ADMIN         // Full access except admin management
+  FINANCE       // Transactions, payments, reports only
+  SUPPORT       // Users, gift cards, transactions (read-only finance)
+  VIEWER        // Read-only access to everything
+}
+
+model AdminSession {
+  id          String    @id @default(cuid())
+  adminUserId String
+  admin       AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  token       String    @unique
+  ipAddress   String
+  userAgent   String?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@index([token])
+}
+
+model AdminAuditLog {
+  id          String    @id @default(cuid())
+  adminUserId String
+  admin       AdminUser @relation(fields: [adminUserId], references: [id])
+
+  action      String    // e.g., "settings.update", "giftcard.revoke"
+  resource    String    // e.g., "GiftCard", "Partner"
+  resourceId  String?
+
+  before      Json?     // State before change
+  after       Json?     // State after change
+
+  ipAddress   String
+  userAgent   String?
+
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================
+// PARTNER SYSTEM
+// ============================================
+
+model Partner {
+  id            String        @id @default(cuid())
+
+  // Identity
+  name          String        // "IndieCrowdfund"
+  slug          String        @unique // "indiecrowdfund"
+
+  // Contact
+  contactName   String
+  contactEmail  String
+  website       String?
+
+  // Configuration
+  status        PartnerStatus @default(PENDING)
+  vpnIp         String?       // Partner's VPN IP (e.g., 10.10.0.2)
+  webhookUrl    String?       // Partner's webhook endpoint
+
+  // Branding
+  logoUrl       String?
+  description   String?
+
+  // Settings
+  settings      Json?         // Partner-specific settings
+
+  // Timestamps
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  activatedAt   DateTime?
+
+  // Relations
+  apiKeys       PartnerApiKey[]
+
+  @@index([slug])
+  @@index([status])
+}
+
+enum PartnerStatus {
+  PENDING       // Awaiting setup
+  ACTIVE        // Live and operational
+  SUSPENDED     // Temporarily disabled
+  DEACTIVATED   // Permanently disabled
+}
+
+model PartnerApiKey {
+  id          String    @id @default(cuid())
+  partnerId   String
+  partner     Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  name        String    // "Production", "Staging"
+  keyHash     String    @unique // SHA-256 hash of the key
+  keyPrefix   String    // First 8 chars for identification
+
+  // Permissions
+  permissions Json      // Specific endpoint permissions
+
+  // Usage
+  lastUsedAt  DateTime?
+  requestCount BigInt   @default(0)
+
+  // Status
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  @@index([keyHash])
+  @@index([partnerId])
+}
+
+// ============================================
+// EMAIL SYSTEM
+// ============================================
+
+model EmailLog {
+  id            String      @id @default(cuid())
+
+  // Recipient
+  toEmail       String
+  toName        String?
+
+  // Sender
+  fromEmail     String
+  fromName      String
+
+  // Content
+  templateId    String?
+  template      EmailTemplate? @relation(fields: [templateId], references: [id])
+  subject       String
+  htmlContent   String?     @db.Text
+  textContent   String?     @db.Text
+
+  // SendGrid
+  sendgridMessageId String? @unique
+
+  // Status
+  status        EmailStatus @default(QUEUED)
+  statusMessage String?
+
+  // Tracking
+  openedAt      DateTime?
+  clickedAt     DateTime?
+  bouncedAt     DateTime?
+
+  // Relations
+  userId        String?
+  transactionId String?
+  giftCardId    String?
+
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  sentAt        DateTime?
+
+  // Events from SendGrid webhooks
+  events        EmailEvent[]
+
+  @@index([toEmail])
+  @@index([status])
+  @@index([templateId])
+  @@index([sendgridMessageId])
+}
+
+enum EmailStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+  SPAM
+}
+
+model EmailEvent {
+  id          String    @id @default(cuid())
+  emailLogId  String
+  emailLog    EmailLog  @relation(fields: [emailLogId], references: [id], onDelete: Cascade)
+
+  event       String    // delivered, open, click, bounce, etc.
+  timestamp   DateTime
+  data        Json?     // Raw event data from SendGrid
+
+  @@index([emailLogId])
+}
+
+model EmailTemplate {
+  id          String    @id @default(cuid())
+
+  // Identity
+  name        String    // Internal name
+  slug        String    @unique // purchase_confirmation, etc.
+  description String?
+
+  // Content
+  subject     String
+  htmlContent String    @db.Text
+  textContent String?   @db.Text
+
+  // Settings
+  isActive    Boolean   @default(true)
+  accountId   String?   // Which email account to use
+
+  // Versioning
+  version     Int       @default(1)
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  emailLogs   EmailLog[]
+  versions    EmailTemplateVersion[]
+}
+
+model EmailTemplateVersion {
+  id          String        @id @default(cuid())
+  templateId  String
+  template    EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  version     Int
+  subject     String
+  htmlContent String        @db.Text
+  textContent String?       @db.Text
+
+  // Who made the change
+  changedBy   String?
+  changeNote  String?
+
+  createdAt   DateTime      @default(now())
+
+  @@unique([templateId, version])
+}
