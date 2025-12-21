@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
           statusMessage = event.reason || 'Email dropped';
           break;
         case 'deferred':
-          status = 'DEFERRED';
-          statusMessage = event.response || 'Email deferred';
+          status = 'QUEUED';
+          statusMessage = event.response || 'Email deferred - will retry';
           break;
         case 'spam_report':
           status = 'SPAM';
