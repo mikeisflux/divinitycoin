@@ -321,31 +321,31 @@ export default function PartnerDetailPage() {
             <div className="bg-white rounded-xl border border-neutral-200 p-6">
               <h2 className="text-lg font-semibold text-neutral-900 mb-4">Application Details</h2>
               <dl className="grid grid-cols-2 gap-4">
-                {settings.businessType && (
+                {Boolean(settings.businessType) && (
                   <div>
                     <dt className="text-sm text-neutral-500">Business Type</dt>
                     <dd className="text-neutral-900">{String(settings.businessType)}</dd>
                   </div>
                 )}
-                {settings.taxId && (
+                {Boolean(settings.taxId) && (
                   <div>
                     <dt className="text-sm text-neutral-500">Tax ID</dt>
                     <dd className="text-neutral-900 font-mono">{String(settings.taxId)}</dd>
                   </div>
                 )}
-                {settings.phone && (
+                {Boolean(settings.phone) && (
                   <div>
                     <dt className="text-sm text-neutral-500">Phone</dt>
                     <dd className="text-neutral-900">{String(settings.phone)}</dd>
                   </div>
                 )}
-                {settings.expectedMonthlyVolume && (
+                {Boolean(settings.expectedMonthlyVolume) && (
                   <div>
                     <dt className="text-sm text-neutral-500">Expected Monthly Volume</dt>
                     <dd className="text-neutral-900">{String(settings.expectedMonthlyVolume)}</dd>
                   </div>
                 )}
-                {settings.address && typeof settings.address === 'object' && (
+                {Boolean(settings.address) && typeof settings.address === 'object' && (
                   <div className="col-span-2">
                     <dt className="text-sm text-neutral-500">Address</dt>
                     <dd className="text-neutral-900">
