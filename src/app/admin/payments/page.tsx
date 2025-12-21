@@ -32,7 +32,7 @@ async function getPaymentData(page: number = 1) {
 
   const statusStats = stats.reduce(
     (acc, s) => {
-      acc[s.status] = { count: s._count, amount: s._sum.amount || 0 };
+      acc[s.status] = { count: s._count, amount: Number(s._sum.amount) || 0 };
       return acc;
     },
     {} as Record<string, { count: number; amount: number }>
@@ -171,7 +171,7 @@ export default async function PaymentsPage({
                     <TypeBadge type={txn.type} />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
-                    {txn.email || '-'}
+                    {txn.guestEmail || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-neutral-600">
                     {txn.giftCard?.codeLast4 ? `****${txn.giftCard.codeLast4}` : '-'}

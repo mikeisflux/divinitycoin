@@ -36,8 +36,8 @@ async function getErrorLogs(page: number = 1) {
     ...transactions.map((t) => ({
       id: t.id,
       type: 'TRANSACTION',
-      message: `Transaction failed: ${t.email || 'Unknown'}`,
-      details: `Amount: $${t.amount}, Status: ${t.status}`,
+      message: `Transaction failed: ${t.guestEmail || 'Unknown'}`,
+      details: `Amount: $${Number(t.amount)}, Status: ${t.status}`,
       createdAt: t.createdAt,
     })),
     ...emails.map((e) => ({

@@ -53,7 +53,7 @@ async function getPartnerData() {
         apiKeys: partner._count.apiKeys,
         totalRedemptions,
         last30DaysRedemptions,
-        totalValue: totalValue._sum.amount || 0,
+        totalValue: Number(totalValue._sum.amount) || 0,
       };
     })
   );
@@ -77,7 +77,7 @@ async function getPartnerData() {
       totalPartners,
       activePartners,
       pendingPartners,
-      totalRedemptionValue: totalPartnerValue._sum.amount || 0,
+      totalRedemptionValue: Number(totalPartnerValue._sum.amount) || 0,
     },
   };
 }

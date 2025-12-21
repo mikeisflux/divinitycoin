@@ -70,7 +70,7 @@ async function getRedemptionData() {
       partnerId: r.redeemedByPartnerId,
       partnerName: r.redeemedByPartnerId ? partnerMap.get(r.redeemedByPartnerId) || 'Unknown' : 'Direct',
       count: r._count,
-      totalValue: r._sum.amount || 0,
+      totalValue: Number(r._sum.amount) || 0,
     })),
     byAmount: redemptionsByAmount.map(r => ({
       amount: r.amount,

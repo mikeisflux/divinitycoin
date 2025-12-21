@@ -37,7 +37,7 @@ async function getAgingData() {
       return {
         ...bucket,
         count: result._count,
-        totalValue: result._sum.amount || 0,
+        totalValue: Number(result._sum.amount) || 0,
       };
     })
   );
@@ -83,9 +83,9 @@ async function getAgingData() {
     buckets: bucketData,
     summary: {
       totalCount: totalUnredeemed._count,
-      totalValue: totalUnredeemed._sum.amount || 0,
+      totalValue: Number(totalUnredeemed._sum.amount) || 0,
       expiringCount: expiringIn30Days._count,
-      expiringValue: expiringIn30Days._sum.amount || 0,
+      expiringValue: Number(expiringIn30Days._sum.amount) || 0,
       oldestCard: oldestUnredeemed,
     },
     topUnredeemed,

@@ -43,14 +43,14 @@ async function getReportData() {
   ]);
 
   return {
-    thisMonthRevenue: thisMonthRevenue._sum.amount || 0,
-    lastMonthRevenue: lastMonthRevenue._sum.amount || 0,
+    thisMonthRevenue: Number(thisMonthRevenue._sum.amount) || 0,
+    lastMonthRevenue: Number(lastMonthRevenue._sum.amount) || 0,
     thisMonthTransactions,
     lastMonthTransactions,
     thisMonthRedemptions,
     lastMonthRedemptions,
     activeCards,
-    unredeemedValue: unredeemedValue._sum.amount || 0,
+    unredeemedValue: Number(unredeemedValue._sum.amount) || 0,
   };
 }
 

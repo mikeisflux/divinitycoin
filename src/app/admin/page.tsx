@@ -77,10 +77,10 @@ async function getDashboardStats() {
   const redemptionRate = totalCards > 0 ? (redeemedCards / totalCards) * 100 : 0;
 
   return {
-    totalRevenue: totalRevenue._sum.amount || 0,
-    todayRevenue: todayRevenue._sum.amount || 0,
-    weekRevenue: weekRevenue._sum.amount || 0,
-    monthRevenue: monthRevenue._sum.amount || 0,
+    totalRevenue: Number(totalRevenue._sum.amount) || 0,
+    todayRevenue: Number(todayRevenue._sum.amount) || 0,
+    weekRevenue: Number(weekRevenue._sum.amount) || 0,
+    monthRevenue: Number(monthRevenue._sum.amount) || 0,
     activeCards,
     totalCards,
     redeemedCards,

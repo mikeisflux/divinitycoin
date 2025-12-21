@@ -59,7 +59,7 @@ async function getRefundData() {
       select: {
         id: true,
         amount: true,
-        email: true,
+        guestEmail: true,
         createdAt: true,
         stripePaymentIntentId: true,
         giftCard: {
@@ -70,12 +70,12 @@ async function getRefundData() {
   ]);
 
   // Calculate refund rate
-  const totalRefundAmount = totalRefunds._sum.amount || 0;
-  const totalPurchaseAmount = totalPurchases._sum.amount || 0;
+  const totalRefundAmount = Number(totalRefunds._sum.amount) || 0;
+  const totalPurchaseAmount = Number(totalPurchases._sum.amount) || 0;
   const refundRate = totalPurchaseAmount > 0 ? (totalRefundAmount / totalPurchaseAmount) * 100 : 0;
 
-  const last30DaysRefundAmount = last30DaysRefunds._sum.amount || 0;
-  const last30DaysPurchaseAmount = last30DaysPurchases._sum.amount || 0;
+  const last30DaysRefundAmount = Number(last30DaysRefunds._sum.amount) || 0;
+  const last30DaysPurchaseAmount = Number(last30DaysPurchases._sum.amount) || 0;
   const last30DaysRefundRate = last30DaysPurchaseAmount > 0
     ? (last30DaysRefundAmount / last30DaysPurchaseAmount) * 100
     : 0;
@@ -97,8 +97,8 @@ async function getRefundData() {
     })),
     recent: recentRefunds.map(r => ({
       id: r.id,
-      amount: r.amount,
-      email: r.email || r.giftCard?.purchaserEmail || 'Unknown',
+      amount: Number(r.amount),
+      email: r.guestEmail || r.giftCard?.purchaserEmail || 'Unknown',
       createdAt: r.createdAt,
       cardLast4: r.giftCard?.codeLast4 || 'N/A',
     })),

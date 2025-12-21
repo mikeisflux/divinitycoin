@@ -39,9 +39,9 @@ async function getRevenueData() {
 
     periods.push({
       month: startOfMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      grossRevenue: purchases._sum.amount || 0,
-      refunds: refunds._sum.amount || 0,
-      netRevenue: (purchases._sum.amount || 0) - (refunds._sum.amount || 0),
+      grossRevenue: Number(purchases._sum.amount) || 0,
+      refunds: Number(refunds._sum.amount) || 0,
+      netRevenue: (Number(purchases._sum.amount) || 0) - (Number(refunds._sum.amount) || 0),
       transactions: purchases._count,
       refundCount: refunds._count,
     });
@@ -64,9 +64,9 @@ async function getRevenueData() {
   return {
     periods: periods.reverse(),
     totals: {
-      grossRevenue: totalPurchases._sum.amount || 0,
-      refunds: totalRefunds._sum.amount || 0,
-      netRevenue: (totalPurchases._sum.amount || 0) - (totalRefunds._sum.amount || 0),
+      grossRevenue: Number(totalPurchases._sum.amount) || 0,
+      refunds: Number(totalRefunds._sum.amount) || 0,
+      netRevenue: (Number(totalPurchases._sum.amount) || 0) - (Number(totalRefunds._sum.amount) || 0),
       transactions: totalPurchases._count,
     },
   };

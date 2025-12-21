@@ -36,7 +36,7 @@ async function getSalesData() {
       return {
         ...tier,
         count: result._count,
-        total: result._sum.amount || 0,
+        total: Number(result._sum.amount) || 0,
       };
     })
   );
@@ -52,7 +52,7 @@ async function getSalesData() {
 
   // Get top customers
   const topCustomers = await prisma.transaction.groupBy({
-    by: ['email'],
+    by: ['guestEmail'],
     where: { type: 'PURCHASE', status: 'COMPLETED' },
     _count: true,
     _sum: { amount: true },
@@ -86,14 +86,14 @@ async function getSalesData() {
       total: Number(d.total),
     })),
     topCustomers: topCustomers.map(c => ({
-      email: c.email || 'Unknown',
+      email: c.guestEmail || 'Unknown',
       purchases: c._count,
-      totalSpent: c._sum.amount || 0,
+      totalSpent: Number(c._sum.amount) || 0,
     })),
     summary: {
-      last7Days: { amount: last7DaysSales._sum.amount || 0, count: last7DaysSales._count },
-      last30Days: { amount: last30DaysSales._sum.amount || 0, count: last30DaysSales._count },
-      avgValue: avgTransactionValue._avg.amount || 0,
+      last7Days: { amount: Number(last7DaysSales._sum.amount) || 0, count: last7DaysSales._count },
+      last30Days: { amount: Number(last30DaysSales._sum.amount) || 0, count: last30DaysSales._count },
+      avgValue: Number(avgTransactionValue._avg.amount) || 0,
     },
   };
 }
