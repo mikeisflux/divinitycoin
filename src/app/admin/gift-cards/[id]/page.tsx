@@ -1,22 +1,38 @@
 // app/admin/gift-cards/[id]/page.tsx
-// Gift card detail page
+// Gift card detail page with working actions
 
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { getAdminFromRequest } from '@/lib/admin/auth';
-import { redirect, notFound } from 'next/navigation';
-import { prisma } from '@/lib/db';
+import { Button } from '@/components/ui/Button';
 
-async function getGiftCard(id: string) {
-  return prisma.giftCard.findUnique({
-    where: { id },
-    include: {
-      purchaser: true,
-      redeemedBy: true,
-      transactions: {
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  });
+interface Transaction {
+  id: string;
+  type: string;
+  amount: string;
+  status: string;
+  createdAt: string;
+}
+
+interface GiftCard {
+  id: string;
+  codeLast4: string;
+  amount: string;
+  status: string;
+  createdAt: string;
+  activatedAt: string | null;
+  expiresAt: string | null;
+  purchaser: { email: string } | null;
+  purchasedByEmail: string | null;
+  redeemedBy: { email: string } | null;
+  redeemedByEmail: string | null;
+  redeemedAt: string | null;
+  redeemedOnPlatform: string | null;
+  redeemedByPlatformUserId: string | null;
+  stripeCheckoutSessionId: string | null;
+  transactions: Transaction[];
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -42,17 +58,110 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export default async function GiftCardDetailPage({ params }: { params: { id: string } }) {
-  const admin = await getAdminFromRequest();
+export default function GiftCardDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const cardId = params.id as string;
 
-  if (!admin) {
-    redirect('/admin/login');
+  const [giftCard, setGiftCard] = useState<GiftCard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    fetchGiftCard();
+  }, [cardId]);
+
+  async function fetchGiftCard() {
+    try {
+      const response = await fetch(`/api/admin/gift-cards/${cardId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setGiftCard(data.giftCard);
+      } else if (response.status === 404) {
+        router.push('/admin/gift-cards');
+      }
+    } catch (err) {
+      console.error('Failed to fetch gift card:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const giftCard = await getGiftCard(params.id);
+  async function handleAction(action: 'revoke' | 'reactivate') {
+    if (action === 'revoke' && !confirm('Are you sure you want to revoke this gift card?')) {
+      return;
+    }
+
+    setActionLoading(action);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/gift-cards/${cardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || `Failed to ${action} gift card` });
+        return;
+      }
+
+      setMessage({ type: 'success', text: `Gift card ${action === 'revoke' ? 'revoked' : 'reactivated'} successfully!` });
+      fetchGiftCard();
+    } catch (err) {
+      setMessage({ type: 'error', text: `Failed to ${action} gift card` });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleResendEmail() {
+    setActionLoading('resend');
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/gift-cards/${cardId}/resend`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to resend email' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Email sent successfully!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to resend email' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <AdminLayout title="Loading..." description="Please wait">
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   if (!giftCard) {
-    notFound();
+    return (
+      <AdminLayout title="Gift Card Not Found" description="">
+        <div className="text-center py-12">
+          <p className="text-neutral-500 mb-4">This gift card does not exist.</p>
+          <Button onClick={() => router.push('/admin/gift-cards')}>Back to Gift Cards</Button>
+        </div>
+      </AdminLayout>
+    );
   }
 
   return (
@@ -60,6 +169,12 @@ export default async function GiftCardDetailPage({ params }: { params: { id: str
       title={`Gift Card ****${giftCard.codeLast4}`}
       description={`${formatCurrency(Number(giftCard.amount))} - ${giftCard.status}`}
     >
+      {message && (
+        <div className={`mb-6 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+          {message.text}
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           {/* Card Details */}
@@ -192,17 +307,65 @@ export default async function GiftCardDetailPage({ params }: { params: { id: str
             <div className="space-y-2">
               {giftCard.status === 'ACTIVE' && (
                 <>
-                  <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition">
-                    Resend Code Email
+                  <button
+                    onClick={handleResendEmail}
+                    disabled={actionLoading === 'resend'}
+                    className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {actionLoading === 'resend' ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-600"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Resend Code Email
+                      </>
+                    )}
                   </button>
-                  <button className="w-full text-left px-4 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition">
-                    Revoke Card
+                  <button
+                    onClick={() => handleAction('revoke')}
+                    disabled={actionLoading === 'revoke'}
+                    className="w-full text-left px-4 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {actionLoading === 'revoke' ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                        Revoking...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        Revoke Card
+                      </>
+                    )}
                   </button>
                 </>
               )}
               {giftCard.status === 'REVOKED' && (
-                <button className="w-full text-left px-4 py-2 rounded-lg text-sm text-green-600 hover:bg-green-50 transition">
-                  Reactivate Card
+                <button
+                  onClick={() => handleAction('reactivate')}
+                  disabled={actionLoading === 'reactivate'}
+                  className="w-full text-left px-4 py-2 rounded-lg text-sm text-green-600 hover:bg-green-50 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {actionLoading === 'reactivate' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                      Reactivating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Reactivate Card
+                    </>
+                  )}
                 </button>
               )}
             </div>

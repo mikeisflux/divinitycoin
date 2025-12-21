@@ -38,7 +38,7 @@ export default function PartnerLoginPage() {
       }
 
       // Redirect to partner dashboard
-      router.push('/partner/dashboard');
+      router.push('/partners/dashboard');
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {

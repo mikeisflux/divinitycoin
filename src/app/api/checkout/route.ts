@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { stripe } from '@/lib/stripe';
+import { getStripeClient } from '@/lib/stripe';
 import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 
 // Constants
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
 
     // Create Stripe checkout session
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const stripe = await getStripeClient();
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -118,8 +119,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Checkout error:', error);
+
+    // Return more specific error messages
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (errorMessage.includes('STRIPE_SECRET_KEY') || errorMessage.includes('not configured')) {
+      return NextResponse.json(
+        { error: 'Payment system is not configured. Please contact support.' },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Failed to create checkout session' },
+      { error: 'Failed to create checkout session. Please try again.' },
       { status: 500 }
     );
   }
