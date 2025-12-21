@@ -1,32 +1,39 @@
 // app/admin/users/[id]/page.tsx
-// User detail page
+// User detail page with edit functionality
 
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { getAdminFromRequest } from '@/lib/admin/auth';
-import { redirect, notFound } from 'next/navigation';
-import { prisma } from '@/lib/db';
+import { Button } from '@/components/ui/Button';
 
-async function getUser(id: string) {
-  return prisma.user.findUnique({
-    where: { id },
-    include: {
-      creditBalances: {
-        include: {
-          holds: {
-            where: { status: 'ACTIVE' },
-          },
-        },
-      },
-      purchasedCards: {
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      },
-      transactions: {
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      },
-    },
-  });
+interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  emailVerified: string | null;
+  stripeCustomerId: string | null;
+  createdAt: string;
+  creditBalances: Array<{
+    availableBalance: string;
+    heldBalance: string;
+    holds: Array<{ id: string; amount: string; status: string }>;
+  }>;
+  purchasedCards: Array<{
+    id: string;
+    codeLast4: string;
+    amount: string;
+    status: string;
+    createdAt: string;
+  }>;
+  transactions: Array<{
+    id: string;
+    type: string;
+    amount: string;
+    status: string;
+    createdAt: string;
+  }>;
 }
 
 function formatCurrency(amount: number): string {
@@ -51,27 +58,155 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default async function UserDetailPage({ params }: { params: { id: string } }) {
-  const admin = await getAdminFromRequest();
+export default function UserDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const userId = params.id as string;
 
-  if (!admin) {
-    redirect('/admin/login');
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    emailVerified: false,
+  });
+
+  useEffect(() => {
+    fetchUser();
+  }, [userId]);
+
+  async function fetchUser() {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+        setEditForm({
+          name: data.user.name || '',
+          email: data.user.email,
+          password: '',
+          emailVerified: !!data.user.emailVerified,
+        });
+      } else if (response.status === 404) {
+        router.push('/admin/users');
+      }
+    } catch (err) {
+      console.error('Failed to fetch user:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const user = await getUser(params.id);
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to update user');
+        return;
+      }
+
+      setShowEditModal(false);
+      setMessage('User updated successfully');
+      fetchUser();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      setError('Failed to update user');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to delete user');
+        setDeleting(false);
+        return;
+      }
+
+      router.push('/admin/users');
+    } catch (err) {
+      setError('Failed to delete user');
+      setDeleting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <AdminLayout title="Loading..." description="Please wait">
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   if (!user) {
-    notFound();
+    return (
+      <AdminLayout title="User Not Found" description="The user could not be found">
+        <div className="text-center py-12">
+          <p className="text-neutral-500 mb-4">This user does not exist or has been deleted.</p>
+          <Button onClick={() => router.push('/admin/users')}>Back to Users</Button>
+        </div>
+      </AdminLayout>
+    );
   }
 
-  const totalBalance = user.creditBalances.reduce((sum: number, b: { availableBalance: unknown }) => sum + Number(b.availableBalance), 0);
-  const totalHeld = user.creditBalances.reduce((sum: number, b: { heldBalance: unknown }) => sum + Number(b.heldBalance), 0);
+  const totalBalance = user.creditBalances.reduce((sum, b) => sum + Number(b.availableBalance), 0);
+  const totalHeld = user.creditBalances.reduce((sum, b) => sum + Number(b.heldBalance), 0);
 
   return (
     <AdminLayout
       title={user.name || user.email}
-      description={`User profile and activity`}
+      description="User profile and activity"
+      actions={
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setShowEditModal(true)}>
+            Edit User
+          </Button>
+          <Button
+            variant="outline"
+            className="border-red-300 text-red-600 hover:bg-red-50"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            Delete
+          </Button>
+        </div>
+      }
     >
+      {message && (
+        <div className="mb-6 p-4 rounded-lg bg-green-50 text-green-800 border border-green-200">
+          {message}
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           {/* User Info */}
@@ -93,7 +228,15 @@ export default async function UserDetailPage({ params }: { params: { id: string 
               <div>
                 <dt className="text-sm text-neutral-500">Email Verified</dt>
                 <dd className="text-neutral-900">
-                  {user.emailVerified ? new Date(user.emailVerified).toLocaleDateString() : 'No'}
+                  {user.emailVerified ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      {new Date(user.emailVerified).toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-600">
+                      No
+                    </span>
+                  )}
                 </dd>
               </div>
               <div>
@@ -191,23 +334,183 @@ export default async function UserDetailPage({ params }: { params: { id: string 
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Quick Actions */}
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
-            <h3 className="font-semibold text-neutral-900 mb-4">Actions</h3>
+            <h3 className="font-semibold text-neutral-900 mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition">
-                Adjust Balance
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Profile
               </button>
-              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition">
-                View in Stripe
-              </button>
-              <button className="w-full text-left px-4 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition">
-                Suspend User
+              {user.stripeCustomerId && (
+                <a
+                  href={`https://dashboard.stripe.com/customers/${user.stripeCustomerId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View in Stripe
+                </a>
+              )}
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="w-full text-left px-4 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete User
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowEditModal(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <h2 className="text-lg font-semibold text-neutral-900 mb-4">Edit User</h2>
+
+              <form onSubmit={handleSave} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    placeholder="User's name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    placeholder="Leave empty to keep current"
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Leave empty to keep current password
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="emailVerified"
+                    checked={editForm.emailVerified}
+                    onChange={(e) => setEditForm({ ...editForm, emailVerified: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                  />
+                  <label htmlFor="emailVerified" className="text-sm text-neutral-700">
+                    Email verified
+                  </label>
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setError('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowDeleteModal(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <h2 className="text-lg font-semibold text-neutral-900 mb-2">Delete User</h2>
+              <p className="text-neutral-600 mb-4">
+                Are you sure you want to delete <strong>{user.email}</strong>? This action cannot be undone.
+              </p>
+
+              {(totalBalance > 0 || totalHeld > 0) && (
+                <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-4">
+                  This user has a balance of {formatCurrency(totalBalance + totalHeld)}. The balance must be cleared before deletion.
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setError('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-red-300 text-red-600 hover:bg-red-50"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete User'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

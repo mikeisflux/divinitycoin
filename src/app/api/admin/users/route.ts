@@ -1,9 +1,11 @@
 // app/api/admin/users/route.ts
-// User list API
+// User list and create API
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/admin/middleware';
+import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
+import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
+import { hashPassword } from '@/lib/auth/user';
 
 export async function GET(request: NextRequest) {
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
@@ -59,5 +61,61 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Failed to fetch users:', error);
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+  }
+}
+
+// Create new user
+export async function POST(request: NextRequest) {
+  const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
+
+  if (!authorized) {
+    return response;
+  }
+
+  try {
+    const { email, name, password } = await request.json();
+
+    // Validate email
+    if (!email || !email.includes('@')) {
+      return NextResponse.json({ error: 'Valid email is required' }, { status: 400 });
+    }
+
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (existingUser) {
+      return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 });
+    }
+
+    // Validate password if provided
+    if (password && password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
+    }
+
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase(),
+        name: name || null,
+        passwordHash: password ? await hashPassword(password) : null,
+      },
+    });
+
+    await logAdminAction(
+      admin!.id,
+      'USER_CREATE',
+      'user',
+      user.id,
+      { email: user.email, name: user.name },
+      getClientIP(request),
+      getUserAgent(request)
+    );
+
+    return NextResponse.json({ user });
+  } catch (error) {
+    console.error('Failed to create user:', error);
+    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
   }
 }
