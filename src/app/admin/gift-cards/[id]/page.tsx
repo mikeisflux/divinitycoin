@@ -1,5 +1,5 @@
 // app/admin/gift-cards/[id]/page.tsx
-// Gift card detail page with working actions
+// Gift card detail page with full CRUD functionality
 
 'use client';
 
@@ -68,6 +68,12 @@ export default function GiftCardDetailPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editAmount, setEditAmount] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [editExpiresAt, setEditExpiresAt] = useState('');
+
   useEffect(() => {
     fetchGiftCard();
   }, [cardId]);
@@ -78,6 +84,10 @@ export default function GiftCardDetailPage() {
       if (response.ok) {
         const data = await response.json();
         setGiftCard(data.giftCard);
+        // Initialize edit values
+        setEditAmount(data.giftCard.amount);
+        setEditStatus(data.giftCard.status);
+        setEditExpiresAt(data.giftCard.expiresAt ? new Date(data.giftCard.expiresAt).toISOString().split('T')[0] : '');
       } else if (response.status === 404) {
         router.push('/admin/gift-cards');
       }
@@ -143,6 +153,88 @@ export default function GiftCardDetailPage() {
     }
   }
 
+  async function handleSaveEdit() {
+    setActionLoading('save');
+    setMessage(null);
+
+    try {
+      const updates: Record<string, unknown> = {};
+
+      if (editAmount !== giftCard?.amount) {
+        updates.amount = editAmount;
+      }
+      if (editStatus !== giftCard?.status) {
+        updates.status = editStatus;
+      }
+      if (editExpiresAt !== (giftCard?.expiresAt ? new Date(giftCard.expiresAt).toISOString().split('T')[0] : '')) {
+        updates.expiresAt = editExpiresAt || null;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        setMessage({ type: 'error', text: 'No changes to save' });
+        setActionLoading(null);
+        return;
+      }
+
+      const response = await fetch(`/api/admin/gift-cards/${cardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to update gift card' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Gift card updated successfully!' });
+      setIsEditing(false);
+      fetchGiftCard();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to update gift card' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm('Are you sure you want to delete this gift card? This cannot be undone.')) {
+      return;
+    }
+
+    setActionLoading('delete');
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/gift-cards/${cardId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to delete gift card' });
+        return;
+      }
+
+      router.push('/admin/gift-cards');
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to delete gift card' });
+      setActionLoading(null);
+    }
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+    if (giftCard) {
+      setEditAmount(giftCard.amount);
+      setEditStatus(giftCard.status);
+      setEditExpiresAt(giftCard.expiresAt ? new Date(giftCard.expiresAt).toISOString().split('T')[0] : '');
+    }
+  }
+
   if (loading) {
     return (
       <AdminLayout title="Loading..." description="Please wait">
@@ -179,43 +271,107 @@ export default function GiftCardDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Card Details */}
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
-            <h2 className="text-lg font-semibold text-neutral-900 mb-4">Gift Card Details</h2>
-            <dl className="grid grid-cols-2 gap-4">
-              <div>
-                <dt className="text-sm text-neutral-500">Card ID</dt>
-                <dd className="text-neutral-900 font-mono text-sm">{giftCard.id}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-neutral-500">Code (Last 4)</dt>
-                <dd className="text-neutral-900 font-mono">****{giftCard.codeLast4}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-neutral-500">Amount</dt>
-                <dd className="text-2xl font-semibold text-neutral-900">
-                  {formatCurrency(Number(giftCard.amount))}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-neutral-500">Status</dt>
-                <dd><StatusBadge status={giftCard.status} /></dd>
-              </div>
-              <div>
-                <dt className="text-sm text-neutral-500">Created</dt>
-                <dd className="text-neutral-900">{new Date(giftCard.createdAt).toLocaleString()}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-neutral-500">Activated</dt>
-                <dd className="text-neutral-900">
-                  {giftCard.activatedAt ? new Date(giftCard.activatedAt).toLocaleString() : '-'}
-                </dd>
-              </div>
-              {giftCard.expiresAt && (
-                <div>
-                  <dt className="text-sm text-neutral-500">Expires</dt>
-                  <dd className="text-neutral-900">{new Date(giftCard.expiresAt).toLocaleString()}</dd>
-                </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-neutral-900">Gift Card Details</h2>
+              {!isEditing && giftCard.status !== 'REDEEMED' && (
+                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                  Edit
+                </Button>
               )}
-            </dl>
+            </div>
+
+            {isEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition bg-white"
+                  >
+                    <option value="PENDING">Pending</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="EXPIRED">Expired</option>
+                    <option value="REVOKED">Revoked</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Expires At</label>
+                  <input
+                    type="date"
+                    value={editExpiresAt}
+                    onChange={(e) => setEditExpiresAt(e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">Leave empty for no expiration</p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveEdit}
+                    disabled={actionLoading === 'save'}
+                  >
+                    {actionLoading === 'save' ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={cancelEdit}
+                    disabled={actionLoading === 'save'}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <dl className="grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-sm text-neutral-500">Card ID</dt>
+                  <dd className="text-neutral-900 font-mono text-sm">{giftCard.id}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-neutral-500">Code (Last 4)</dt>
+                  <dd className="text-neutral-900 font-mono">****{giftCard.codeLast4}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-neutral-500">Amount</dt>
+                  <dd className="text-2xl font-semibold text-neutral-900">
+                    {formatCurrency(Number(giftCard.amount))}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-neutral-500">Status</dt>
+                  <dd><StatusBadge status={giftCard.status} /></dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-neutral-500">Created</dt>
+                  <dd className="text-neutral-900">{new Date(giftCard.createdAt).toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-neutral-500">Activated</dt>
+                  <dd className="text-neutral-900">
+                    {giftCard.activatedAt ? new Date(giftCard.activatedAt).toLocaleString() : '-'}
+                  </dd>
+                </div>
+                {giftCard.expiresAt && (
+                  <div>
+                    <dt className="text-sm text-neutral-500">Expires</dt>
+                    <dd className="text-neutral-900">{new Date(giftCard.expiresAt).toLocaleString()}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
           </div>
 
           {/* Purchase Info */}
@@ -370,6 +526,44 @@ export default function GiftCardDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Danger Zone */}
+          {giftCard.status !== 'REDEEMED' && (
+            <div className="bg-white rounded-xl border border-red-200 p-6">
+              <h3 className="font-semibold text-red-800 mb-2">Danger Zone</h3>
+              <p className="text-sm text-neutral-600 mb-4">
+                Once you delete a gift card, there is no going back. Please be certain.
+              </p>
+              <button
+                onClick={handleDelete}
+                disabled={actionLoading === 'delete'}
+                className="w-full px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {actionLoading === 'delete' ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Gift Card
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Back Button */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => router.push('/admin/gift-cards')}
+          >
+            Back to Gift Cards
+          </Button>
         </div>
       </div>
     </AdminLayout>

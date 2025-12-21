@@ -17,11 +17,21 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const status = searchParams.get('status');
+    const search = searchParams.get('search');
 
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (status) where.status = status;
+
+    // Search by code last 4, purchaser email, or redeemer email
+    if (search) {
+      where.OR = [
+        { codeLast4: { contains: search, mode: 'insensitive' } },
+        { purchasedByEmail: { contains: search, mode: 'insensitive' } },
+        { redeemedByEmail: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [giftCards, total] = await Promise.all([
       prisma.giftCard.findMany({
