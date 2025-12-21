@@ -97,10 +97,6 @@ export default function ApiKeysSettingsPage() {
     { key: 'STRIPE_SECRET_KEY', label: 'Stripe Secret Key', description: 'Your Stripe API secret key (starts with sk_)', category: 'stripe', hasValue: false, maskedValue: '' },
     { key: 'STRIPE_WEBHOOK_SECRET', label: 'Stripe Webhook Secret', description: 'Webhook signing secret from Stripe dashboard', category: 'stripe', hasValue: false, maskedValue: '' },
     { key: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', label: 'Stripe Publishable Key', description: 'Your Stripe publishable key (starts with pk_)', category: 'stripe', hasValue: false, maskedValue: '' },
-    { key: 'SENDGRID_API_KEY', label: 'SendGrid API Key', description: 'Your SendGrid API key for sending emails', category: 'sendgrid', hasValue: false, maskedValue: '' },
-    { key: 'SENDGRID_FROM_EMAIL', label: 'From Email', description: 'Verified sender email address', category: 'sendgrid', hasValue: false, maskedValue: '' },
-    { key: 'SENDGRID_FROM_NAME', label: 'From Name', description: 'Display name for sent emails', category: 'sendgrid', hasValue: false, maskedValue: '' },
-    { key: 'SENDGRID_WEBHOOK_SECRET', label: 'SendGrid Webhook Secret', description: 'Secret for verifying SendGrid webhooks', category: 'sendgrid', hasValue: false, maskedValue: '' },
     { key: 'INTERNAL_API_KEY', label: 'Internal API Key', description: 'Secret key for partner API authentication', category: 'internal', hasValue: false, maskedValue: '' },
   ];
 
@@ -115,7 +111,6 @@ export default function ApiKeysSettingsPage() {
 
   const categories = [
     { id: 'stripe', label: 'Stripe', description: 'Payment processing configuration' },
-    { id: 'sendgrid', label: 'SendGrid', description: 'Email service configuration' },
     { id: 'internal', label: 'Internal API', description: 'Partner integration configuration' },
   ];
 
