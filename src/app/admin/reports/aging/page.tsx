@@ -149,7 +149,7 @@ export default async function AgingReportPage() {
             {data.summary.oldestCard ? getDaysOld(data.summary.oldestCard.createdAt) : 0} days
           </p>
           <p className="text-sm text-neutral-500 mt-1">
-            {data.summary.oldestCard ? formatCurrency(data.summary.oldestCard.amount) : '$0'}
+            {data.summary.oldestCard ? formatCurrency(Number(data.summary.oldestCard.amount)) : '$0'}
           </p>
         </div>
 
@@ -213,7 +213,7 @@ export default async function AgingReportPage() {
                   <p className="text-xs text-neutral-400">{getDaysOld(card.createdAt)} days old</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-neutral-900">{formatCurrency(card.amount)}</p>
+                  <p className="font-semibold text-neutral-900">{formatCurrency(Number(card.amount))}</p>
                   {card.expiresAt && (
                     <p className="text-xs text-neutral-500">Expires {formatDate(card.expiresAt)}</p>
                   )}

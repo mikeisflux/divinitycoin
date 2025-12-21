@@ -218,7 +218,7 @@ export default async function RefundsReportPage() {
                     <td className="px-6 py-4 text-sm text-neutral-900">{refund.email}</td>
                     <td className="px-6 py-4 text-sm font-mono text-neutral-600">****{refund.cardLast4}</td>
                     <td className="px-6 py-4 text-sm text-right font-medium text-red-600">
-                      {formatCurrency(refund.amount)}
+                      {formatCurrency(Number(refund.amount))}
                     </td>
                   </tr>
                 )) : (

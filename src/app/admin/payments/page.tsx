@@ -177,7 +177,7 @@ export default async function PaymentsPage({
                     {txn.giftCard?.codeLast4 ? `****${txn.giftCard.codeLast4}` : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-neutral-900">
-                    {formatCurrency(txn.amount)}
+                    {formatCurrency(Number(txn.amount))}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={txn.status} />

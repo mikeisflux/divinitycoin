@@ -18,7 +18,7 @@ async function getApiLogs(page: number = 1) {
       skip,
       take: pageSize,
       include: {
-        adminUser: {
+        admin: {
           select: { email: true, name: true },
         },
       },
@@ -112,11 +112,11 @@ export default async function ApiLogsPage({
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {log.adminUser ? (
+                    {log.admin ? (
                       <div>
-                        <div className="text-neutral-900">{log.adminUser.name || log.adminUser.email}</div>
-                        {log.adminUser.name && (
-                          <div className="text-neutral-500 text-xs">{log.adminUser.email}</div>
+                        <div className="text-neutral-900">{log.admin.name || log.admin.email}</div>
+                        {log.admin.name && (
+                          <div className="text-neutral-500 text-xs">{log.admin.email}</div>
                         )}
                       </div>
                     ) : (

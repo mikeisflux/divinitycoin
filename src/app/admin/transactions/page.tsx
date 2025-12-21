@@ -129,7 +129,7 @@ export default async function TransactionsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`text-sm font-medium ${tx.type === 'REFUND' ? 'text-red-600' : 'text-green-600'}`}>
-                      {tx.type === 'REFUND' ? '-' : '+'}{formatCurrency(tx.amount)}
+                      {tx.type === 'REFUND' ? '-' : '+'}{formatCurrency(Number(tx.amount))}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

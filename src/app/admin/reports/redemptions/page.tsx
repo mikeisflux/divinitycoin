@@ -181,7 +181,7 @@ export default async function RedemptionsReportPage() {
           <div className="divide-y divide-neutral-200">
             {data.byAmount.length > 0 ? data.byAmount.map((tier) => (
               <div key={tier.amount} className="p-4 flex items-center justify-between">
-                <p className="font-medium text-neutral-900">{formatCurrency(tier.amount)} cards</p>
+                <p className="font-medium text-neutral-900">{formatCurrency(Number(tier.amount))} cards</p>
                 <p className="font-semibold text-neutral-900">{tier.count} redeemed</p>
               </div>
             )) : (
@@ -210,7 +210,7 @@ export default async function RedemptionsReportPage() {
               {data.recent.map((redemption) => (
                 <tr key={redemption.id} className="hover:bg-neutral-50">
                   <td className="px-6 py-4 text-sm font-mono text-neutral-900">****{redemption.codeLast4}</td>
-                  <td className="px-6 py-4 text-sm text-neutral-900">{formatCurrency(redemption.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-neutral-900">{formatCurrency(Number(redemption.amount))}</td>
                   <td className="px-6 py-4 text-sm text-neutral-600">{redemption.partnerName}</td>
                   <td className="px-6 py-4 text-sm text-neutral-600">{formatDate(redemption.redeemedAt)}</td>
                 </tr>

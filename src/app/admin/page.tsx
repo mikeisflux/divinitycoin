@@ -197,7 +197,7 @@ export default async function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className={`text-sm font-medium ${tx.type === 'REFUND' ? 'text-red-600' : 'text-green-600'}`}>
-                      {tx.type === 'REFUND' ? '-' : '+'}{formatCurrency(tx.amount)}
+                      {tx.type === 'REFUND' ? '-' : '+'}{formatCurrency(Number(tx.amount))}
                     </p>
                     <p className={`text-xs ${tx.status === 'COMPLETED' ? 'text-green-600' : tx.status === 'FAILED' ? 'text-red-600' : 'text-neutral-500'}`}>
                       {tx.status}
@@ -228,7 +228,7 @@ export default async function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-neutral-900">
-                      {formatCurrency(card.amount)}
+                      {formatCurrency(Number(card.amount))}
                     </p>
                     <p className="text-xs text-neutral-500">
                       {card.redeemedByEmail || 'Unknown'}
