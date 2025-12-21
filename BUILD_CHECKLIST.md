@@ -321,6 +321,41 @@
 - [ ] Verify touch-friendly inputs
 - [ ] Test mobile navigation menu
 
+### 10.6 Global Styles (`app/globals.css`)
+- [ ] Tailwind base/components/utilities imports
+- [ ] CSS custom properties for primary colors (50-900 scale)
+- [ ] Smooth scroll behavior
+- [ ] Base body styling with antialiased text
+- [ ] Container component class
+- [ ] Text-balance utility
+
+### 10.7 Tailwind Configuration (`tailwind.config.ts`)
+- [ ] Content paths configuration (pages, components, app)
+- [ ] Extended color palette (primary 50-900)
+- [ ] Custom font families (sans: Inter, mono: JetBrains Mono)
+- [ ] Plugins setup
+
+### 10.8 FAQ Content Data
+- [ ] Purchasing category questions (4 items)
+  - [ ] Payment methods accepted
+  - [ ] Minimum/maximum purchase amounts
+  - [ ] Account requirement
+  - [ ] Code delivery time
+- [ ] Using Credits category questions (4 items)
+  - [ ] Where to use credits
+  - [ ] Credits expiration
+  - [ ] Cross-platform usage
+  - [ ] Failed project credit return
+- [ ] Refunds & Support category questions (4 items)
+  - [ ] Refund eligibility
+  - [ ] Missing code resolution
+  - [ ] Non-working code troubleshooting
+  - [ ] Support contact methods
+- [ ] Security category questions (3 items)
+  - [ ] Payment security (Stripe PCI compliance)
+  - [ ] Code sharing guidelines
+  - [ ] Stolen code policy
+
 ---
 
 ## 11. Admin Panel
@@ -567,6 +602,43 @@
 
 ---
 
+## 15. Appendix A: API Error Codes
+
+### 15.1 Error Code Implementation
+- [ ] `INVALID_CODE_FORMAT` - Code is not 16 hex characters
+- [ ] `CODE_NOT_FOUND` - No gift card matches this code
+- [ ] `ALREADY_REDEEMED` - Code has already been used
+- [ ] `CODE_EXPIRED` - Code is past expiration date
+- [ ] `CODE_REVOKED` - Code was manually revoked
+- [ ] `RATE_LIMITED` - Too many redemption attempts
+- [ ] `INSUFFICIENT_BALANCE` - Not enough credits for operation
+- [ ] `HOLD_NOT_FOUND` - No hold exists for this pledge
+- [ ] `HOLD_NOT_ACTIVE` - Hold is not in active state
+- [ ] `INVALID_AMOUNT` - Amount outside allowed range
+
+---
+
+## 16. Appendix B: Database Indexes for Performance
+
+### 16.1 Additional Performance Indexes (SQL)
+- [ ] `idx_giftcard_status_created` - GiftCard(status, createdAt) WHERE status = 'ACTIVE'
+- [ ] `idx_credithold_expires` - CreditHold(expiresAt) WHERE status = 'ACTIVE'
+- [ ] `idx_redemption_ip_time` - RedemptionAttempt(ipAddress, createdAt DESC)
+- [ ] `idx_ledger_balance_time` - CreditLedger(creditBalanceId, createdAt DESC)
+
+---
+
+## 17. Appendix C: Glossary Implementation
+
+### 17.1 Terms to Define in Documentation
+- [ ] **Credit** - Virtual currency purchased on CreatorCredits, redeemable on IndieCrowdfund
+- [ ] **Hold** - Credits reserved for an active pledge, not available for other use
+- [ ] **Capture** - Converting held credits to a completed payment when project funds
+- [ ] **Release** - Returning held credits to available balance when project fails
+- [ ] **Platform User ID** - User's unique ID on IndieCrowdfund, used to link credit balances
+
+---
+
 ## Summary Statistics
 
 | Category | Items |
@@ -580,12 +652,15 @@
 | Stripe Integration | 9 |
 | Email System | 17 |
 | Server Configuration | 24 |
-| Frontend Website | 38 |
+| Frontend Website | 58 |
 | Admin Panel | 55 |
 | Legal Pages | 43 |
 | Validation Flow | 7 |
 | Deployment | 44 |
-| **TOTAL** | **~314 items** |
+| Appendix A (Error Codes) | 10 |
+| Appendix B (Indexes) | 4 |
+| Appendix C (Glossary) | 5 |
+| **TOTAL** | **~343 items** |
 
 ---
 
@@ -596,3 +671,4 @@
 3. Internal API binds ONLY to VPN interface (10.10.0.1:3001)
 4. Consider having legal pages reviewed by an attorney before launch
 5. Test thoroughly with Stripe test mode before going live
+6. Document version: 1.0 (as per spec)
