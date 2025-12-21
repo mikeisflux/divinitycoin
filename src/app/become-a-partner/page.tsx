@@ -1,5 +1,5 @@
 // app/become-a-partner/page.tsx
-// Partner information and contact page
+// Partner application form
 
 'use client';
 
@@ -7,390 +7,459 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 
+interface FormData {
+  // Contact Info
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+
+  // Business Info
+  businessName: string;
+  businessType: string;
+  taxId: string;
+
+  // Address
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+
+  // Platform Info
+  websiteUrl: string;
+  platformDescription: string;
+  expectedMonthlyVolume: string;
+
+  // Agreement
+  agreeToTerms: boolean;
+}
+
 export default function BecomeAPartnerPage() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    company: '',
-    website: '',
-    message: '',
+  const [formData, setFormData] = useState<FormData>({
+    contactName: '',
+    contactEmail: '',
+    contactPhone: '',
+    businessName: '',
+    businessType: 'llc',
+    taxId: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'US',
+    websiteUrl: '',
+    platformDescription: '',
+    expectedMonthlyVolume: '',
+    agreeToTerms: false,
   });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
-    // Create mailto link with form data
-    const subject = encodeURIComponent(`Partnership Inquiry from ${formData.company || formData.name}`);
-    const body = encodeURIComponent(
-      `Name: ${formData.name}\n` +
-      `Email: ${formData.email}\n` +
-      `Company: ${formData.company}\n` +
-      `Website: ${formData.website}\n\n` +
-      `Message:\n${formData.message}`
-    );
+    try {
+      const response = await fetch('/api/partners/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-    window.location.href = `mailto:support@divinitycoin.com?subject=${subject}&body=${body}`;
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to submit application');
+      }
 
-    setLoading(false);
-    setSubmitted(true);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
   };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-neutral-50 py-24">
+        <div className="max-w-2xl mx-auto px-4">
+          <Card>
+            <CardContent className="py-16 text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8">
+                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-neutral-900 mb-4">
+                Application Submitted!
+              </h1>
+              <p className="text-lg text-neutral-600 mb-8">
+                Thank you for your interest in becoming a DivinityCoin partner.
+                Our team will review your application and contact you within 2-3 business days.
+              </p>
+              <p className="text-neutral-500">
+                Check your email at <strong>{formData.contactEmail}</strong> for a confirmation.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-50 via-white to-white py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl font-bold text-neutral-900">
-              Become a <span className="text-primary-600">DivinityCoin</span> Partner
-            </h1>
-            <p className="mt-6 text-xl text-neutral-600 leading-relaxed">
-              Integrate DivinityCoin into your platform and offer your users a seamless way
-              to fund creators and projects. Join our growing network of partner platforms.
-            </p>
-          </div>
+      <section className="bg-gradient-to-br from-primary-50 via-white to-white py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl sm:text-5xl font-bold text-neutral-900">
+            Become a <span className="text-primary-600">Partner</span>
+          </h1>
+          <p className="mt-6 text-xl text-neutral-600">
+            Join our network of platforms and offer DivinityCoin credits to your users.
+          </p>
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-neutral-900 text-center mb-16">
-            Why Partner with DivinityCoin?
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center">
-              <CardContent className="pt-8">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-3">
-                  New Revenue Stream
-                </h3>
-                <p className="text-neutral-600">
-                  Accept DivinityCoin credits as payment on your platform, expanding how users can fund projects and creators.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center">
-              <CardContent className="pt-8">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-3">
-                  Easy Integration
-                </h3>
-                <p className="text-neutral-600">
-                  Our simple API makes integration straightforward. We provide comprehensive documentation and support.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center">
-              <CardContent className="pt-8">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-3">
-                  Secure & Reliable
-                </h3>
-                <p className="text-neutral-600">
-                  Enterprise-grade security with encrypted communications, rate limiting, and comprehensive audit logging.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-24 bg-neutral-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-neutral-900 text-center mb-16">
-            How Integration Works
-          </h2>
-
-          <div className="max-w-3xl mx-auto space-y-8">
-            <div className="flex gap-6">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold">
-                1
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Apply for Partnership</h3>
-                <p className="text-neutral-600">
-                  Fill out the contact form below with your platform details. Our team will review your application
-                  and reach out within 2-3 business days.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-6">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold">
-                2
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Technical Onboarding</h3>
-                <p className="text-neutral-600">
-                  Once approved, we'll provide you with API credentials, documentation, and a dedicated VPN connection
-                  for secure communication between our systems.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-6">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold">
-                3
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Integrate Our API</h3>
-                <p className="text-neutral-600">
-                  Use our REST API to validate and redeem credit codes, place holds on credits for pledges,
-                  and manage user balances on your platform.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-6">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold">
-                4
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Go Live</h3>
-                <p className="text-neutral-600">
-                  After testing in our sandbox environment, you're ready to go live. We'll monitor the integration
-                  and provide ongoing support.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* API Features Section */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-neutral-900 mb-8">
-                Powerful API Features
-              </h2>
-
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <svg className="w-6 h-6 text-primary-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <div>
-                    <h4 className="font-semibold text-neutral-900">Code Validation & Redemption</h4>
-                    <p className="text-neutral-600 mt-1">Validate credit codes and redeem them to add funds to user accounts.</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <svg className="w-6 h-6 text-primary-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <div>
-                    <h4 className="font-semibold text-neutral-900">Credit Holds for Pledges</h4>
-                    <p className="text-neutral-600 mt-1">Place holds on credits for crowdfunding pledges, then capture or release based on project outcome.</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <svg className="w-6 h-6 text-primary-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <div>
-                    <h4 className="font-semibold text-neutral-900">Balance Management</h4>
-                    <p className="text-neutral-600 mt-1">Query user balances including available credits and active holds.</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <svg className="w-6 h-6 text-primary-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <div>
-                    <h4 className="font-semibold text-neutral-900">Webhooks</h4>
-                    <p className="text-neutral-600 mt-1">Receive real-time notifications for important events like refunds and code revocations.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-neutral-900 rounded-2xl p-8 text-sm font-mono text-neutral-300 overflow-x-auto">
-              <div className="text-neutral-500 mb-4"># Redeem a credit code</div>
-              <div>
-                <span className="text-green-400">POST</span> /internal/validate
-              </div>
-              <div className="mt-4 text-neutral-400">
-{`{
-  "code": "XXXX-XXXX-XXXX-XXXX",
-  "platformUserId": "user_123",
-  "email": "user@example.com"
-}`}
-              </div>
-              <div className="mt-6 text-neutral-500"># Response</div>
-              <div className="mt-2 text-neutral-400">
-{`{
-  "success": true,
-  "amount": 50.00,
-  "newBalance": 150.00
-}`}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Form Section */}
-      <section className="py-24 bg-neutral-50" id="contact">
+      {/* Application Form */}
+      <section className="py-16 bg-neutral-50">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-neutral-900">
-              Get in Touch
-            </h2>
-            <p className="mt-4 text-lg text-neutral-600">
-              Interested in becoming a partner? Fill out the form below and we'll be in touch soon.
-            </p>
-          </div>
+          <Card>
+            <CardContent className="p-8">
+              <form onSubmit={handleSubmit} className="space-y-8">
 
-          {submitted ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">
-                  Thank You!
-                </h3>
-                <p className="text-neutral-600">
-                  Your email client should have opened. If not, please email us directly at{' '}
-                  <a href="mailto:support@divinitycoin.com" className="text-primary-600 hover:underline">
-                    support@divinitycoin.com
-                  </a>
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Contact Information */}
+                <div>
+                  <h2 className="text-xl font-semibold text-neutral-900 mb-6 pb-2 border-b">
+                    Contact Information
+                  </h2>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-neutral-700 mb-2">
-                        Your Name *
+                      <label htmlFor="contactName" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Full Name *
                       </label>
                       <input
                         type="text"
-                        id="name"
-                        name="name"
+                        id="contactName"
+                        name="contactName"
                         required
-                        value={formData.name}
+                        value={formData.contactName}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                         placeholder="John Smith"
                       />
                     </div>
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-2">
+                      <label htmlFor="contactEmail" className="block text-sm font-medium text-neutral-700 mb-2">
                         Email Address *
                       </label>
                       <input
                         type="email"
-                        id="email"
-                        name="email"
+                        id="contactEmail"
+                        name="contactEmail"
                         required
-                        value={formData.email}
+                        value={formData.contactEmail}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                         placeholder="john@company.com"
                       />
                     </div>
+                    <div className="md:col-span-2">
+                      <label htmlFor="contactPhone" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        id="contactPhone"
+                        name="contactPhone"
+                        value={formData.contactPhone}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="+1 (555) 123-4567"
+                      />
+                    </div>
                   </div>
+                </div>
 
+                {/* Business Information */}
+                <div>
+                  <h2 className="text-xl font-semibold text-neutral-900 mb-6 pb-2 border-b">
+                    Business Information
+                  </h2>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="company" className="block text-sm font-medium text-neutral-700 mb-2">
-                        Company/Platform Name
+                      <label htmlFor="businessName" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Business Name *
                       </label>
                       <input
                         type="text"
-                        id="company"
-                        name="company"
-                        value={formData.company}
+                        id="businessName"
+                        name="businessName"
+                        required
+                        value={formData.businessName}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
-                        placeholder="Acme Inc"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="Acme Platforms Inc."
                       />
                     </div>
                     <div>
-                      <label htmlFor="website" className="block text-sm font-medium text-neutral-700 mb-2">
-                        Website URL
+                      <label htmlFor="businessType" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Business Type *
+                      </label>
+                      <select
+                        id="businessType"
+                        name="businessType"
+                        required
+                        value={formData.businessType}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                      >
+                        <option value="llc">LLC</option>
+                        <option value="corporation">Corporation</option>
+                        <option value="partnership">Partnership</option>
+                        <option value="sole_proprietor">Sole Proprietor</option>
+                        <option value="nonprofit">Non-Profit</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label htmlFor="taxId" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Tax ID / EIN *
+                      </label>
+                      <input
+                        type="text"
+                        id="taxId"
+                        name="taxId"
+                        required
+                        value={formData.taxId}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="XX-XXXXXXX"
+                      />
+                      <p className="mt-1 text-sm text-neutral-500">
+                        Your Employer Identification Number (EIN) or Tax ID
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Address */}
+                <div>
+                  <h2 className="text-xl font-semibold text-neutral-900 mb-6 pb-2 border-b">
+                    Business Address
+                  </h2>
+                  <div className="space-y-6">
+                    <div>
+                      <label htmlFor="addressLine1" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Address Line 1 *
+                      </label>
+                      <input
+                        type="text"
+                        id="addressLine1"
+                        name="addressLine1"
+                        required
+                        value={formData.addressLine1}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="123 Main Street"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="addressLine2" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Address Line 2
+                      </label>
+                      <input
+                        type="text"
+                        id="addressLine2"
+                        name="addressLine2"
+                        value={formData.addressLine2}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="Suite 100"
+                      />
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label htmlFor="city" className="block text-sm font-medium text-neutral-700 mb-2">
+                          City *
+                        </label>
+                        <input
+                          type="text"
+                          id="city"
+                          name="city"
+                          required
+                          value={formData.city}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                          placeholder="New York"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="state" className="block text-sm font-medium text-neutral-700 mb-2">
+                          State / Province *
+                        </label>
+                        <input
+                          type="text"
+                          id="state"
+                          name="state"
+                          required
+                          value={formData.state}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                          placeholder="NY"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label htmlFor="zipCode" className="block text-sm font-medium text-neutral-700 mb-2">
+                          ZIP / Postal Code *
+                        </label>
+                        <input
+                          type="text"
+                          id="zipCode"
+                          name="zipCode"
+                          required
+                          value={formData.zipCode}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                          placeholder="10001"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="country" className="block text-sm font-medium text-neutral-700 mb-2">
+                          Country *
+                        </label>
+                        <select
+                          id="country"
+                          name="country"
+                          required
+                          value={formData.country}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                        >
+                          <option value="US">United States</option>
+                          <option value="CA">Canada</option>
+                          <option value="GB">United Kingdom</option>
+                          <option value="AU">Australia</option>
+                          <option value="DE">Germany</option>
+                          <option value="FR">France</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Platform Information */}
+                <div>
+                  <h2 className="text-xl font-semibold text-neutral-900 mb-6 pb-2 border-b">
+                    Platform Information
+                  </h2>
+                  <div className="space-y-6">
+                    <div>
+                      <label htmlFor="websiteUrl" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Website URL *
                       </label>
                       <input
                         type="url"
-                        id="website"
-                        name="website"
-                        value={formData.website}
+                        id="websiteUrl"
+                        name="websiteUrl"
+                        required
+                        value={formData.websiteUrl}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
-                        placeholder="https://example.com"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="https://yourplatform.com"
                       />
                     </div>
+                    <div>
+                      <label htmlFor="platformDescription" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Platform Description *
+                      </label>
+                      <textarea
+                        id="platformDescription"
+                        name="platformDescription"
+                        required
+                        rows={4}
+                        value={formData.platformDescription}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
+                        placeholder="Describe your platform, what you do, and how you plan to use DivinityCoin..."
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="expectedMonthlyVolume" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Expected Monthly Transaction Volume
+                      </label>
+                      <select
+                        id="expectedMonthlyVolume"
+                        name="expectedMonthlyVolume"
+                        value={formData.expectedMonthlyVolume}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                      >
+                        <option value="">Select an estimate</option>
+                        <option value="under_1k">Under $1,000</option>
+                        <option value="1k_10k">$1,000 - $10,000</option>
+                        <option value="10k_50k">$10,000 - $50,000</option>
+                        <option value="50k_100k">$50,000 - $100,000</option>
+                        <option value="over_100k">Over $100,000</option>
+                      </select>
+                    </div>
                   </div>
+                </div>
 
-                  <div>
-                    <label htmlFor="message" className="block text-sm font-medium text-neutral-700 mb-2">
-                      Tell Us About Your Platform *
-                    </label>
-                    <textarea
-                      id="message"
-                      name="message"
-                      required
-                      rows={5}
-                      value={formData.message}
+                {/* Terms Agreement */}
+                <div className="bg-neutral-50 p-6 rounded-lg">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="agreeToTerms"
+                      checked={formData.agreeToTerms}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition resize-none"
-                      placeholder="Describe your platform, how you'd use DivinityCoin, and any questions you have..."
+                      required
+                      className="mt-1 w-5 h-5 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
                     />
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                    <p className="text-sm text-neutral-500">
-                      Or email us directly at{' '}
-                      <a href="mailto:support@divinitycoin.com" className="text-primary-600 hover:underline">
-                        support@divinitycoin.com
+                    <span className="text-sm text-neutral-700">
+                      I agree to the DivinityCoin{' '}
+                      <a href="/terms" className="text-primary-600 hover:underline" target="_blank">
+                        Terms of Service
+                      </a>{' '}
+                      and{' '}
+                      <a href="/privacy" className="text-primary-600 hover:underline" target="_blank">
+                        Privacy Policy
                       </a>
-                    </p>
-                    <Button type="submit" size="lg" disabled={loading}>
-                      {loading ? 'Sending...' : 'Send Inquiry'}
-                    </Button>
+                      . I confirm that all information provided is accurate and I am authorized to act on behalf of this business.
+                    </span>
+                  </label>
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 text-red-700 p-4 rounded-lg">
+                    {error}
                   </div>
-                </form>
-              </CardContent>
-            </Card>
-          )}
+                )}
+
+                <div className="flex justify-end">
+                  <Button type="submit" size="lg" disabled={loading || !formData.agreeToTerms}>
+                    {loading ? 'Submitting...' : 'Submit Application'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </section>
     </>

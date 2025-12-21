@@ -47,9 +47,14 @@ export function Header() {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/balance">
+            <Link href="/partner/login">
               <Button variant="ghost" size="sm">
-                Check Balance
+                Partner Login
+              </Button>
+            </Link>
+            <Link href="/account">
+              <Button variant="ghost" size="sm">
+                My Account
               </Button>
             </Link>
             <Link href="/buy">
@@ -114,9 +119,14 @@ export function Header() {
                 FAQ
               </Link>
               <hr className="border-neutral-200" />
-              <Link href="/balance" onClick={() => setMobileMenuOpen(false)}>
+              <Link href="/partner/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="outline" className="w-full">
-                  Check Balance
+                  Partner Login
+                </Button>
+              </Link>
+              <Link href="/account" onClick={() => setMobileMenuOpen(false)}>
+                <Button variant="outline" className="w-full">
+                  My Account
                 </Button>
               </Link>
               <Link href="/buy" onClick={() => setMobileMenuOpen(false)}>
