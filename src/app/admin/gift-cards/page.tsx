@@ -114,7 +114,7 @@ export default async function GiftCardsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-medium text-neutral-900">
-                      {formatCurrency(card.amount)}
+                      {formatCurrency(Number(card.amount))}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
