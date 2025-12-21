@@ -164,7 +164,7 @@ async function handleRefund(charge: Stripe.Charge) {
   // Create refund transaction
   await prisma.transaction.create({
     data: {
-      guestEmail: giftCard.purchaseEmail,
+      guestEmail: giftCard.purchasedByEmail,
       type: 'REFUND',
       amount: giftCard.amount,
       currency: giftCard.currency,
