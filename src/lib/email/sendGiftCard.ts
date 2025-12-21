@@ -1,13 +1,7 @@
 // lib/email/sendGiftCard.ts
 
-import sgMail from '@sendgrid/mail';
 import { formatCodeForDisplay } from '@/lib/giftcard/generate';
-import { prisma } from '@/lib/db';
-
-// Initialize SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+import { sendEmail } from './smtp';
 
 interface SendGiftCardParams {
   to: string;
@@ -26,8 +20,6 @@ export async function sendGiftCardEmail({
   toName,
 }: SendGiftCardParams): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const formattedCode = formatCodeForDisplay(code);
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@creatorcredits.com';
-  const fromName = process.env.SENDGRID_FROM_NAME || 'CreatorCredits';
 
   const subject = `Your $${amount.toFixed(2)} CreatorCredits Code`;
 
@@ -48,11 +40,11 @@ export async function sendGiftCardEmail({
           <tr>
             <td align="center">
               <div style="display: inline-flex; align-items: center; gap: 8px;">
-                <div style="width: 40px; height: 40px; background-color: #0070cc; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 40px; height: 40px; background-color: #6366f1; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
                   <span style="color: white; font-weight: bold; font-size: 20px;">C</span>
                 </div>
                 <span style="font-size: 24px; font-weight: 600; color: #111827;">
-                  Creator<span style="color: #0070cc;">Credits</span>
+                  Creator<span style="color: #6366f1;">Credits</span>
                 </span>
               </div>
             </td>
@@ -73,7 +65,7 @@ export async function sendGiftCardEmail({
 
               <!-- Amount -->
               <div style="text-align: center; margin-bottom: 30px;">
-                <span style="font-size: 48px; font-weight: 700; color: #0070cc;">
+                <span style="font-size: 48px; font-weight: 700; color: #6366f1;">
                   $${amount.toFixed(2)}
                 </span>
               </div>
@@ -150,66 +142,11 @@ Need help? Contact us at support@creatorcredits.com
 © ${new Date().getFullYear()} CreatorCredits. All rights reserved.
   `;
 
-  try {
-    // Log email attempt
-    const emailLog = await prisma.emailLog.create({
-      data: {
-        toEmail: to,
-        toName,
-        fromEmail,
-        fromName,
-        subject,
-        htmlContent,
-        textContent,
-        status: 'SENDING',
-      },
-    });
-
-    // Send via SendGrid
-    const [response] = await sgMail.send({
-      to,
-      from: {
-        email: fromEmail,
-        name: fromName,
-      },
-      subject,
-      html: htmlContent,
-      text: textContent,
-    });
-
-    // Update log with SendGrid message ID
-    const messageId = response.headers['x-message-id'];
-    await prisma.emailLog.update({
-      where: { id: emailLog.id },
-      data: {
-        status: 'SENT',
-        sendgridMessageId: messageId,
-        sentAt: new Date(),
-      },
-    });
-
-    return { success: true, messageId };
-  } catch (error) {
-    console.error('SendGrid error:', error);
-
-    // Log failure
-    await prisma.emailLog.create({
-      data: {
-        toEmail: to,
-        toName,
-        fromEmail,
-        fromName,
-        subject,
-        htmlContent,
-        textContent,
-        status: 'FAILED',
-        statusMessage: error instanceof Error ? error.message : 'Unknown error',
-      },
-    });
-
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to send email',
-    };
-  }
+  return sendEmail({
+    to,
+    toName,
+    subject,
+    html: htmlContent,
+    text: textContent,
+  });
 }

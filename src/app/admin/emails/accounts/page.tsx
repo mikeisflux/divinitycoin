@@ -1,10 +1,32 @@
 // app/admin/emails/accounts/page.tsx
-// Email account/sender configuration
+// SMTP email account/sender configuration
 
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { prisma } from '@/lib/db';
+
+async function getSmtpStatus() {
+  const configs = await prisma.systemConfig.findMany({
+    where: {
+      key: {
+        in: ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL', 'SMTP_FROM_NAME'],
+      },
+    },
+  });
+
+  const configMap = new Map(configs.map(c => [c.key, c.value]));
+
+  return {
+    host: configMap.get('SMTP_HOST') || process.env.SMTP_HOST || 'smtp.office365.com',
+    port: configMap.get('SMTP_PORT') || process.env.SMTP_PORT || '587',
+    user: configMap.get('SMTP_USER') || process.env.SMTP_USER || '',
+    hasPassword: !!(configMap.get('SMTP_PASS') || process.env.SMTP_PASS),
+    fromEmail: configMap.get('SMTP_FROM_EMAIL') || process.env.SMTP_FROM_EMAIL || '',
+    fromName: configMap.get('SMTP_FROM_NAME') || process.env.SMTP_FROM_NAME || 'CreatorCredits',
+  };
+}
 
 export default async function EmailAccountsPage() {
   const admin = await getAdminFromRequest();
@@ -13,17 +35,13 @@ export default async function EmailAccountsPage() {
     redirect('/admin/login');
   }
 
-  // Get SendGrid configuration from environment
-  const sendgridApiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com';
-  const fromName = process.env.SENDGRID_FROM_NAME || 'CreatorCredits';
-
-  const isConfigured = !!sendgridApiKey;
+  const smtp = await getSmtpStatus();
+  const isConfigured = !!(smtp.user && smtp.hasPassword);
 
   return (
     <AdminLayout
       title="Email Accounts"
-      description="Configure email sending accounts"
+      description="SMTP email configuration status"
     >
       <div className="mb-6">
         <Link href="/admin/emails" className="text-primary-600 hover:text-primary-700 text-sm">
@@ -31,7 +49,7 @@ export default async function EmailAccountsPage() {
         </Link>
       </div>
 
-      {/* SendGrid Status */}
+      {/* SMTP Status */}
       <div className={`rounded-xl border p-6 mb-8 ${
         isConfigured ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
       }`}>
@@ -51,12 +69,12 @@ export default async function EmailAccountsPage() {
           </div>
           <div>
             <h3 className={`font-semibold ${isConfigured ? 'text-green-900' : 'text-red-900'}`}>
-              SendGrid {isConfigured ? 'Connected' : 'Not Configured'}
+              SMTP {isConfigured ? 'Configured' : 'Not Configured'}
             </h3>
             <p className={`text-sm mt-1 ${isConfigured ? 'text-green-700' : 'text-red-700'}`}>
               {isConfigured
-                ? 'Your SendGrid account is connected and ready to send emails.'
-                : 'Set SENDGRID_API_KEY in your environment variables to enable email sending.'}
+                ? 'Your SMTP server is configured and ready to send emails.'
+                : 'Configure your SMTP settings in the Email Settings page to enable email sending.'}
             </p>
           </div>
         </div>
@@ -65,31 +83,49 @@ export default async function EmailAccountsPage() {
       {/* Current Configuration */}
       <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden mb-8">
         <div className="px-6 py-4 border-b border-neutral-200">
-          <h3 className="font-semibold text-neutral-900">Current Configuration</h3>
+          <h3 className="font-semibold text-neutral-900">Current SMTP Configuration</h3>
         </div>
         <div className="p-6 space-y-4">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">SMTP Server</label>
+              <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 font-mono">
+                {smtp.host}:{smtp.port}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Username</label>
+              <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900">
+                {smtp.user || <span className="text-neutral-400">Not set</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">From Email</label>
               <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900">
-                {fromEmail}
+                {smtp.fromEmail || <span className="text-neutral-400">Not set</span>}
               </div>
-              <p className="text-xs text-neutral-500 mt-1">Set via SENDGRID_FROM_EMAIL environment variable</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">From Name</label>
               <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900">
-                {fromName}
+                {smtp.fromName}
               </div>
-              <p className="text-xs text-neutral-500 mt-1">Set via SENDGRID_FROM_NAME environment variable</p>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">API Key Status</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">Password Status</label>
             <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg">
-              {isConfigured ? (
-                <span className="text-green-600 font-mono">SG.****...{sendgridApiKey?.slice(-8)}</span>
+              {smtp.hasPassword ? (
+                <span className="text-green-600 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Password configured
+                </span>
               ) : (
                 <span className="text-red-600">Not set</span>
               )}
@@ -98,63 +134,50 @@ export default async function EmailAccountsPage() {
         </div>
       </div>
 
-      {/* Webhook Configuration */}
-      <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-neutral-200">
-          <h3 className="font-semibold text-neutral-900">Webhook Configuration</h3>
-        </div>
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-neutral-600">
-            Configure SendGrid to send event webhooks to track email delivery, opens, and clicks.
-          </p>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Webhook URL</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={`${process.env.NEXT_PUBLIC_BASE_URL || 'https://your-domain.com'}/webhook/sendgrid`}
-                className="flex-1 px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 font-mono text-sm"
-              />
-              <button
-                type="button"
-                className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-200 transition"
-                onClick={() => {}}
-              >
-                Copy
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2">Setup Instructions</h4>
-            <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
-              <li>Go to SendGrid Dashboard → Settings → Mail Settings → Event Webhook</li>
-              <li>Enable the Event Webhook</li>
-              <li>Enter the webhook URL above</li>
-              <li>Select events: Delivered, Opened, Clicked, Bounced, Dropped, Spam Reports</li>
-              <li>Save the configuration</li>
-            </ol>
-          </div>
+      {/* Office 365 Info */}
+      <div className="bg-blue-50 rounded-xl border border-blue-200 p-6 mb-8">
+        <h3 className="font-semibold text-blue-900 mb-3">GoDaddy Office 365 Configuration</h3>
+        <div className="text-sm text-blue-800 space-y-2">
+          <p>For GoDaddy Office 365 email accounts, use these settings:</p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>SMTP Server: <code className="bg-blue-100 px-1 rounded">smtp.office365.com</code></li>
+            <li>Port: <code className="bg-blue-100 px-1 rounded">587</code> (STARTTLS)</li>
+            <li>Username: Your full email address</li>
+            <li>Password: Your Office 365 password or app password</li>
+          </ul>
         </div>
       </div>
 
-      {/* Test Email */}
+      {/* Actions */}
       <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-neutral-200">
-          <h3 className="font-semibold text-neutral-900">Send Test Email</h3>
+          <h3 className="font-semibold text-neutral-900">Configuration</h3>
         </div>
         <div className="p-6">
           <p className="text-sm text-neutral-600 mb-4">
-            Send a test email to verify your configuration is working correctly.
+            Configure your SMTP settings to enable email sending for gift card codes and notifications.
           </p>
-          <Link
-            href="/admin/settings/email"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
-          >
-            Go to Email Settings
-          </Link>
+          <div className="flex gap-3">
+            <Link
+              href="/admin/settings/email"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Configure SMTP Settings
+            </Link>
+            <Link
+              href="/admin/emails/logs"
+              className="inline-flex items-center gap-2 px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-50 transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              View Email Logs
+            </Link>
+          </div>
         </div>
       </div>
     </AdminLayout>
