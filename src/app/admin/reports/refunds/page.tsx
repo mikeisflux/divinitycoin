@@ -63,7 +63,7 @@ async function getRefundData() {
         createdAt: true,
         stripePaymentIntentId: true,
         giftCard: {
-          select: { codeLast4: true, purchaserEmail: true },
+          select: { codeLast4: true, purchasedByEmail: true },
         },
       },
     }),
@@ -98,7 +98,7 @@ async function getRefundData() {
     recent: recentRefunds.map(r => ({
       id: r.id,
       amount: Number(r.amount),
-      email: r.guestEmail || r.giftCard?.purchaserEmail || 'Unknown',
+      email: r.guestEmail || r.giftCard?.purchasedByEmail || 'Unknown',
       createdAt: r.createdAt,
       cardLast4: r.giftCard?.codeLast4 || 'N/A',
     })),

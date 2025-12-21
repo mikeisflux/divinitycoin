@@ -73,7 +73,7 @@ async function getAgingData() {
       id: true,
       codeLast4: true,
       amount: true,
-      purchaserEmail: true,
+      purchasedByEmail: true,
       createdAt: true,
       expiresAt: true,
     },
@@ -209,7 +209,7 @@ export default async function AgingReportPage() {
               <div key={card.id} className="p-4 flex items-center justify-between">
                 <div>
                   <p className="font-mono text-sm text-neutral-900">****{card.codeLast4}</p>
-                  <p className="text-sm text-neutral-500">{card.purchaserEmail}</p>
+                  <p className="text-sm text-neutral-500">{card.purchasedByEmail}</p>
                   <p className="text-xs text-neutral-400">{getDaysOld(card.createdAt)} days old</p>
                 </div>
                 <div className="text-right">
