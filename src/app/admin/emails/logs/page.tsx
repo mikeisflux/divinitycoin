@@ -22,7 +22,7 @@ async function getEmailLogs(page: number = 1, status?: string) {
       take: pageSize,
       include: {
         events: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { timestamp: 'desc' },
           take: 1,
         },
       },
@@ -153,7 +153,7 @@ export default async function EmailLogsPage({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
                     {log.events[0]
-                      ? new Date(log.events[0].createdAt).toLocaleString()
+                      ? new Date(log.events[0].timestamp).toLocaleString()
                       : '-'}
                   </td>
                 </tr>
