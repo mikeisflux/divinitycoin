@@ -1,96 +1,12 @@
 // app/admin/settlements/page.tsx
-// Settlement management page
+// Admin settlement list page
 
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/db';
-import Link from 'next/link';
+import { getSettlements, getSettlementStats } from '@/lib/settlements';
 import { SettlementStatus } from '@prisma/client';
-
-interface SearchParams {
-  status?: string;
-  partner?: string;
-  page?: string;
-}
-
-async function getSettlements(params: SearchParams) {
-  const page = parseInt(params.page || '1');
-  const limit = 20;
-  const offset = (page - 1) * limit;
-
-  const where: {
-    status?: SettlementStatus;
-    partnerId?: string;
-  } = {};
-
-  if (params.status && Object.values(SettlementStatus).includes(params.status as SettlementStatus)) {
-    where.status = params.status as SettlementStatus;
-  }
-
-  if (params.partner) {
-    where.partnerId = params.partner;
-  }
-
-  const [settlements, total, stats] = await Promise.all([
-    prisma.partnerSettlement.findMany({
-      where,
-      include: {
-        partner: { select: { name: true } },
-        _count: { select: { captures: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset,
-    }),
-    prisma.partnerSettlement.count({ where }),
-    getSettlementStats(),
-  ]);
-
-  return { settlements, total, page, limit, stats };
-}
-
-async function getSettlementStats() {
-  const now = new Date();
-  const startOfMonth = new Date(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  const startOfYear = new Date(now.getUTCFullYear(), 0, 1);
-
-  const [pending, paidThisMonth, paidThisYear] = await Promise.all([
-    prisma.partnerSettlement.aggregate({
-      where: { status: SettlementStatus.PENDING },
-      _sum: { netAmount: true },
-      _count: true,
-    }),
-    prisma.partnerSettlement.aggregate({
-      where: {
-        status: SettlementStatus.PAID,
-        paidAt: { gte: startOfMonth },
-      },
-      _sum: { netAmount: true },
-    }),
-    prisma.partnerSettlement.aggregate({
-      where: {
-        status: SettlementStatus.PAID,
-        paidAt: { gte: startOfYear },
-      },
-      _sum: { netAmount: true },
-    }),
-  ]);
-
-  return {
-    totalPending: Number(pending._sum.netAmount ?? 0),
-    pendingCount: pending._count,
-    totalPaidThisMonth: Number(paidThisMonth._sum.netAmount ?? 0),
-    totalPaidThisYear: Number(paidThisYear._sum.netAmount ?? 0),
-  };
-}
-
-async function getPartners() {
-  return prisma.partner.findMany({
-    select: { id: true, name: true },
-    orderBy: { name: 'asc' },
-  });
-}
+import Link from 'next/link';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -99,44 +15,23 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function formatDateRange(start: Date, end: Date): string {
-  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  return `${startStr} - ${endStr}`;
+function getStatusBadgeClass(status: SettlementStatus): string {
+  switch (status) {
+    case 'PAID': return 'bg-green-100 text-green-800';
+    case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+    case 'APPROVED': return 'bg-blue-100 text-blue-800';
+    case 'PROCESSING': return 'bg-purple-100 text-purple-800';
+    case 'FAILED': return 'bg-red-100 text-red-800';
+    case 'DISPUTED': return 'bg-orange-100 text-orange-800';
+    default: return 'bg-neutral-100 text-neutral-800';
+  }
 }
 
-function StatusBadge({ status }: { status: SettlementStatus }) {
-  const styles: Record<SettlementStatus, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    APPROVED: 'bg-blue-100 text-blue-800',
-    PROCESSING: 'bg-purple-100 text-purple-800',
-    PAID: 'bg-green-100 text-green-800',
-    FAILED: 'bg-red-100 text-red-800',
-    DISPUTED: 'bg-orange-100 text-orange-800',
-  };
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  );
+interface PageProps {
+  searchParams: Promise<{ status?: string; partner?: string; page?: string }>;
 }
 
-function StatCard({ label, value, subValue }: { label: string; value: string; subValue?: string }) {
-  return (
-    <div className="bg-white rounded-xl border border-neutral-200 p-6">
-      <p className="text-sm text-neutral-500">{label}</p>
-      <p className="text-2xl font-bold text-neutral-900 mt-1">{value}</p>
-      {subValue && <p className="text-sm text-neutral-500 mt-1">{subValue}</p>}
-    </div>
-  );
-}
-
-export default async function SettlementsPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
+export default async function SettlementsPage({ searchParams }: PageProps) {
   const admin = await getAdminFromRequest();
 
   if (!admin) {
@@ -144,189 +39,150 @@ export default async function SettlementsPage({
   }
 
   const params = await searchParams;
-  const { settlements, total, page, limit, stats } = await getSettlements(params);
-  const partners = await getPartners();
+  const status = params.status as SettlementStatus | undefined;
+  const partnerId = params.partner;
+  const page = parseInt(params.page || '1');
+  const limit = 20;
+  const offset = (page - 1) * limit;
+
+  const [{ settlements, total }, stats] = await Promise.all([
+    getSettlements({
+      status,
+      partnerId,
+      limit,
+      offset,
+    }),
+    getSettlementStats(),
+  ]);
+
   const totalPages = Math.ceil(total / limit);
 
   return (
     <AdminLayout
       title="Settlements"
       description="Manage partner settlements and payouts"
-      actions={
-        <Link
-          href="/admin/settings/settlements"
-          className="inline-flex items-center gap-2 px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-50 transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Settings
-        </Link>
-      }
     >
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard
-          label="Pending Settlements"
-          value={formatCurrency(stats.totalPending)}
-          subValue={`${stats.pendingCount} settlements`}
-        />
-        <StatCard
-          label="Paid This Month"
-          value={formatCurrency(stats.totalPaidThisMonth)}
-        />
-        <StatCard
-          label="Paid This Year"
-          value={formatCurrency(stats.totalPaidThisYear)}
-        />
+      <div className="grid md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-lg border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500">Pending</p>
+          <p className="text-2xl font-semibold text-yellow-600">
+            {formatCurrency(stats.totalPending)}
+          </p>
+          <p className="text-xs text-neutral-400">{stats.pendingCount} settlements</p>
+        </div>
+        <div className="bg-white rounded-lg border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500">Paid This Month</p>
+          <p className="text-2xl font-semibold text-green-600">
+            {formatCurrency(stats.totalPaidThisMonth)}
+          </p>
+          <p className="text-xs text-neutral-400">{stats.paidCountThisMonth} settlements</p>
+        </div>
+        <div className="bg-white rounded-lg border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500">Paid This Year</p>
+          <p className="text-2xl font-semibold text-primary-600">
+            {formatCurrency(stats.totalPaidThisYear)}
+          </p>
+          <p className="text-xs text-neutral-400">{stats.paidCountThisYear} settlements</p>
+        </div>
+        <div className="bg-white rounded-lg border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500">Total Settlements</p>
+          <p className="text-2xl font-semibold text-neutral-900">{total}</p>
+          <p className="text-xs text-neutral-400">all time</p>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-neutral-200 p-4 mb-6">
-        <form className="flex flex-wrap gap-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-500 mb-1">Status</label>
-            <select
-              name="status"
-              defaultValue={params.status || ''}
-              className="block w-40 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+      <div className="bg-white rounded-lg border border-neutral-200 p-4 mb-6">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/settlements"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${!status ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
+          >
+            All
+          </Link>
+          {Object.values(SettlementStatus).map(s => (
+            <Link
+              key={s}
+              href={`/admin/settlements?status=${s}`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${status === s ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
             >
-              <option value="">All Statuses</option>
-              {Object.values(SettlementStatus).map((status) => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-500 mb-1">Partner</label>
-            <select
-              name="partner"
-              defaultValue={params.partner || ''}
-              className="block w-48 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">All Partners</option>
-              {partners.map((partner) => (
-                <option key={partner.id} value={partner.id}>{partner.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
-            >
-              Filter
-            </button>
-          </div>
-          {(params.status || params.partner) && (
-            <div className="flex items-end">
-              <Link
-                href="/admin/settlements"
-                className="px-4 py-2 text-neutral-600 hover:text-neutral-900 text-sm"
-              >
-                Clear filters
-              </Link>
-            </div>
-          )}
-        </form>
+              {s}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-neutral-200">
-          <thead className="bg-neutral-50">
+      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-neutral-50 border-b border-neutral-200">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Partner
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Period
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Captures
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Gross
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Fee
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Net
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th scope="col" className="relative px-6 py-3">
-                <span className="sr-only">Actions</span>
-              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Partner</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Period</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Gross</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Fee</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Net</th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-neutral-500 uppercase">Captures</th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-neutral-500 uppercase">Status</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-neutral-200">
-            {settlements.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-neutral-500">
-                  No settlements found.
+          <tbody className="divide-y divide-neutral-100">
+            {settlements.map(s => (
+              <tr key={s.id} className="hover:bg-neutral-50">
+                <td className="px-4 py-3 text-sm font-medium text-neutral-900">{s.partnerName}</td>
+                <td className="px-4 py-3 text-sm text-neutral-600">
+                  {s.periodStart.toLocaleDateString()} - {s.periodEnd.toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 text-sm text-right text-neutral-900">{formatCurrency(s.grossAmount)}</td>
+                <td className="px-4 py-3 text-sm text-right text-neutral-500">{formatCurrency(s.partnerFee)}</td>
+                <td className="px-4 py-3 text-sm text-right font-medium text-neutral-900">{formatCurrency(s.netAmount)}</td>
+                <td className="px-4 py-3 text-sm text-center text-neutral-600">{s.captureCount}</td>
+                <td className="px-4 py-3 text-center">
+                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(s.status)}`}>
+                    {s.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    href={`/admin/settlements/${s.id}`}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
+                    View
+                  </Link>
                 </td>
               </tr>
-            ) : (
-              settlements.map((settlement) => (
-                <tr key={settlement.id} className="hover:bg-neutral-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-neutral-900">{settlement.partner.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
-                    {formatDateRange(settlement.periodStart, settlement.periodEnd)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
-                    {settlement._count.captures}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
-                    {formatCurrency(Number(settlement.grossAmount))}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                    -{formatCurrency(Number(settlement.partnerFee))}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                    {formatCurrency(Number(settlement.netAmount))}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <StatusBadge status={settlement.status} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Link
-                      href={`/admin/settlements/${settlement.id}`}
-                      className="text-primary-600 hover:text-primary-900"
-                    >
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))
+            ))}
+            {settlements.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-neutral-500">
+                  No settlements found
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-neutral-200 flex items-center justify-between">
-            <p className="text-sm text-neutral-500">
-              Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total} settlements
+          <div className="bg-neutral-50 border-t border-neutral-200 px-4 py-3 flex items-center justify-between">
+            <p className="text-sm text-neutral-600">
+              Showing {offset + 1} to {Math.min(offset + limit, total)} of {total}
             </p>
             <div className="flex gap-2">
               {page > 1 && (
                 <Link
-                  href={`/admin/settlements?page=${page - 1}${params.status ? `&status=${params.status}` : ''}${params.partner ? `&partner=${params.partner}` : ''}`}
-                  className="px-3 py-1 border border-neutral-300 rounded text-sm hover:bg-neutral-50"
+                  href={`/admin/settlements?page=${page - 1}${status ? `&status=${status}` : ''}`}
+                  className="px-3 py-1 bg-white border border-neutral-300 rounded text-sm hover:bg-neutral-50"
                 >
                   Previous
                 </Link>
               )}
               {page < totalPages && (
                 <Link
-                  href={`/admin/settlements?page=${page + 1}${params.status ? `&status=${params.status}` : ''}${params.partner ? `&partner=${params.partner}` : ''}`}
-                  className="px-3 py-1 border border-neutral-300 rounded text-sm hover:bg-neutral-50"
+                  href={`/admin/settlements?page=${page + 1}${status ? `&status=${status}` : ''}`}
+                  className="px-3 py-1 bg-white border border-neutral-300 rounded text-sm hover:bg-neutral-50"
                 >
                   Next
                 </Link>

@@ -63,7 +63,7 @@ export function middleware(request: NextRequest) {
     }
 
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-API-Key');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-API-Key, X-Internal-Key, X-Webhook-Signature');
     response.headers.set('Access-Control-Max-Age', '86400');
     response.headers.set('Access-Control-Allow-Credentials', 'true');
 

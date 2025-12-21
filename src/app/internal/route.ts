@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateAndRedeemCode, checkCodeStatus } from '@/lib/giftcard/redeem';
 import { placeHold, releaseHold, captureHold, getBalance } from '@/lib/credits/holds';
 import { redemptionRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
+import { getSettlements, getSettlementDetail, getCaptures, createCapture } from '@/lib/settlements';
+import { SettlementStatus } from '@prisma/client';
 
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
@@ -60,6 +62,9 @@ export async function POST(request: NextRequest) {
       case 'capture':
         return handleCapture(body);
 
+      case 'record_capture':
+        return handleRecordCapture(body);
+
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -70,6 +75,56 @@ export async function POST(request: NextRequest) {
     console.error('Internal API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Record capture metadata for settlement
+ */
+async function handleRecordCapture(body: {
+  holdId: string;
+  partnerId: string;
+  creatorId: string;
+  creatorEmail?: string;
+  projectId: string;
+  projectName?: string;
+  amount: number;
+}) {
+  const { holdId, partnerId, creatorId, projectId, amount } = body;
+
+  if (!holdId || !partnerId || !creatorId || !projectId || !amount) {
+    return NextResponse.json(
+      { error: 'Missing required fields: holdId, partnerId, creatorId, projectId, amount' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const result = await createCapture({
+      holdId,
+      partnerId,
+      creatorId,
+      creatorEmail: body.creatorEmail,
+      projectId,
+      projectName: body.projectName,
+      amount,
+    });
+
+    return NextResponse.json({
+      success: true,
+      capture: {
+        id: result.id,
+        holdId,
+        amount,
+        capturedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Failed to record capture:', error);
+    return NextResponse.json(
+      { error: 'Failed to record capture' },
       { status: 500 }
     );
   }
@@ -86,18 +141,209 @@ export async function GET(request: NextRequest) {
 
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
+  const partnerId = url.searchParams.get('partnerId');
 
-  if (action === 'health') {
-    return NextResponse.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-    });
+  switch (action) {
+    case 'health':
+      return NextResponse.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+      });
+
+    case 'settlements':
+      return handleGetSettlements(url, partnerId);
+
+    case 'settlement':
+      return handleGetSettlement(url, partnerId);
+
+    case 'captures':
+      return handleGetCaptures(url, partnerId);
+
+    default:
+      return NextResponse.json(
+        { error: 'Invalid action' },
+        { status: 400 }
+      );
+  }
+}
+
+/**
+ * Get list of settlements for a partner
+ */
+async function handleGetSettlements(url: URL, partnerId: string | null) {
+  if (!partnerId) {
+    return NextResponse.json(
+      { error: 'partnerId is required' },
+      { status: 400 }
+    );
   }
 
-  return NextResponse.json(
-    { error: 'Invalid action' },
-    { status: 400 }
-  );
+  const status = url.searchParams.get('status') as SettlementStatus | null;
+  const fromStr = url.searchParams.get('from');
+  const toStr = url.searchParams.get('to');
+  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const offset = parseInt(url.searchParams.get('offset') || '0');
+
+  const from = fromStr ? new Date(fromStr) : undefined;
+  const to = toStr ? new Date(toStr) : undefined;
+
+  const result = await getSettlements({
+    partnerId,
+    status: status || undefined,
+    from,
+    to,
+    limit,
+    offset,
+  });
+
+  return NextResponse.json({
+    settlements: result.settlements.map(s => ({
+      id: s.id,
+      periodStart: s.periodStart.toISOString(),
+      periodEnd: s.periodEnd.toISOString(),
+      grossAmount: s.grossAmount,
+      partnerFee: s.partnerFee,
+      netAmount: s.netAmount,
+      captureCount: s.captureCount,
+      status: s.status,
+      paymentMethod: s.paymentMethod,
+      paymentRef: s.paymentRef,
+      paidAt: s.paidAt?.toISOString(),
+      createdAt: s.createdAt.toISOString(),
+    })),
+    pagination: {
+      total: result.total,
+      limit,
+      offset,
+    },
+  });
+}
+
+/**
+ * Get settlement detail by ID
+ */
+async function handleGetSettlement(url: URL, partnerId: string | null) {
+  if (!partnerId) {
+    return NextResponse.json(
+      { error: 'partnerId is required' },
+      { status: 400 }
+    );
+  }
+
+  const settlementId = url.searchParams.get('id');
+  if (!settlementId) {
+    return NextResponse.json(
+      { error: 'id is required' },
+      { status: 400 }
+    );
+  }
+
+  const settlement = await getSettlementDetail(settlementId);
+
+  if (!settlement) {
+    return NextResponse.json(
+      { error: 'Settlement not found' },
+      { status: 404 }
+    );
+  }
+
+  // Verify the settlement belongs to the requesting partner
+  if (settlement.partnerId !== partnerId) {
+    return NextResponse.json(
+      { error: 'Settlement not found' },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({
+    settlement: {
+      id: settlement.id,
+      periodStart: settlement.periodStart.toISOString(),
+      periodEnd: settlement.periodEnd.toISOString(),
+      grossAmount: settlement.grossAmount,
+      partnerFee: settlement.partnerFee,
+      feePercentage: settlement.feePercentage,
+      netAmount: settlement.netAmount,
+      currency: settlement.currency,
+      status: settlement.status,
+      paymentMethod: settlement.paymentMethod,
+      paymentRef: settlement.paymentRef,
+      paidAt: settlement.paidAt?.toISOString(),
+    },
+    captures: settlement.captures.map(c => ({
+      id: c.id,
+      creatorId: c.creatorId,
+      creatorEmail: c.creatorEmail,
+      projectId: c.projectId,
+      projectName: c.projectName,
+      amount: c.amount,
+      capturedAt: c.capturedAt.toISOString(),
+    })),
+    summary: {
+      byCreator: settlement.byCreator,
+      byProject: settlement.byProject,
+    },
+  });
+}
+
+/**
+ * Get captures for a partner
+ */
+async function handleGetCaptures(url: URL, partnerId: string | null) {
+  if (!partnerId) {
+    return NextResponse.json(
+      { error: 'partnerId is required' },
+      { status: 400 }
+    );
+  }
+
+  const settled = url.searchParams.get('settled');
+  const creatorId = url.searchParams.get('creatorId') || undefined;
+  const projectId = url.searchParams.get('projectId') || undefined;
+  const fromStr = url.searchParams.get('from');
+  const toStr = url.searchParams.get('to');
+  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const offset = parseInt(url.searchParams.get('offset') || '0');
+
+  const from = fromStr ? new Date(fromStr) : undefined;
+  const to = toStr ? new Date(toStr) : undefined;
+
+  let settledFilter: boolean | undefined;
+  if (settled === 'true') settledFilter = true;
+  else if (settled === 'false') settledFilter = false;
+
+  const result = await getCaptures({
+    partnerId,
+    settled: settledFilter,
+    creatorId,
+    projectId,
+    from,
+    to,
+    limit,
+    offset,
+  });
+
+  return NextResponse.json({
+    captures: result.captures.map(c => ({
+      id: c.id,
+      holdId: c.holdId,
+      creatorId: c.creatorId,
+      creatorEmail: c.creatorEmail,
+      projectId: c.projectId,
+      projectName: c.projectName,
+      amount: c.amount,
+      capturedAt: c.capturedAt.toISOString(),
+    })),
+    summary: {
+      totalUnsettled: result.summary.totalUnsettled,
+      captureCount: result.summary.captureCount,
+    },
+    pagination: {
+      total: result.total,
+      limit,
+      offset,
+    },
+  });
 }
 
 /**

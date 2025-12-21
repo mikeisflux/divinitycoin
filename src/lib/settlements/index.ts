@@ -1,34 +1,12 @@
 // lib/settlements/index.ts
-// Settlement system for partner payouts
+// Settlement system library - handles partner settlements and captures
 
 import { prisma } from '@/lib/db';
-import { SettlementStatus, SettlementFrequency, Prisma } from '@prisma/client';
-import { getConfig } from '@/lib/admin/config';
+import { SettlementStatus, Prisma } from '@prisma/client';
 
-// ============================================
+// ==============================================
 // TYPES
-// ============================================
-
-export interface SettlementCalculation {
-  grossAmount: number;
-  partnerFee: number;
-  feePercentage: number;
-  netAmount: number;
-  captureCount: number;
-  captureIds: string[];
-  periodStart: Date;
-  periodEnd: Date;
-}
-
-export interface CreateCaptureParams {
-  holdId: string;
-  partnerId: string;
-  creatorId: string;
-  creatorEmail?: string;
-  projectId: string;
-  projectName?: string;
-  amount: number;
-}
+// ==============================================
 
 export interface SettlementSummary {
   id: string;
@@ -41,50 +19,49 @@ export interface SettlementSummary {
   netAmount: number;
   captureCount: number;
   status: SettlementStatus;
-  paymentMethod?: string;
-  paymentRef?: string;
-  paidAt?: Date;
+  paymentMethod: string | null;
+  paymentRef: string | null;
+  paidAt: Date | null;
   createdAt: Date;
 }
 
 export interface SettlementDetail extends SettlementSummary {
   feePercentage: number;
   currency: string;
-  approvedBy?: string;
-  approvedAt?: Date;
-  adminNotes?: string;
-  disputeReason?: string;
-  captures: CaptureDetail[];
-  byCreator: CreatorSummary[];
-  byProject: ProjectSummary[];
+  adminNotes: string | null;
+  disputeReason: string | null;
+  approvedBy: string | null;
+  approvedAt: Date | null;
+  captures: CaptureInfo[];
+  byCreator: { creatorId: string; creatorEmail?: string; amount: number; count: number }[];
+  byProject: { projectId: string; projectName?: string; amount: number; count: number }[];
 }
 
-export interface CaptureDetail {
+export interface CaptureInfo {
   id: string;
   holdId: string;
   creatorId: string;
-  creatorEmail?: string;
+  creatorEmail: string | null;
   projectId: string;
-  projectName?: string;
+  projectName: string | null;
   amount: number;
   capturedAt: Date;
 }
 
-export interface CreatorSummary {
-  creatorId: string;
-  creatorEmail?: string;
-  amount: number;
-  count: number;
+export interface SettlementStats {
+  totalPending: number;
+  pendingCount: number;
+  totalPaidThisMonth: number;
+  paidCountThisMonth: number;
+  totalPaidThisYear: number;
+  paidCountThisYear: number;
 }
 
-export interface ProjectSummary {
-  projectId: string;
-  projectName?: string;
-  amount: number;
-  count: number;
-}
+// ==============================================
+// QUERY FUNCTIONS
+// ==============================================
 
-export interface SettlementListParams {
+export interface GetSettlementsParams {
   partnerId?: string;
   status?: SettlementStatus;
   from?: Date;
@@ -93,434 +70,24 @@ export interface SettlementListParams {
   offset?: number;
 }
 
-// ============================================
-// CONSTANTS
-// ============================================
-
-export const DEFAULT_PARTNER_FEE = 0.06; // 6%
-export const DEFAULT_MINIMUM_SETTLEMENT = 100; // $100
-
-// ============================================
-// CONFIGURATION
-// ============================================
-
-/**
- * Get the default partner fee percentage from config or use default
- */
-export async function getDefaultPartnerFee(): Promise<number> {
-  const configValue = await getConfig('DEFAULT_PARTNER_FEE');
-  if (configValue) {
-    const parsed = parseFloat(configValue);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
-      return parsed;
-    }
-  }
-  return DEFAULT_PARTNER_FEE;
-}
-
-/**
- * Get the default minimum settlement amount from config or use default
- */
-export async function getDefaultMinimumSettlement(): Promise<number> {
-  const configValue = await getConfig('DEFAULT_MINIMUM_SETTLEMENT');
-  if (configValue) {
-    const parsed = parseFloat(configValue);
-    if (!isNaN(parsed) && parsed >= 0) {
-      return parsed;
-    }
-  }
-  return DEFAULT_MINIMUM_SETTLEMENT;
-}
-
-/**
- * Get the auto-approve threshold (settlements under this are auto-approved)
- */
-export async function getAutoApproveThreshold(): Promise<number | null> {
-  const enabled = await getConfig('AUTO_APPROVE_ENABLED');
-  if (enabled !== 'true') {
-    return null;
-  }
-
-  const threshold = await getConfig('AUTO_APPROVE_THRESHOLD');
-  if (threshold) {
-    const parsed = parseFloat(threshold);
-    if (!isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-  return null;
-}
-
-// ============================================
-// CAPTURE FUNCTIONS
-// ============================================
-
-/**
- * Create a credit capture record (called when a hold is captured)
- */
-export async function createCapture(params: CreateCaptureParams): Promise<{ id: string }> {
-  const capture = await prisma.creditCapture.create({
-    data: {
-      holdId: params.holdId,
-      partnerId: params.partnerId,
-      creatorId: params.creatorId,
-      creatorEmail: params.creatorEmail,
-      projectId: params.projectId,
-      projectName: params.projectName,
-      amount: params.amount,
-    },
-  });
-
-  return { id: capture.id };
-}
-
-/**
- * Get unsettled captures for a partner
- */
-export async function getUnsettledCaptures(partnerId: string): Promise<CaptureDetail[]> {
-  const captures = await prisma.creditCapture.findMany({
-    where: {
-      partnerId,
-      settlementId: null,
-    },
-    orderBy: { capturedAt: 'asc' },
-  });
-
-  return captures.map(c => ({
-    id: c.id,
-    holdId: c.holdId,
-    creatorId: c.creatorId,
-    creatorEmail: c.creatorEmail ?? undefined,
-    projectId: c.projectId,
-    projectName: c.projectName ?? undefined,
-    amount: Number(c.amount),
-    capturedAt: c.capturedAt,
-  }));
-}
-
-// ============================================
-// SETTLEMENT CALCULATION
-// ============================================
-
-/**
- * Calculate settlement for a partner's unsettled captures
- */
-export async function calculateSettlement(partnerId: string): Promise<SettlementCalculation | null> {
-  // Get partner with fee override
-  const partner = await prisma.partner.findUnique({
-    where: { id: partnerId },
-    select: { partnerFeeOverride: true },
-  });
-
-  if (!partner) {
-    return null;
-  }
-
-  // Get unsettled captures
-  const captures = await prisma.creditCapture.findMany({
-    where: {
-      partnerId,
-      settlementId: null,
-    },
-  });
-
-  if (captures.length === 0) {
-    return null;
-  }
-
-  // Calculate totals
-  const grossAmount = captures.reduce((sum, c) => sum + Number(c.amount), 0);
-
-  // Get fee percentage (partner override or default)
-  const defaultFee = await getDefaultPartnerFee();
-  const feePercentage = partner.partnerFeeOverride
-    ? Number(partner.partnerFeeOverride)
-    : defaultFee;
-
-  const partnerFee = grossAmount * feePercentage;
-  const netAmount = grossAmount - partnerFee;
-
-  // Determine period based on capture dates
-  const dates = captures.map(c => c.capturedAt.getTime());
-  const periodStart = new Date(Math.min(...dates));
-  const periodEnd = new Date(Math.max(...dates));
-
-  return {
-    grossAmount,
-    partnerFee,
-    feePercentage,
-    netAmount,
-    captureCount: captures.length,
-    captureIds: captures.map(c => c.id),
-    periodStart,
-    periodEnd,
-  };
-}
-
-// ============================================
-// SETTLEMENT GENERATION
-// ============================================
-
-/**
- * Generate a settlement for a partner (if minimum threshold is met)
- */
-export async function generateSettlement(partnerId: string): Promise<{ id: string } | null> {
-  // Get partner with settings
-  const partner = await prisma.partner.findUnique({
-    where: { id: partnerId },
-    select: {
-      minimumSettlement: true,
-      partnerFeeOverride: true,
-      paymentMethod: true,
-    },
-  });
-
-  if (!partner) {
-    throw new Error('Partner not found');
-  }
-
-  // Calculate settlement
-  const calculation = await calculateSettlement(partnerId);
-
-  if (!calculation) {
-    return null; // No unsettled captures
-  }
-
-  // Check minimum threshold
-  const defaultMinimum = await getDefaultMinimumSettlement();
-  const minimumAmount = Number(partner.minimumSettlement) || defaultMinimum;
-
-  if (calculation.grossAmount < minimumAmount) {
-    return null; // Below minimum threshold
-  }
-
-  // Create settlement in transaction
-  const settlement = await prisma.$transaction(async (tx) => {
-    // Create settlement record
-    const settlement = await tx.partnerSettlement.create({
-      data: {
-        partnerId,
-        periodStart: calculation.periodStart,
-        periodEnd: calculation.periodEnd,
-        grossAmount: calculation.grossAmount,
-        partnerFee: calculation.partnerFee,
-        feePercentage: calculation.feePercentage,
-        netAmount: calculation.netAmount,
-        paymentMethod: partner.paymentMethod,
-        status: SettlementStatus.PENDING,
-      },
-    });
-
-    // Link captures to settlement
-    await tx.creditCapture.updateMany({
-      where: {
-        id: { in: calculation.captureIds },
-      },
-      data: {
-        settlementId: settlement.id,
-        settledAt: new Date(),
-      },
-    });
-
-    return settlement;
-  });
-
-  // Check for auto-approval
-  const autoApproveThreshold = await getAutoApproveThreshold();
-  if (autoApproveThreshold && calculation.netAmount <= autoApproveThreshold) {
-    await approveSettlement(settlement.id, 'SYSTEM_AUTO_APPROVE');
-  }
-
-  return { id: settlement.id };
-}
-
-/**
- * Generate settlements for all eligible partners
- * Called by scheduled job
- */
-export async function generateAllSettlements(): Promise<{ generated: number; partnersChecked: number }> {
-  const now = new Date();
-  const dayOfWeek = now.getUTCDay() || 7; // 1-7 (Monday = 1)
-  const dayOfMonth = now.getUTCDate();
-
-  // Get all active partners
-  const partners = await prisma.partner.findMany({
-    where: { status: 'ACTIVE' },
-    select: {
-      id: true,
-      settlementFrequency: true,
-      settlementDay: true,
-    },
-  });
-
-  let generated = 0;
-
-  for (const partner of partners) {
-    // Check if settlement is due based on frequency
-    let isDue = false;
-
-    switch (partner.settlementFrequency) {
-      case SettlementFrequency.DAILY:
-        isDue = true;
-        break;
-      case SettlementFrequency.WEEKLY:
-        isDue = dayOfWeek === partner.settlementDay;
-        break;
-      case SettlementFrequency.BIWEEKLY:
-        // Every other week on the specified day
-        const weekNumber = Math.floor((now.getTime() - new Date(now.getUTCFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
-        isDue = dayOfWeek === partner.settlementDay && weekNumber % 2 === 0;
-        break;
-      case SettlementFrequency.MONTHLY:
-        isDue = dayOfMonth === partner.settlementDay;
-        break;
-    }
-
-    if (isDue) {
-      try {
-        const result = await generateSettlement(partner.id);
-        if (result) {
-          generated++;
-        }
-      } catch (error) {
-        console.error(`Failed to generate settlement for partner ${partner.id}:`, error);
-      }
-    }
-  }
-
-  return { generated, partnersChecked: partners.length };
-}
-
-// ============================================
-// SETTLEMENT STATUS MANAGEMENT
-// ============================================
-
-/**
- * Approve a settlement (PENDING -> APPROVED)
- */
-export async function approveSettlement(settlementId: string, adminId: string): Promise<void> {
-  await prisma.partnerSettlement.update({
-    where: { id: settlementId },
-    data: {
-      status: SettlementStatus.APPROVED,
-      approvedBy: adminId,
-      approvedAt: new Date(),
-    },
-  });
-}
-
-/**
- * Mark settlement as processing (APPROVED -> PROCESSING)
- */
-export async function processSettlement(settlementId: string, paymentRef?: string): Promise<void> {
-  await prisma.partnerSettlement.update({
-    where: { id: settlementId },
-    data: {
-      status: SettlementStatus.PROCESSING,
-      paymentRef,
-    },
-  });
-}
-
-/**
- * Mark settlement as paid (PROCESSING -> PAID)
- */
-export async function markSettlementPaid(settlementId: string, paymentRef?: string): Promise<void> {
-  await prisma.partnerSettlement.update({
-    where: { id: settlementId },
-    data: {
-      status: SettlementStatus.PAID,
-      paymentRef: paymentRef ?? undefined,
-      paidAt: new Date(),
-    },
-  });
-}
-
-/**
- * Mark settlement as failed (PROCESSING -> FAILED)
- */
-export async function markSettlementFailed(settlementId: string, reason?: string): Promise<void> {
-  await prisma.partnerSettlement.update({
-    where: { id: settlementId },
-    data: {
-      status: SettlementStatus.FAILED,
-      adminNotes: reason,
-    },
-  });
-}
-
-/**
- * Dispute a settlement
- */
-export async function disputeSettlement(settlementId: string, reason: string): Promise<void> {
-  await prisma.partnerSettlement.update({
-    where: { id: settlementId },
-    data: {
-      status: SettlementStatus.DISPUTED,
-      disputeReason: reason,
-    },
-  });
-}
-
-/**
- * Add admin notes to a settlement
- */
-export async function addSettlementNote(settlementId: string, note: string): Promise<void> {
-  const settlement = await prisma.partnerSettlement.findUnique({
-    where: { id: settlementId },
-    select: { adminNotes: true },
-  });
-
-  const timestamp = new Date().toISOString();
-  const newNote = `[${timestamp}] ${note}`;
-  const updatedNotes = settlement?.adminNotes
-    ? `${settlement.adminNotes}\n${newNote}`
-    : newNote;
-
-  await prisma.partnerSettlement.update({
-    where: { id: settlementId },
-    data: { adminNotes: updatedNotes },
-  });
-}
-
-// ============================================
-// SETTLEMENT QUERIES
-// ============================================
-
-/**
- * Get list of settlements with filtering
- */
-export async function getSettlements(params: SettlementListParams): Promise<{
-  settlements: SettlementSummary[];
-  total: number;
-}> {
+export async function getSettlements(params: GetSettlementsParams) {
   const { partnerId, status, from, to, limit = 20, offset = 0 } = params;
 
   const where: Prisma.PartnerSettlementWhereInput = {};
 
-  if (partnerId) {
-    where.partnerId = partnerId;
-  }
-
-  if (status) {
-    where.status = status;
-  }
-
+  if (partnerId) where.partnerId = partnerId;
+  if (status) where.status = status;
   if (from || to) {
     where.periodEnd = {};
-    if (from) {
-      where.periodEnd.gte = from;
-    }
-    if (to) {
-      where.periodEnd.lte = to;
-    }
+    if (from) where.periodEnd.gte = from;
+    if (to) where.periodEnd.lte = to;
   }
 
   const [settlements, total] = await Promise.all([
     prisma.partnerSettlement.findMany({
       where,
       include: {
-        partner: { select: { name: true } },
+        partner: { select: { id: true, name: true } },
         _count: { select: { captures: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -542,65 +109,44 @@ export async function getSettlements(params: SettlementListParams): Promise<{
       netAmount: Number(s.netAmount),
       captureCount: s._count.captures,
       status: s.status,
-      paymentMethod: s.paymentMethod ?? undefined,
-      paymentRef: s.paymentRef ?? undefined,
-      paidAt: s.paidAt ?? undefined,
+      paymentMethod: s.paymentMethod,
+      paymentRef: s.paymentRef,
+      paidAt: s.paidAt,
       createdAt: s.createdAt,
     })),
     total,
   };
 }
 
-/**
- * Get detailed settlement by ID
- */
-export async function getSettlementDetail(settlementId: string): Promise<SettlementDetail | null> {
+export async function getSettlementDetail(id: string): Promise<SettlementDetail | null> {
   const settlement = await prisma.partnerSettlement.findUnique({
-    where: { id: settlementId },
+    where: { id },
     include: {
-      partner: { select: { name: true } },
+      partner: { select: { id: true, name: true } },
       captures: {
-        orderBy: { capturedAt: 'asc' },
+        orderBy: { capturedAt: 'desc' },
       },
     },
   });
 
-  if (!settlement) {
-    return null;
-  }
+  if (!settlement) return null;
 
-  // Group by creator
-  const byCreator = new Map<string, CreatorSummary>();
-  for (const capture of settlement.captures) {
-    const existing = byCreator.get(capture.creatorId);
-    if (existing) {
-      existing.amount += Number(capture.amount);
-      existing.count += 1;
-    } else {
-      byCreator.set(capture.creatorId, {
-        creatorId: capture.creatorId,
-        creatorEmail: capture.creatorEmail ?? undefined,
-        amount: Number(capture.amount),
-        count: 1,
-      });
-    }
-  }
+  // Group captures by creator and project
+  const byCreatorMap = new Map<string, { email?: string; amount: number; count: number }>();
+  const byProjectMap = new Map<string, { name?: string; amount: number; count: number }>();
 
-  // Group by project
-  const byProject = new Map<string, ProjectSummary>();
   for (const capture of settlement.captures) {
-    const existing = byProject.get(capture.projectId);
-    if (existing) {
-      existing.amount += Number(capture.amount);
-      existing.count += 1;
-    } else {
-      byProject.set(capture.projectId, {
-        projectId: capture.projectId,
-        projectName: capture.projectName ?? undefined,
-        amount: Number(capture.amount),
-        count: 1,
-      });
-    }
+    // By creator
+    const creatorData = byCreatorMap.get(capture.creatorId) || { email: capture.creatorEmail || undefined, amount: 0, count: 0 };
+    creatorData.amount += Number(capture.amount);
+    creatorData.count += 1;
+    byCreatorMap.set(capture.creatorId, creatorData);
+
+    // By project
+    const projectData = byProjectMap.get(capture.projectId) || { name: capture.projectName || undefined, amount: 0, count: 0 };
+    projectData.amount += Number(capture.amount);
+    projectData.count += 1;
+    byProjectMap.set(capture.projectId, projectData);
   }
 
   return {
@@ -613,50 +159,48 @@ export async function getSettlementDetail(settlementId: string): Promise<Settlem
     partnerFee: Number(settlement.partnerFee),
     feePercentage: Number(settlement.feePercentage),
     netAmount: Number(settlement.netAmount),
+    currency: settlement.currency,
     captureCount: settlement.captures.length,
     status: settlement.status,
-    currency: settlement.currency,
-    paymentMethod: settlement.paymentMethod ?? undefined,
-    paymentRef: settlement.paymentRef ?? undefined,
-    paidAt: settlement.paidAt ?? undefined,
-    approvedBy: settlement.approvedBy ?? undefined,
-    approvedAt: settlement.approvedAt ?? undefined,
-    adminNotes: settlement.adminNotes ?? undefined,
-    disputeReason: settlement.disputeReason ?? undefined,
+    paymentMethod: settlement.paymentMethod,
+    paymentRef: settlement.paymentRef,
+    paidAt: settlement.paidAt,
+    adminNotes: settlement.adminNotes,
+    disputeReason: settlement.disputeReason,
+    approvedBy: settlement.approvedBy,
+    approvedAt: settlement.approvedAt,
     createdAt: settlement.createdAt,
     captures: settlement.captures.map(c => ({
       id: c.id,
       holdId: c.holdId,
       creatorId: c.creatorId,
-      creatorEmail: c.creatorEmail ?? undefined,
+      creatorEmail: c.creatorEmail,
       projectId: c.projectId,
-      projectName: c.projectName ?? undefined,
+      projectName: c.projectName,
       amount: Number(c.amount),
       capturedAt: c.capturedAt,
     })),
-    byCreator: Array.from(byCreator.values()).sort((a, b) => b.amount - a.amount),
-    byProject: Array.from(byProject.values()).sort((a, b) => b.amount - a.amount),
+    byCreator: Array.from(byCreatorMap.entries()).map(([creatorId, data]) => ({
+      creatorId,
+      creatorEmail: data.email,
+      amount: data.amount,
+      count: data.count,
+    })),
+    byProject: Array.from(byProjectMap.entries()).map(([projectId, data]) => ({
+      projectId,
+      projectName: data.name,
+      amount: data.amount,
+      count: data.count,
+    })),
   };
 }
 
-/**
- * Get settlement statistics
- */
-export async function getSettlementStats(partnerId?: string): Promise<{
-  totalPending: number;
-  pendingCount: number;
-  totalPaidThisMonth: number;
-  paidCountThisMonth: number;
-  totalPaidThisYear: number;
-  paidCountThisYear: number;
-}> {
+export async function getSettlementStats(partnerId?: string): Promise<SettlementStats> {
   const now = new Date();
-  const startOfMonth = new Date(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  const startOfYear = new Date(now.getUTCFullYear(), 0, 1);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-  const baseWhere: Prisma.PartnerSettlementWhereInput = partnerId
-    ? { partnerId }
-    : {};
+  const baseWhere: Prisma.PartnerSettlementWhereInput = partnerId ? { partnerId } : {};
 
   const [pending, paidThisMonth, paidThisYear] = await Promise.all([
     prisma.partnerSettlement.aggregate({
@@ -685,19 +229,20 @@ export async function getSettlementStats(partnerId?: string): Promise<{
   ]);
 
   return {
-    totalPending: Number(pending._sum.netAmount ?? 0),
+    totalPending: Number(pending._sum.netAmount) || 0,
     pendingCount: pending._count,
-    totalPaidThisMonth: Number(paidThisMonth._sum.netAmount ?? 0),
+    totalPaidThisMonth: Number(paidThisMonth._sum.netAmount) || 0,
     paidCountThisMonth: paidThisMonth._count,
-    totalPaidThisYear: Number(paidThisYear._sum.netAmount ?? 0),
+    totalPaidThisYear: Number(paidThisYear._sum.netAmount) || 0,
     paidCountThisYear: paidThisYear._count,
   };
 }
 
-/**
- * Get captures with filtering (for partner API)
- */
-export async function getCaptures(params: {
+// ==============================================
+// CAPTURE FUNCTIONS
+// ==============================================
+
+export interface GetCapturesParams {
   partnerId: string;
   settled?: boolean;
   creatorId?: string;
@@ -706,35 +251,23 @@ export async function getCaptures(params: {
   to?: Date;
   limit?: number;
   offset?: number;
-}): Promise<{
-  captures: CaptureDetail[];
-  summary: { totalUnsettled: number; captureCount: number };
-  total: number;
-}> {
+}
+
+export async function getCaptures(params: GetCapturesParams) {
   const { partnerId, settled, creatorId, projectId, from, to, limit = 20, offset = 0 } = params;
 
   const where: Prisma.CreditCaptureWhereInput = { partnerId };
 
-  if (typeof settled === 'boolean') {
-    where.settlementId = settled ? { not: null } : null;
-  }
+  if (settled === true) where.settlementId = { not: null };
+  else if (settled === false) where.settlementId = null;
 
-  if (creatorId) {
-    where.creatorId = creatorId;
-  }
-
-  if (projectId) {
-    where.projectId = projectId;
-  }
+  if (creatorId) where.creatorId = creatorId;
+  if (projectId) where.projectId = projectId;
 
   if (from || to) {
     where.capturedAt = {};
-    if (from) {
-      where.capturedAt.gte = from;
-    }
-    if (to) {
-      where.capturedAt.lte = to;
-    }
+    if (from) where.capturedAt.gte = from;
+    if (to) where.capturedAt.lte = to;
   }
 
   const [captures, total, unsettledSum] = await Promise.all([
@@ -757,16 +290,189 @@ export async function getCaptures(params: {
       id: c.id,
       holdId: c.holdId,
       creatorId: c.creatorId,
-      creatorEmail: c.creatorEmail ?? undefined,
+      creatorEmail: c.creatorEmail,
       projectId: c.projectId,
-      projectName: c.projectName ?? undefined,
+      projectName: c.projectName,
       amount: Number(c.amount),
       capturedAt: c.capturedAt,
     })),
+    total,
     summary: {
-      totalUnsettled: Number(unsettledSum._sum.amount ?? 0),
+      totalUnsettled: Number(unsettledSum._sum.amount) || 0,
       captureCount: unsettledSum._count,
     },
-    total,
   };
+}
+
+export interface CreateCaptureParams {
+  holdId: string;
+  partnerId: string;
+  creatorId: string;
+  creatorEmail?: string;
+  projectId: string;
+  projectName?: string;
+  amount: number;
+}
+
+export async function createCapture(params: CreateCaptureParams) {
+  const { holdId, partnerId, creatorId, creatorEmail, projectId, projectName, amount } = params;
+
+  const capture = await prisma.creditCapture.create({
+    data: {
+      holdId,
+      partnerId,
+      creatorId,
+      creatorEmail,
+      projectId,
+      projectName,
+      amount,
+    },
+  });
+
+  return capture;
+}
+
+// ==============================================
+// SETTLEMENT STATUS FUNCTIONS
+// ==============================================
+
+export async function approveSettlement(id: string, adminId: string) {
+  return prisma.partnerSettlement.update({
+    where: { id },
+    data: {
+      status: SettlementStatus.APPROVED,
+      approvedBy: adminId,
+      approvedAt: new Date(),
+    },
+  });
+}
+
+export async function processSettlement(id: string) {
+  return prisma.partnerSettlement.update({
+    where: { id },
+    data: {
+      status: SettlementStatus.PROCESSING,
+    },
+  });
+}
+
+export async function markSettlementPaid(id: string, paymentRef: string, paymentMethod?: string) {
+  return prisma.partnerSettlement.update({
+    where: { id },
+    data: {
+      status: SettlementStatus.PAID,
+      paymentRef,
+      paymentMethod,
+      paidAt: new Date(),
+    },
+  });
+}
+
+export async function markSettlementFailed(id: string, reason?: string) {
+  return prisma.partnerSettlement.update({
+    where: { id },
+    data: {
+      status: SettlementStatus.FAILED,
+      adminNotes: reason,
+    },
+  });
+}
+
+export async function disputeSettlement(id: string, reason: string) {
+  return prisma.partnerSettlement.update({
+    where: { id },
+    data: {
+      status: SettlementStatus.DISPUTED,
+      disputeReason: reason,
+    },
+  });
+}
+
+// ==============================================
+// SETTLEMENT GENERATION
+// ==============================================
+
+export async function generateSettlement(partnerId: string, periodStart: Date, periodEnd: Date) {
+  // Get partner config
+  const partner = await prisma.partner.findUnique({
+    where: { id: partnerId },
+    select: { id: true, partnerFeePercent: true, minimumSettlement: true, paymentMethod: true },
+  });
+
+  if (!partner) {
+    throw new Error('Partner not found');
+  }
+
+  // Get unsettled captures in the period
+  const captures = await prisma.creditCapture.findMany({
+    where: {
+      partnerId,
+      settlementId: null,
+      capturedAt: { gte: periodStart, lte: periodEnd },
+    },
+  });
+
+  if (captures.length === 0) {
+    return null; // No captures to settle
+  }
+
+  // Calculate totals
+  const grossAmount = captures.reduce((sum, c) => sum + Number(c.amount), 0);
+  const feePercentage = Number(partner.partnerFeePercent);
+  const partnerFee = grossAmount * feePercentage;
+  const netAmount = grossAmount - partnerFee;
+
+  // Check minimum
+  if (netAmount < Number(partner.minimumSettlement)) {
+    return null; // Below minimum threshold
+  }
+
+  // Create settlement and link captures
+  const settlement = await prisma.partnerSettlement.create({
+    data: {
+      partnerId,
+      periodStart,
+      periodEnd,
+      grossAmount,
+      partnerFee,
+      feePercentage,
+      netAmount,
+      paymentMethod: partner.paymentMethod,
+      captures: {
+        connect: captures.map(c => ({ id: c.id })),
+      },
+    },
+    include: {
+      _count: { select: { captures: true } },
+    },
+  });
+
+  return settlement;
+}
+
+export async function generateAllSettlements(periodStart: Date, periodEnd: Date) {
+  // Get all active partners with unsettled captures
+  const partnersWithCaptures = await prisma.creditCapture.groupBy({
+    by: ['partnerId'],
+    where: {
+      settlementId: null,
+      capturedAt: { gte: periodStart, lte: periodEnd },
+    },
+    _sum: { amount: true },
+  });
+
+  const results = [];
+
+  for (const p of partnersWithCaptures) {
+    try {
+      const settlement = await generateSettlement(p.partnerId, periodStart, periodEnd);
+      if (settlement) {
+        results.push({ partnerId: p.partnerId, settlementId: settlement.id, success: true });
+      }
+    } catch (error) {
+      results.push({ partnerId: p.partnerId, success: false, error: String(error) });
+    }
+  }
+
+  return results;
 }

@@ -1,12 +1,8 @@
 // app/api/admin/settlements/[id]/paid/route.ts
-// Mark settlement as paid
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFromRequest } from '@/lib/admin/auth';
+import { markSettlementPaid, getSettlementDetail } from '@/lib/settlements';
 import { prisma } from '@/lib/db';
-import { SettlementStatus } from '@prisma/client';
-import { notifySettlementStatusChange } from '@/lib/settlements/webhooks';
-import { sendSettlementPaidEmail } from '@/lib/settlements/emails';
 
 export async function POST(
   request: NextRequest,
@@ -14,65 +10,42 @@ export async function POST(
 ) {
   try {
     const admin = await getAdminFromRequest();
-
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!['SUPER_ADMIN', 'ADMIN', 'FINANCE'].includes(admin.role)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
     const { id } = await params;
-    const body = await request.json().catch(() => ({}));
+    const body = await request.json();
     const { paymentRef } = body;
 
-    const settlement = await prisma.partnerSettlement.findUnique({
-      where: { id },
-    });
+    if (!paymentRef) {
+      return NextResponse.json({ error: 'Payment reference is required' }, { status: 400 });
+    }
+
+    const settlement = await getSettlementDetail(id);
 
     if (!settlement) {
       return NextResponse.json({ error: 'Settlement not found' }, { status: 404 });
     }
 
-    if (settlement.status !== SettlementStatus.PROCESSING) {
-      return NextResponse.json({ error: `Cannot mark as paid with status: ${settlement.status}` }, { status: 400 });
+    if (settlement.status !== 'PROCESSING') {
+      return NextResponse.json({ error: 'Settlement is not processing' }, { status: 400 });
     }
 
-    // Update settlement
-    await prisma.partnerSettlement.update({
-      where: { id },
-      data: {
-        status: SettlementStatus.PAID,
-        paymentRef: paymentRef || settlement.paymentRef,
-        paidAt: new Date(),
-      },
-    });
+    await markSettlementPaid(id, paymentRef);
 
-    // Log the action
+    // Audit log
     await prisma.adminAuditLog.create({
       data: {
         adminId: admin.id,
         action: 'settlement.paid',
         resource: 'PartnerSettlement',
         resourceId: id,
-        details: JSON.stringify({
-          paymentRef: paymentRef || settlement.paymentRef,
-          netAmount: settlement.netAmount.toString(),
-        }),
+        details: JSON.stringify({ partnerId: settlement.partnerId, amount: settlement.netAmount, paymentRef }),
       },
     });
 
-    // Send webhook and email
-    await Promise.all([
-      notifySettlementStatusChange(id, SettlementStatus.PAID),
-      sendSettlementPaidEmail(id),
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Settlement marked as paid',
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to mark settlement as paid:', error);
     return NextResponse.json({ error: 'Failed to mark settlement as paid' }, { status: 500 });

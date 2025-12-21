@@ -1,36 +1,13 @@
 // app/admin/settlements/[id]/page.tsx
-// Settlement detail page
+// Admin settlement detail page
 
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { redirect, notFound } from 'next/navigation';
-import { prisma } from '@/lib/db';
-import Link from 'next/link';
+import { getSettlementDetail } from '@/lib/settlements';
 import { SettlementStatus } from '@prisma/client';
+import Link from 'next/link';
 import { SettlementActions } from './SettlementActions';
-
-async function getSettlement(id: string) {
-  const settlement = await prisma.partnerSettlement.findUnique({
-    where: { id },
-    include: {
-      partner: {
-        select: {
-          id: true,
-          name: true,
-          contactEmail: true,
-          paymentMethod: true,
-          bankName: true,
-          bankSwiftCode: true,
-        },
-      },
-      captures: {
-        orderBy: { capturedAt: 'asc' },
-      },
-    },
-  });
-
-  return settlement;
-}
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -39,44 +16,23 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function getStatusBadgeClass(status: SettlementStatus): string {
+  switch (status) {
+    case 'PAID': return 'bg-green-100 text-green-800';
+    case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+    case 'APPROVED': return 'bg-blue-100 text-blue-800';
+    case 'PROCESSING': return 'bg-purple-100 text-purple-800';
+    case 'FAILED': return 'bg-red-100 text-red-800';
+    case 'DISPUTED': return 'bg-orange-100 text-orange-800';
+    default: return 'bg-neutral-100 text-neutral-800';
+  }
 }
 
-function formatDateRange(start: Date, end: Date): string {
-  const startStr = start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  const endStr = end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  return `${startStr} - ${endStr}`;
-}
-
-function StatusBadge({ status }: { status: SettlementStatus }) {
-  const styles: Record<SettlementStatus, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    APPROVED: 'bg-blue-100 text-blue-800',
-    PROCESSING: 'bg-purple-100 text-purple-800',
-    PAID: 'bg-green-100 text-green-800',
-    FAILED: 'bg-red-100 text-red-800',
-    DISPUTED: 'bg-orange-100 text-orange-800',
-  };
-
-  return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  );
-}
-
-export default async function SettlementDetailPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default async function SettlementDetailPage({ params }: PageProps) {
   const admin = await getAdminFromRequest();
 
   if (!admin) {
@@ -84,284 +40,193 @@ export default async function SettlementDetailPage({
   }
 
   const { id } = await params;
-  const settlement = await getSettlement(id);
+  const settlement = await getSettlementDetail(id);
 
   if (!settlement) {
     notFound();
   }
 
-  // Group captures by creator
-  const byCreator = new Map<string, { email?: string; amount: number; count: number }>();
-  for (const capture of settlement.captures) {
-    const existing = byCreator.get(capture.creatorId);
-    if (existing) {
-      existing.amount += Number(capture.amount);
-      existing.count += 1;
-    } else {
-      byCreator.set(capture.creatorId, {
-        email: capture.creatorEmail ?? undefined,
-        amount: Number(capture.amount),
-        count: 1,
-      });
-    }
-  }
-
-  // Group by project
-  const byProject = new Map<string, { name?: string; amount: number; count: number }>();
-  for (const capture of settlement.captures) {
-    const existing = byProject.get(capture.projectId);
-    if (existing) {
-      existing.amount += Number(capture.amount);
-      existing.count += 1;
-    } else {
-      byProject.set(capture.projectId, {
-        name: capture.projectName ?? undefined,
-        amount: Number(capture.amount),
-        count: 1,
-      });
-    }
-  }
-
   return (
     <AdminLayout
-      title={`Settlement #${id.slice(0, 8)}...`}
-      description={`${settlement.partner.name} - ${formatDateRange(settlement.periodStart, settlement.periodEnd)}`}
-      backLink="/admin/settlements"
+      title={`Settlement - ${settlement.partnerName}`}
+      description={`${settlement.periodStart.toLocaleDateString()} to ${settlement.periodEnd.toLocaleDateString()}`}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Summary Card */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-neutral-900">Settlement Summary</h2>
-              <StatusBadge status={settlement.status} />
-            </div>
+      <div className="mb-6">
+        <Link href="/admin/settlements" className="text-primary-600 hover:text-primary-700 text-sm">
+          ← Back to Settlements
+        </Link>
+      </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <p className="text-sm text-neutral-500">Partner</p>
-                <Link href={`/admin/partners/${settlement.partnerId}`} className="text-primary-600 hover:underline font-medium">
-                  {settlement.partner.name}
-                </Link>
-              </div>
-              <div>
-                <p className="text-sm text-neutral-500">Contact</p>
-                <p className="text-neutral-900">{settlement.partner.contactEmail || '-'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-neutral-500">Period</p>
-                <p className="text-neutral-900">{formatDateRange(settlement.periodStart, settlement.periodEnd)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-neutral-500">Captures</p>
-                <p className="text-neutral-900">{settlement.captures.length}</p>
-              </div>
-            </div>
-
-            <div className="bg-neutral-50 rounded-lg p-4">
-              <div className="flex justify-between py-2">
-                <span className="text-neutral-600">Gross Amount</span>
-                <span className="font-medium">{formatCurrency(Number(settlement.grossAmount))}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-neutral-600">Partner Fee ({(Number(settlement.feePercentage) * 100).toFixed(1)}%)</span>
-                <span className="font-medium text-red-600">-{formatCurrency(Number(settlement.partnerFee))}</span>
-              </div>
-              <div className="border-t border-neutral-200 mt-2 pt-2">
-                <div className="flex justify-between py-2">
-                  <span className="font-semibold text-neutral-900">Net Amount</span>
-                  <span className="font-bold text-green-600 text-lg">{formatCurrency(Number(settlement.netAmount))}</span>
-                </div>
-              </div>
-            </div>
+      {/* Summary Card */}
+      <div className="bg-white rounded-lg border border-neutral-200 p-6 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-neutral-900">{settlement.partnerName}</h2>
+            <p className="text-neutral-500">
+              Period: {settlement.periodStart.toLocaleDateString()} - {settlement.periodEnd.toLocaleDateString()}
+            </p>
           </div>
+          <span className={`inline-flex px-3 py-1.5 text-sm font-medium rounded-full ${getStatusBadgeClass(settlement.status)}`}>
+            {settlement.status}
+          </span>
+        </div>
 
-          {/* Captures by Creator */}
-          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-200">
-              <h2 className="font-semibold text-neutral-900">By Creator</h2>
-            </div>
-            <table className="min-w-full divide-y divide-neutral-200">
-              <thead className="bg-neutral-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Creator ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Captures</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {Array.from(byCreator.entries())
-                  .sort((a, b) => b[1].amount - a[1].amount)
-                  .map(([creatorId, data]) => (
-                    <tr key={creatorId}>
-                      <td className="px-6 py-4 text-sm font-mono text-neutral-900">{creatorId}</td>
-                      <td className="px-6 py-4 text-sm text-neutral-500">{data.email || '-'}</td>
-                      <td className="px-6 py-4 text-sm text-neutral-500">{data.count}</td>
-                      <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(data.amount)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+        <div className="grid md:grid-cols-4 gap-6">
+          <div>
+            <p className="text-sm text-neutral-500">Gross Amount</p>
+            <p className="text-2xl font-semibold text-neutral-900">{formatCurrency(settlement.grossAmount)}</p>
           </div>
-
-          {/* Captures by Project */}
-          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-200">
-              <h2 className="font-semibold text-neutral-900">By Project</h2>
-            </div>
-            <table className="min-w-full divide-y divide-neutral-200">
-              <thead className="bg-neutral-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Project ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Captures</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {Array.from(byProject.entries())
-                  .sort((a, b) => b[1].amount - a[1].amount)
-                  .map(([projectId, data]) => (
-                    <tr key={projectId}>
-                      <td className="px-6 py-4 text-sm font-mono text-neutral-900">{projectId}</td>
-                      <td className="px-6 py-4 text-sm text-neutral-500">{data.name || '-'}</td>
-                      <td className="px-6 py-4 text-sm text-neutral-500">{data.count}</td>
-                      <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(data.amount)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+          <div>
+            <p className="text-sm text-neutral-500">Platform Fee ({(settlement.feePercentage * 100).toFixed(1)}%)</p>
+            <p className="text-2xl font-semibold text-red-600">-{formatCurrency(settlement.partnerFee)}</p>
           </div>
-
-          {/* All Captures */}
-          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-200">
-              <h2 className="font-semibold text-neutral-900">All Captures ({settlement.captures.length})</h2>
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              <table className="min-w-full divide-y divide-neutral-200">
-                <thead className="bg-neutral-50 sticky top-0">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Capture ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Creator</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Project</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Captured At</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-200">
-                  {settlement.captures.map((capture) => (
-                    <tr key={capture.id}>
-                      <td className="px-6 py-3 text-xs font-mono text-neutral-500">{capture.id.slice(0, 8)}...</td>
-                      <td className="px-6 py-3 text-sm text-neutral-900">{capture.creatorId}</td>
-                      <td className="px-6 py-3 text-sm text-neutral-500">{capture.projectName || capture.projectId}</td>
-                      <td className="px-6 py-3 text-sm text-neutral-500">{formatDate(capture.capturedAt)}</td>
-                      <td className="px-6 py-3 text-sm text-right font-medium">{formatCurrency(Number(capture.amount))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div>
+            <p className="text-sm text-neutral-500">Net Payout</p>
+            <p className="text-2xl font-semibold text-green-600">{formatCurrency(settlement.netAmount)}</p>
+          </div>
+          <div>
+            <p className="text-sm text-neutral-500">Captures</p>
+            <p className="text-2xl font-semibold text-neutral-900">{settlement.captureCount}</p>
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Actions */}
-          <SettlementActions
-            settlementId={settlement.id}
-            status={settlement.status}
-            netAmount={Number(settlement.netAmount)}
-            paymentMethod={settlement.partner.paymentMethod}
-            paymentRef={settlement.paymentRef}
-          />
+        {/* Actions */}
+        <div className="mt-6 pt-6 border-t border-neutral-200">
+          <SettlementActions settlementId={settlement.id} status={settlement.status} />
+        </div>
+      </div>
 
-          {/* Payment Details */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-6">
-            <h3 className="font-semibold text-neutral-900 mb-4">Payment Details</h3>
-            <dl className="space-y-3 text-sm">
+      {/* Payment Info */}
+      {(settlement.paymentMethod || settlement.paymentRef || settlement.paidAt) && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6 mb-6">
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">Payment Details</h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            {settlement.paymentMethod && (
               <div>
-                <dt className="text-neutral-500">Method</dt>
-                <dd className="font-medium">{settlement.partner.paymentMethod || 'Not configured'}</dd>
+                <p className="text-sm text-neutral-500">Payment Method</p>
+                <p className="font-medium text-neutral-900">{settlement.paymentMethod}</p>
               </div>
-              {settlement.partner.bankName && (
-                <div>
-                  <dt className="text-neutral-500">Bank</dt>
-                  <dd className="font-medium">{settlement.partner.bankName}</dd>
-                </div>
-              )}
-              {settlement.partner.bankSwiftCode && (
-                <div>
-                  <dt className="text-neutral-500">SWIFT/BIC</dt>
-                  <dd className="font-mono">{settlement.partner.bankSwiftCode}</dd>
-                </div>
-              )}
-              {settlement.paymentRef && (
-                <div>
-                  <dt className="text-neutral-500">Payment Reference</dt>
-                  <dd className="font-mono">{settlement.paymentRef}</dd>
-                </div>
-              )}
-              {settlement.paidAt && (
-                <div>
-                  <dt className="text-neutral-500">Paid At</dt>
-                  <dd>{formatDate(settlement.paidAt)}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-
-          {/* Timeline */}
-          <div className="bg-white rounded-xl border border-neutral-200 p-6">
-            <h3 className="font-semibold text-neutral-900 mb-4">Timeline</h3>
-            <div className="space-y-4 text-sm">
-              <div className="flex gap-3">
-                <div className="w-2 h-2 mt-1.5 rounded-full bg-neutral-400"></div>
-                <div>
-                  <p className="font-medium">Created</p>
-                  <p className="text-neutral-500">{formatDate(settlement.createdAt)}</p>
-                </div>
+            )}
+            {settlement.paymentRef && (
+              <div>
+                <p className="text-sm text-neutral-500">Reference</p>
+                <p className="font-medium text-neutral-900">{settlement.paymentRef}</p>
               </div>
-              {settlement.approvedAt && (
-                <div className="flex gap-3">
-                  <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500"></div>
-                  <div>
-                    <p className="font-medium">Approved</p>
-                    <p className="text-neutral-500">{formatDate(settlement.approvedAt)}</p>
-                    {settlement.approvedBy && <p className="text-neutral-400 text-xs">by {settlement.approvedBy}</p>}
-                  </div>
-                </div>
-              )}
-              {settlement.paidAt && (
-                <div className="flex gap-3">
-                  <div className="w-2 h-2 mt-1.5 rounded-full bg-green-500"></div>
-                  <div>
-                    <p className="font-medium">Paid</p>
-                    <p className="text-neutral-500">{formatDate(settlement.paidAt)}</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
+            {settlement.paidAt && (
+              <div>
+                <p className="text-sm text-neutral-500">Paid At</p>
+                <p className="font-medium text-neutral-900">{settlement.paidAt.toLocaleString()}</p>
+              </div>
+            )}
           </div>
+        </div>
+      )}
 
-          {/* Notes */}
+      {/* Notes */}
+      {(settlement.adminNotes || settlement.disputeReason) && (
+        <div className="bg-white rounded-lg border border-neutral-200 p-6 mb-6">
+          <h3 className="text-lg font-semibold text-neutral-900 mb-4">Notes</h3>
           {settlement.adminNotes && (
-            <div className="bg-white rounded-xl border border-neutral-200 p-6">
-              <h3 className="font-semibold text-neutral-900 mb-4">Notes</h3>
-              <pre className="text-sm text-neutral-600 whitespace-pre-wrap font-sans">{settlement.adminNotes}</pre>
+            <div className="mb-4">
+              <p className="text-sm text-neutral-500 mb-1">Admin Notes</p>
+              <p className="text-neutral-700">{settlement.adminNotes}</p>
             </div>
           )}
-
-          {/* Dispute Reason */}
           {settlement.disputeReason && (
-            <div className="bg-orange-50 rounded-xl border border-orange-200 p-6">
-              <h3 className="font-semibold text-orange-900 mb-2">Dispute Reason</h3>
-              <p className="text-sm text-orange-800">{settlement.disputeReason}</p>
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-sm text-orange-600 font-medium mb-1">Dispute Reason</p>
+              <p className="text-orange-800">{settlement.disputeReason}</p>
             </div>
           )}
         </div>
+      )}
+
+      {/* By Creator */}
+      <div className="bg-white rounded-lg border border-neutral-200 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">By Creator</h3>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-neutral-200">
+              <th className="py-2 text-left text-sm font-medium text-neutral-500">Creator ID</th>
+              <th className="py-2 text-left text-sm font-medium text-neutral-500">Email</th>
+              <th className="py-2 text-right text-sm font-medium text-neutral-500">Captures</th>
+              <th className="py-2 text-right text-sm font-medium text-neutral-500">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {settlement.byCreator.map(c => (
+              <tr key={c.creatorId}>
+                <td className="py-2 text-sm font-mono text-neutral-900">{c.creatorId}</td>
+                <td className="py-2 text-sm text-neutral-600">{c.creatorEmail || '-'}</td>
+                <td className="py-2 text-sm text-right text-neutral-600">{c.count}</td>
+                <td className="py-2 text-sm text-right font-medium text-neutral-900">{formatCurrency(c.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* By Project */}
+      <div className="bg-white rounded-lg border border-neutral-200 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">By Project</h3>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-neutral-200">
+              <th className="py-2 text-left text-sm font-medium text-neutral-500">Project ID</th>
+              <th className="py-2 text-left text-sm font-medium text-neutral-500">Name</th>
+              <th className="py-2 text-right text-sm font-medium text-neutral-500">Captures</th>
+              <th className="py-2 text-right text-sm font-medium text-neutral-500">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {settlement.byProject.map(p => (
+              <tr key={p.projectId}>
+                <td className="py-2 text-sm font-mono text-neutral-900">{p.projectId}</td>
+                <td className="py-2 text-sm text-neutral-600">{p.projectName || '-'}</td>
+                <td className="py-2 text-sm text-right text-neutral-600">{p.count}</td>
+                <td className="py-2 text-sm text-right font-medium text-neutral-900">{formatCurrency(p.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* All Captures */}
+      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        <div className="p-6 border-b border-neutral-200">
+          <h3 className="text-lg font-semibold text-neutral-900">All Captures ({settlement.captureCount})</h3>
+        </div>
+        <table className="w-full">
+          <thead className="bg-neutral-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Captured At</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Creator</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Project</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-neutral-500 uppercase">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {settlement.captures.slice(0, 50).map(c => (
+              <tr key={c.id} className="hover:bg-neutral-50">
+                <td className="px-4 py-3 text-sm text-neutral-600">{c.capturedAt.toLocaleString()}</td>
+                <td className="px-4 py-3 text-sm">
+                  <span className="font-mono text-neutral-900">{c.creatorId}</span>
+                  {c.creatorEmail && <span className="text-neutral-500 ml-2">({c.creatorEmail})</span>}
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {c.projectName || <span className="font-mono text-neutral-600">{c.projectId}</span>}
+                </td>
+                <td className="px-4 py-3 text-sm text-right font-medium text-neutral-900">{formatCurrency(c.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {settlement.captureCount > 50 && (
+          <div className="p-4 bg-neutral-50 border-t border-neutral-200 text-center text-sm text-neutral-500">
+            Showing first 50 of {settlement.captureCount} captures
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

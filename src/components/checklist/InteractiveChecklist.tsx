@@ -324,14 +324,16 @@ export const settlementChecklistData: ChecklistSection[] = [
   {
     id: 'partner-api',
     title: '7. Partner Settlement API',
-    description: 'Implement internal API endpoints for partners',
+    description: 'Implement internal API endpoints for partners (VPN access via /internal)',
     items: [
-      { id: 'api-1', label: 'Implement GET /internal/settlements', completed: false, description: 'List settlements with filters: status, limit, offset, from, to' },
-      { id: 'api-2', label: 'Implement GET /internal/settlements/:id', completed: false, description: 'Detailed settlement with capture breakdown, summary by creator/project' },
-      { id: 'api-3', label: 'Implement GET /internal/captures', completed: false, description: 'Query unsettled captures with filters: settled, creatorId, projectId, from, to' },
-      { id: 'api-4', label: 'Implement POST /internal/captures', completed: false, description: 'Record capture metadata: holdId, creatorId, creatorEmail, projectId, projectName' },
-      { id: 'api-5', label: 'Add X-Internal-Key header validation', completed: false },
+      { id: 'api-1', label: 'Implement GET /internal?action=settlements', completed: false, description: 'List settlements with filters: status, limit, offset, from, to, partnerId' },
+      { id: 'api-2', label: 'Implement GET /internal?action=settlement&id=X', completed: false, description: 'Detailed settlement with capture breakdown, summary by creator/project' },
+      { id: 'api-3', label: 'Implement GET /internal?action=captures', completed: false, description: 'Query unsettled captures with filters: settled, creatorId, projectId, from, to' },
+      { id: 'api-4', label: 'Implement POST /internal?action=record_capture', completed: false, description: 'Record capture metadata: holdId, partnerId, creatorId, creatorEmail, projectId, projectName, amount' },
+      { id: 'api-5', label: 'Add Bearer token authorization (Authorization: Bearer <INTERNAL_API_KEY>)', completed: false },
       { id: 'api-6', label: 'Add proper pagination to all list endpoints', completed: false },
+      { id: 'api-7', label: 'Partner session API: GET /api/partners/settlements', completed: false, description: 'Alternative endpoint using partner session auth instead of VPN' },
+      { id: 'api-8', label: 'Partner session API: GET /api/partners/captures', completed: false, description: 'Alternative endpoint using partner session auth instead of VPN' },
     ]
   },
   {

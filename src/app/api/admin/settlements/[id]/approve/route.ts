@@ -1,11 +1,8 @@
 // app/api/admin/settlements/[id]/approve/route.ts
-// Approve a settlement
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFromRequest } from '@/lib/admin/auth';
+import { approveSettlement, getSettlementDetail } from '@/lib/settlements';
 import { prisma } from '@/lib/db';
-import { SettlementStatus } from '@prisma/client';
-import { notifySettlementStatusChange } from '@/lib/settlements/webhooks';
 
 export async function POST(
   request: NextRequest,
@@ -13,61 +10,35 @@ export async function POST(
 ) {
   try {
     const admin = await getAdminFromRequest();
-
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!['SUPER_ADMIN', 'ADMIN', 'FINANCE'].includes(admin.role)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
     const { id } = await params;
-
-    const settlement = await prisma.partnerSettlement.findUnique({
-      where: { id },
-    });
+    const settlement = await getSettlementDetail(id);
 
     if (!settlement) {
       return NextResponse.json({ error: 'Settlement not found' }, { status: 404 });
     }
 
-    // Can only approve from PENDING, FAILED, or DISPUTED states
-    if (!['PENDING', 'FAILED', 'DISPUTED'].includes(settlement.status)) {
-      return NextResponse.json({ error: `Cannot approve settlement with status: ${settlement.status}` }, { status: 400 });
+    if (settlement.status !== 'PENDING') {
+      return NextResponse.json({ error: 'Settlement is not pending' }, { status: 400 });
     }
 
-    // Update settlement
-    await prisma.partnerSettlement.update({
-      where: { id },
-      data: {
-        status: SettlementStatus.APPROVED,
-        approvedBy: admin.id,
-        approvedAt: new Date(),
-      },
-    });
+    await approveSettlement(id, admin.id);
 
-    // Log the action
+    // Audit log
     await prisma.adminAuditLog.create({
       data: {
         adminId: admin.id,
         action: 'settlement.approve',
         resource: 'PartnerSettlement',
         resourceId: id,
-        details: JSON.stringify({
-          previousStatus: settlement.status,
-          netAmount: settlement.netAmount.toString(),
-        }),
+        details: JSON.stringify({ partnerId: settlement.partnerId, amount: settlement.netAmount }),
       },
     });
 
-    // Send webhook
-    await notifySettlementStatusChange(id, SettlementStatus.APPROVED);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Settlement approved',
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to approve settlement:', error);
     return NextResponse.json({ error: 'Failed to approve settlement' }, { status: 500 });

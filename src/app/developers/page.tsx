@@ -3,14 +3,39 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { InteractiveChecklist, settlementChecklistData } from '@/components/checklist/InteractiveChecklist';
 
+type TabId = 'overview' | 'api' | 'settlements' | 'checklist';
+
 export default function DevelopersPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'api' | 'settlements' | 'checklist'>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
+
+  // Handle URL hash navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['overview', 'api', 'settlements', 'checklist'].includes(hash)) {
+        setActiveTab(hash as TabId);
+      }
+    };
+
+    // Check hash on initial load
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Update URL hash when tab changes
+  const handleTabChange = (tabId: TabId) => {
+    setActiveTab(tabId);
+    window.history.replaceState(null, '', `#${tabId}`);
+  };
 
   return (
     <>
@@ -28,7 +53,7 @@ export default function DevelopersPage() {
             <Link href="/become-a-partner">
               <Button size="lg">Get API Access</Button>
             </Link>
-            <button onClick={() => setActiveTab('checklist')}>
+            <button onClick={() => handleTabChange('checklist')}>
               <Button variant="outline" size="lg">
                 Integration Checklist ({Math.round((progress.completed / Math.max(progress.total, 1)) * 100)}%)
               </Button>
@@ -49,7 +74,7 @@ export default function DevelopersPage() {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                onClick={() => handleTabChange(tab.id as TabId)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
                   activeTab === tab.id
                     ? 'border-primary-600 text-primary-600'
