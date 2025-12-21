@@ -5,11 +5,11 @@ module.exports = {
   apps: [
     {
       name: 'divinitycoin',
-      script: 'node_modules/.bin/next',
+      script: 'npm',
       args: 'start',
       cwd: '/root/divinitycoin',
       instances: 1,
-      exec_mode: 'cluster',
+      exec_mode: 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
