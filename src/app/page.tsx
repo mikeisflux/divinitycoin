@@ -319,6 +319,41 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Partner CTA Section */}
+      <section className="py-24 bg-neutral-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white">
+            Want to Accept DivinityCoin on Your Platform?
+          </h2>
+          <p className="mt-4 text-xl text-neutral-300">
+            Partner with us and offer your users a new way to fund creators and projects.
+          </p>
+          <div className="mt-10">
+            <Link href="/become-a-partner">
+              <Button
+                size="xl"
+                className="bg-primary-600 text-white hover:bg-primary-700"
+              >
+                Become a Partner
+                <svg
+                  className="ml-2 w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-24 bg-primary-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

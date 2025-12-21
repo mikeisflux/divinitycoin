@@ -20,8 +20,7 @@ model User {
   passwordHash  String?
 
   // Profile
-  firstName     String?
-  lastName      String?
+  name          String?
 
   // Stripe
   stripeCustomerId String? @unique
@@ -31,11 +30,11 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  purchasedCards GiftCard[]     @relation("PurchasedCards")
-  redeemedCards  GiftCard[]     @relation("RedeemedCards")
-  creditBalance  CreditBalance?
-  transactions   Transaction[]
-  sessions       Session[]
+  purchasedCards  GiftCard[]      @relation("PurchasedCards")
+  redeemedCards   GiftCard[]      @relation("RedeemedCards")
+  creditBalances  CreditBalance[]
+  transactions    Transaction[]
+  sessions        Session[]
 
   @@index([email])
   @@index([stripeCustomerId])
@@ -73,12 +72,12 @@ model GiftCard {
   currency      String         @default("USD")
 
   // Status
-  status        GiftCardStatus @default(ACTIVE)
+  status        GiftCardStatus @default(PENDING)
 
   // Purchase info
   purchaserId   String?
   purchaser     User?          @relation("PurchasedCards", fields: [purchaserId], references: [id])
-  purchaseEmail String?        // For guest purchases
+  purchasedByEmail String?     // For guest purchases
 
   // Stripe
   stripePaymentIntentId String? @unique
@@ -87,11 +86,20 @@ model GiftCard {
   // Redemption info
   redeemedById  String?
   redeemedBy    User?          @relation("RedeemedCards", fields: [redeemedById], references: [id])
+  redeemedByEmail String?      // Email of redeemer
   redeemedAt    DateTime?
   redeemedOnPlatform String?   // Which platform redeemed it
+  redeemedByPlatformUserId String? // Platform user ID
 
   // Validity
+  activatedAt   DateTime?
   expiresAt     DateTime?
+
+  // Metadata
+  metadata      String?        @db.Text
+
+  // Transactions
+  transactions  Transaction[]
 
   // Timestamps
   createdAt     DateTime       @default(now())
@@ -120,6 +128,7 @@ model CreditBalance {
 
   // User (linked via platform user ID)
   platformUserId  String   @unique  // User ID from IndieCrowdfund
+  email           String?  // Email for matching
 
   // Or local user for account linking
   userId          String?  @unique
@@ -138,6 +147,7 @@ model CreditBalance {
   ledgerEntries   CreditLedger[]
 
   @@index([platformUserId])
+  @@index([email])
 }
 
 model CreditHold {
@@ -237,6 +247,7 @@ model Transaction {
 
   // Related gift card
   giftCardId      String?
+  giftCard        GiftCard?         @relation(fields: [giftCardId], references: [id])
 
   // Metadata
   metadata        Json?
@@ -250,6 +261,7 @@ model Transaction {
   @@index([userId])
   @@index([stripePaymentIntentId])
   @@index([status])
+  @@index([giftCardId])
 }
 
 enum TransactionType {
@@ -274,13 +286,15 @@ model RedemptionAttempt {
 
   // Attempt details
   codeHashAttempt String   // Hash of attempted code
-  ipAddress       String
+  codeLast4       String?  // Last 4 chars for display
+  ipAddress       String?
   userAgent       String?
   platformUserId  String?
 
   // Result
-  success     Boolean
-  failureReason String?
+  success         Boolean
+  errorCode       String?
+  failureReason   String?
 
   // Timestamps
   createdAt   DateTime @default(now())
@@ -295,9 +309,12 @@ model RedemptionAttempt {
 // ============================================
 
 model SystemConfig {
-  key       String   @id
-  value     Json
-  updatedAt DateTime @updatedAt
+  key         String   @id
+  value       String   @db.Text
+  isEncrypted Boolean  @default(false)
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ============================================
@@ -310,8 +327,7 @@ model AdminUser {
   passwordHash  String
 
   // Profile
-  firstName     String
-  lastName      String
+  name          String
 
   // Role & Permissions
   role          AdminRole @default(ADMIN)
@@ -322,7 +338,7 @@ model AdminUser {
   mfaSecret     String?
   lastLoginAt   DateTime?
   lastLoginIp   String?
-  failedAttempts Int      @default(0)
+  failedLoginAttempts Int @default(0)
   lockedUntil   DateTime?
 
   // Timestamps
@@ -346,36 +362,37 @@ enum AdminRole {
 
 model AdminSession {
   id          String    @id @default(cuid())
-  adminUserId String
-  admin       AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  adminId     String
+  admin       AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   token       String    @unique
-  ipAddress   String
+  ipAddress   String?
   userAgent   String?
   expiresAt   DateTime
+  lastActivityAt DateTime?
   createdAt   DateTime  @default(now())
 
   @@index([token])
+  @@index([adminId])
 }
 
 model AdminAuditLog {
   id          String    @id @default(cuid())
-  adminUserId String
-  admin       AdminUser @relation(fields: [adminUserId], references: [id])
+  adminId     String
+  admin       AdminUser @relation(fields: [adminId], references: [id])
 
   action      String    // e.g., "settings.update", "giftcard.revoke"
   resource    String    // e.g., "GiftCard", "Partner"
   resourceId  String?
 
-  before      Json?     // State before change
-  after       Json?     // State after change
+  details     String?   @db.Text  // JSON string of details
 
-  ipAddress   String
+  ipAddress   String?
   userAgent   String?
 
   createdAt   DateTime  @default(now())
 
-  @@index([adminUserId])
+  @@index([adminId])
   @@index([action])
   @@index([createdAt])
 }
@@ -392,8 +409,8 @@ model Partner {
   slug          String        @unique // "indiecrowdfund"
 
   // Contact
-  contactName   String
-  contactEmail  String
+  contactName   String?
+  contactEmail  String?
   website       String?
 
   // Configuration
@@ -428,28 +445,29 @@ enum PartnerStatus {
 }
 
 model PartnerApiKey {
-  id          String    @id @default(cuid())
-  partnerId   String
-  partner     Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  partnerId    String
+  partner      Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
-  name        String    // "Production", "Staging"
-  keyHash     String    @unique // SHA-256 hash of the key
-  keyPrefix   String    // First 8 chars for identification
+  name         String    // "Production", "Staging"
+  keyHash      String    @unique // SHA-256 hash of the key
+  keyPrefix    String    // First 10 chars for identification
+  encryptedKey String?   @db.Text // Encrypted version of the key
 
   // Permissions
-  permissions Json      // Specific endpoint permissions
+  permissions  Json?     // Specific endpoint permissions
 
   // Usage
-  lastUsedAt  DateTime?
-  requestCount BigInt   @default(0)
+  lastUsedAt   DateTime?
+  requestCount BigInt    @default(0)
 
   // Status
-  isActive    Boolean   @default(true)
-  expiresAt   DateTime?
+  isActive     Boolean   @default(true)
+  expiresAt    DateTime?
 
   // Timestamps
-  createdAt   DateTime  @default(now())
-  revokedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
 
   @@index([keyHash])
   @@index([partnerId])
@@ -485,6 +503,7 @@ model EmailLog {
   statusMessage String?
 
   // Tracking
+  deliveredAt   DateTime?
   openedAt      DateTime?
   clickedAt     DateTime?
   bouncedAt     DateTime?
