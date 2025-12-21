@@ -12,7 +12,7 @@ async function getTemplates() {
     orderBy: { name: 'asc' },
     include: {
       versions: {
-        where: { isActive: true },
+        orderBy: { version: 'desc' },
         take: 1,
       },
       _count: {
@@ -75,7 +75,7 @@ export default async function EmailTemplatesPage() {
           <thead className="bg-neutral-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Template</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Category</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Slug</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Subject</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Versions</th>
@@ -99,12 +99,8 @@ export default async function EmailTemplatesPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      template.category === 'transactional' ? 'bg-blue-100 text-blue-800' :
-                      template.category === 'marketing' ? 'bg-green-100 text-green-800' :
-                      'bg-purple-100 text-purple-800'
-                    }`}>
-                      {template.category}
+                    <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {template.slug}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-neutral-600 max-w-xs truncate">
