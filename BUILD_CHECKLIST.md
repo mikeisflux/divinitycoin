@@ -14,7 +14,7 @@
 - [x] Set up pnpm as package manager
 - [x] Configure ESLint
 - [x] Configure Prettier
-- [ ] Set up Vitest for testing
+- [x] Set up Vitest for testing
 
 ### 1.2 Brand Identity
 - [ ] Choose neutral domain name (e.g., creatorcredits.com, fundingcredits.com)
@@ -103,7 +103,7 @@
 - [x] Create database indexes as specified
 - [x] Run initial migration
 - [x] Seed default admin user
-- [ ] Seed default email templates
+- [x] Seed default email templates (script: `npm run db:seed`)
 
 ---
 
@@ -219,11 +219,11 @@
 
 ### 8.2 Email Templates (`emails/`)
 - [x] `GiftCardEmail.tsx` - Purchase confirmation with code
-- [x] Refund confirmation template
-- [ ] Welcome email template (if accounts enabled)
-- [ ] Password reset template
-- [ ] Admin alert template
-- [ ] Unredeemed card reminder template
+- [x] `RefundEmail.tsx` - Refund confirmation template
+- [x] `WelcomeEmail.tsx` - Welcome email template
+- [x] `PasswordResetEmail.tsx` - Password reset template
+- [x] `AdminAlertEmail.tsx` - Admin alert template
+- [x] `UnredeemedReminderEmail.tsx` - Unredeemed card reminder template
 
 ### 8.3 SendGrid Webhook Handler
 - [x] Process `processed` event
@@ -681,25 +681,25 @@
 
 | Category | Items | Completed |
 |----------|-------|-----------|
-| Project Setup & Brand Identity | 27 | ~22 |
-| Database Schema | 27 | 26 |
+| Project Setup & Brand Identity | 27 | 23 |
+| Database Schema | 27 | 27 |
 | Gift Card Library | 7 | 7 |
 | Credit Hold Library | 4 | 4 |
 | Rate Limiting | 4 | 3 |
 | API Endpoints | 16 | 16 |
 | Stripe Integration | 17 | 17 |
-| Email System | 17 | 14 |
+| Email System | 17 | 17 |
 | Server Configuration | 30 | 25 |
 | Frontend Website | 58 | 58 |
 | Admin Panel | 55 | 53 |
 | Partner Portal | 7 | 7 |
 | Legal Pages | 43 | 42 |
 | Validation Flow | 7 | 7 |
-| Deployment | 44 | 38 |
+| Deployment | 44 | 39 |
 | Appendix A (Error Codes) | 10 | 10 |
 | Appendix B (Indexes) | 4 | 4 |
 | Appendix C (Glossary) | 5 | 5 |
-| **TOTAL** | **~378 items** | **~348 completed (~92%)** |
+| **TOTAL** | **~378 items** | **~364 completed (~96%)** |
 
 ---
 
@@ -712,13 +712,14 @@
 5. Test thoroughly with Stripe test mode before going live
 6. Document version: 1.0 (as per spec)
 
-## Build Status: ~92% Complete
+## Build Status: ~96% Complete
 
-Remaining items to complete:
-- Testing setup (Vitest)
+Remaining items (infrastructure/optional):
+- Brand identity decisions (domain name, tagline selection)
 - MFA for admin users (optional)
 - Scheduled email delivery (optional)
-- WireGuard VPN configuration (infrastructure)
-- UFW firewall setup (infrastructure)
-- Uptime monitoring (infrastructure)
-- Email template seeding (data)
+- WireGuard VPN configuration (server setup)
+- UFW firewall setup (server setup)
+- Uptime monitoring (e.g., UptimeRobot)
+- Crontab for database backups (server setup)
+- Version history storage for legal pages (optional)

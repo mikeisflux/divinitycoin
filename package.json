@@ -8,10 +8,13 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:seed": "tsx scripts/seed-email-templates.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",
@@ -27,17 +30,24 @@
     "tailwind-merge": "^2.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.0.0",
     "eslint-config-next": "14.0.0",
+    "jsdom": "^22.0.0",
     "postcss": "^8.4.31",
     "prettier": "^3.0.0",
     "prisma": "^5.0.0",
     "tailwindcss": "^3.3.0",
+    "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "vitest": "^1.0.0"
   }
