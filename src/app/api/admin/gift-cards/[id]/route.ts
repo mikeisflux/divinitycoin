@@ -164,7 +164,7 @@ export async function DELETE(
 
     // Delete related transactions first
     if (giftCard.transactions.length > 0) {
-      await prisma.giftCardTransaction.deleteMany({
+      await prisma.transaction.deleteMany({
         where: { giftCardId: params.id },
       });
     }
