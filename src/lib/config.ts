@@ -96,11 +96,12 @@ export async function getSmtpConfig() {
 
 /**
  * Get Stripe configuration
+ * Note: Uses same key names as /admin/settings/api page
  */
 export async function getStripeConfig() {
   return {
     secretKey: await getConfig('STRIPE_SECRET_KEY', ''),
-    publishableKey: await getConfig('STRIPE_PUBLISHABLE_KEY', ''),
+    publishableKey: await getConfig('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', ''),
     webhookSecret: await getConfig('STRIPE_WEBHOOK_SECRET', ''),
   };
 }
