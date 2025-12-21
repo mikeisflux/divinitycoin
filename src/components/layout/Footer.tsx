@@ -6,7 +6,7 @@ export function Footer() {
   return (
     <footer className="bg-neutral-900 text-neutral-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
@@ -75,10 +75,10 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/developers"
+                  href="/become-a-partner"
                   className="hover:text-white transition-colors"
                 >
-                  Developers
+                  Become a Partner
                 </Link>
               </li>
               <li>
@@ -95,6 +95,45 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                 >
                   Support
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Developers */}
+          <div>
+            <h4 className="font-semibold text-white mb-4">Developers</h4>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link
+                  href="/developers"
+                  className="hover:text-white transition-colors"
+                >
+                  API Documentation
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/developers#settlements"
+                  className="hover:text-white transition-colors"
+                >
+                  Settlements & Payouts
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/developers#checklist"
+                  className="hover:text-white transition-colors"
+                >
+                  Integration Checklist
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/partners/documentation"
+                  className="hover:text-white transition-colors"
+                >
+                  Partner Portal
                 </Link>
               </li>
             </ul>
