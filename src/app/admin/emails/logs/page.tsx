@@ -25,6 +25,9 @@ async function getEmailLogs(page: number = 1, status?: string) {
           orderBy: { timestamp: 'desc' },
           take: 1,
         },
+        template: {
+          select: { name: true },
+        },
       },
     }),
     prisma.emailLog.count({ where }),
@@ -143,7 +146,7 @@ export default async function EmailLogsPage({
                     {log.subject}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                    {log.templateName || '-'}
+                    {log.template?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={log.status} />
