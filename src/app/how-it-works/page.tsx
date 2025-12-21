@@ -10,7 +10,7 @@ export default function HowItWorksPage() {
       <section className="bg-gradient-to-br from-primary-50 to-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-neutral-900">
-            How CreatorCredits Works
+            How DivinityCoin Works
           </h1>
           <p className="mt-4 text-xl text-neutral-600">
             A simple, flexible way to support creators across the web.
@@ -117,7 +117,7 @@ export default function HowItWorksPage() {
                 a: 'Unused credits can be refunded within 30 days of purchase. Contact our support team.',
               },
               {
-                q: 'What platforms accept CreatorCredits?',
+                q: 'What platforms accept DivinityCoin?',
                 a: "We partner with select creator platforms. After purchase, you'll see redemption instructions in your confirmation email.",
               },
               {

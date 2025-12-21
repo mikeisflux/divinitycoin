@@ -27,7 +27,7 @@ export const GiftCardEmail = ({
   purchaseDate = new Date().toLocaleDateString(),
   expiryDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString(),
 }: GiftCardEmailProps) => {
-  const previewText = `Your $${amount} CreatorCredits Gift Card is ready!`;
+  const previewText = `Your $${amount} DivinityCoin Gift Card is ready!`;
 
   return (
     <Html>
@@ -36,14 +36,14 @@ export const GiftCardEmail = ({
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Heading style={logo}>CreatorCredits</Heading>
+            <Heading style={logo}>DivinityCoin</Heading>
           </Section>
 
           <Section style={content}>
             <Heading style={heading}>Your Gift Card is Ready! 🎉</Heading>
 
             <Text style={paragraph}>
-              Thank you for your purchase! Your ${amount} CreatorCredits gift card is now active and ready to use.
+              Thank you for your purchase! Your ${amount} DivinityCoin gift card is now active and ready to use.
             </Text>
 
             <Section style={codeSection}>
@@ -77,7 +77,7 @@ export const GiftCardEmail = ({
             </Section>
 
             <Section style={buttonSection}>
-              <Link href="https://creatorcredits.com/redeem" style={button}>
+              <Link href="https://divinitycoin.com/redeem" style={button}>
                 Find Where to Redeem
               </Link>
             </Section>
@@ -90,19 +90,19 @@ export const GiftCardEmail = ({
           <Section style={footer}>
             <Text style={footerText}>
               Questions? Contact us at{' '}
-              <Link href="mailto:support@creatorcredits.com" style={link}>
-                support@creatorcredits.com
+              <Link href="mailto:support@divinitycoin.com" style={link}>
+                support@divinitycoin.com
               </Link>
             </Text>
             <Text style={footerText}>
-              © {new Date().getFullYear()} CreatorCredits. All rights reserved.
+              © {new Date().getFullYear()} DivinityCoin. All rights reserved.
             </Text>
             <Text style={footerLinks}>
-              <Link href="https://creatorcredits.com/terms" style={link}>Terms</Link>
+              <Link href="https://divinitycoin.com/terms" style={link}>Terms</Link>
               {' • '}
-              <Link href="https://creatorcredits.com/privacy" style={link}>Privacy</Link>
+              <Link href="https://divinitycoin.com/privacy" style={link}>Privacy</Link>
               {' • '}
-              <Link href="https://creatorcredits.com/refunds" style={link}>Refunds</Link>
+              <Link href="https://divinitycoin.com/refunds" style={link}>Refunds</Link>
             </Text>
           </Section>
         </Container>

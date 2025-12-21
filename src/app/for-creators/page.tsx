@@ -17,11 +17,11 @@ export default function ForCreatorsPage() {
             Accept Payments Without the Hassle
           </h1>
           <p className="mt-6 text-xl text-neutral-300 max-w-2xl mx-auto">
-            Partner with CreatorCredits to offer your users a flexible payment
+            Partner with DivinityCoin to offer your users a flexible payment
             option. No integration headaches. No payment processor restrictions.
           </p>
           <div className="mt-10">
-            <a href="mailto:partners@creatorcredits.com">
+            <a href="mailto:partners@divinitycoin.com">
               <Button
                 size="xl"
                 className="bg-white text-neutral-900 hover:bg-neutral-100"
@@ -147,7 +147,7 @@ export default function ForCreatorsPage() {
               {
                 step: 2,
                 title: 'User Redeems Code',
-                desc: 'Users enter their CreatorCredits code on your platform. Your backend validates it with our API and adds credits to their account.',
+                desc: 'Users enter their DivinityCoin code on your platform. Your backend validates it with our API and adds credits to their account.',
               },
               {
                 step: 3,
@@ -184,9 +184,9 @@ export default function ForCreatorsPage() {
           </h2>
           <p className="text-xl text-neutral-600 mb-8 max-w-2xl mx-auto">
             We're selectively onboarding new partner platforms. Reach out to
-            discuss how CreatorCredits can work for your platform.
+            discuss how DivinityCoin can work for your platform.
           </p>
-          <a href="mailto:partners@creatorcredits.com">
+          <a href="mailto:partners@divinitycoin.com">
             <Button size="lg">Contact Partnership Team</Button>
           </a>
         </div>

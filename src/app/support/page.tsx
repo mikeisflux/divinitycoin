@@ -46,8 +46,8 @@ export default function SupportPage() {
                 <p className="text-neutral-600 mb-6">
                   Send us an email and we'll get back to you within 24 hours.
                 </p>
-                <a href="mailto:support@creatorcredits.com">
-                  <Button>support@creatorcredits.com</Button>
+                <a href="mailto:support@divinitycoin.com">
+                  <Button>support@divinitycoin.com</Button>
                 </a>
               </CardContent>
             </Card>

@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
             currency: 'usd',
             unit_amount: Math.round(amount * 100), // Convert to cents
             product_data: {
-              name: 'CreatorCredits',
+              name: 'DivinityCoin',
               description: `$${amount.toFixed(2)} in credits`,
             },
           },

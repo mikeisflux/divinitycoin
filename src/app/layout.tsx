@@ -16,10 +16,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata = {
-  title: 'CreatorCredits - Support Creators Seamlessly',
+  title: 'DivinityCoin - Support Creators Seamlessly',
   description:
     'Purchase credits to support your favorite creators across partner platforms.',
-  keywords: ['creator', 'credits', 'support', 'crowdfunding', 'gift card'],
+  keywords: ['divinity', 'coin', 'credits', 'support', 'crowdfunding', 'gift card'],
 };
 
 export default function RootLayout({

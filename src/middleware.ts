@@ -6,8 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 // Define allowed origins for CORS
 const allowedOrigins = [
   process.env.NEXT_PUBLIC_BASE_URL,
-  'https://creatorcredits.com',
-  'https://www.creatorcredits.com',
+  'https://divinitycoin.com',
+  'https://www.divinitycoin.com',
 ].filter(Boolean);
 
 // VPN subnet for internal API (WireGuard)

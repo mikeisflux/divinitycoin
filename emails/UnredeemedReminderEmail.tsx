@@ -26,7 +26,7 @@ export const UnredeemedReminderEmail = ({
   daysUnredeemed = 30,
   expiryDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString(),
 }: UnredeemedReminderEmailProps) => {
-  const previewText = `Your $${amount} CreatorCredits gift card is waiting to be used!`;
+  const previewText = `Your $${amount} DivinityCoin gift card is waiting to be used!`;
 
   return (
     <Html>
@@ -35,14 +35,14 @@ export const UnredeemedReminderEmail = ({
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Heading style={logo}>CreatorCredits</Heading>
+            <Heading style={logo}>DivinityCoin</Heading>
           </Section>
 
           <Section style={content}>
             <Heading style={heading}>Don't Forget Your Credits! 🎁</Heading>
 
             <Text style={paragraph}>
-              You have a ${amount} CreatorCredits gift card that hasn't been redeemed yet. It's been {daysUnredeemed} days since your purchase - we wanted to make sure you didn't forget about it!
+              You have a ${amount} DivinityCoin gift card that hasn't been redeemed yet. It's been {daysUnredeemed} days since your purchase - we wanted to make sure you didn't forget about it!
             </Text>
 
             <Section style={codeSection}>
@@ -67,7 +67,7 @@ export const UnredeemedReminderEmail = ({
               <Text style={paragraph}>
                 Visit any of our partner platforms and enter your code to start supporting creators you love!
               </Text>
-              <Link href="https://creatorcredits.com/redeem" style={button}>
+              <Link href="https://divinitycoin.com/redeem" style={button}>
                 Find Where to Redeem
               </Link>
             </Section>
@@ -96,19 +96,19 @@ export const UnredeemedReminderEmail = ({
           <Section style={footer}>
             <Text style={footerText}>
               Questions?{' '}
-              <Link href="mailto:support@creatorcredits.com" style={link}>
+              <Link href="mailto:support@divinitycoin.com" style={link}>
                 Contact Support
               </Link>
             </Text>
             <Text style={footerText}>
-              © {new Date().getFullYear()} CreatorCredits. All rights reserved.
+              © {new Date().getFullYear()} DivinityCoin. All rights reserved.
             </Text>
             <Text style={footerLinks}>
-              <Link href="https://creatorcredits.com/terms" style={link}>Terms</Link>
+              <Link href="https://divinitycoin.com/terms" style={link}>Terms</Link>
               {' • '}
-              <Link href="https://creatorcredits.com/privacy" style={link}>Privacy</Link>
+              <Link href="https://divinitycoin.com/privacy" style={link}>Privacy</Link>
               {' • '}
-              <Link href="https://creatorcredits.com/unsubscribe" style={link}>Unsubscribe</Link>
+              <Link href="https://divinitycoin.com/unsubscribe" style={link}>Unsubscribe</Link>
             </Text>
           </Section>
         </Container>

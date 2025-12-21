@@ -27,7 +27,7 @@ export default function EmailSettingsPage() {
     user: '',
     pass: '',
     fromEmail: '',
-    fromName: 'CreatorCredits',
+    fromName: 'DivinityCoin',
     replyTo: '',
     testEmailRecipient: '',
   });
@@ -285,7 +285,7 @@ export default function EmailSettingsPage() {
                 value={settings.fromName}
                 onChange={(e) => setSettings(prev => ({ ...prev, fromName: e.target.value }))}
                 className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                placeholder="CreatorCredits"
+                placeholder="DivinityCoin"
               />
               <p className="text-sm text-neutral-500 mt-1">Display name for sent emails</p>
             </div>

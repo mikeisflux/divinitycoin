@@ -1,4 +1,4 @@
-# Dockerfile for CreatorCredits/DivinityCoin Gift Card Service
+# Dockerfile for DivinityCoin Gift Card Service
 
 # Build stage
 FROM node:20-alpine AS builder

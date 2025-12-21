@@ -29,7 +29,7 @@ export const AdminAlertEmail = ({
   message = 'An important event occurred that requires your attention.',
   details = {},
   timestamp = new Date().toISOString(),
-  actionUrl = 'https://creatorcredits.com/admin',
+  actionUrl = 'https://divinitycoin.com/admin',
   actionLabel = 'View Dashboard',
 }: AdminAlertEmailProps) => {
   const previewText = `[${severity.toUpperCase()}] ${alertType}`;
@@ -50,7 +50,7 @@ export const AdminAlertEmail = ({
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Heading style={logo}>CreatorCredits Admin</Heading>
+            <Heading style={logo}>DivinityCoin Admin</Heading>
           </Section>
 
           <Section style={content}>
@@ -96,7 +96,7 @@ export const AdminAlertEmail = ({
             </Section>
 
             <Text style={paragraph}>
-              This is an automated alert from your CreatorCredits system. Please review and take appropriate action.
+              This is an automated alert from your DivinityCoin system. Please review and take appropriate action.
             </Text>
           </Section>
 
@@ -105,7 +105,7 @@ export const AdminAlertEmail = ({
               This alert was sent to all administrators.
             </Text>
             <Text style={footerText}>
-              © {new Date().getFullYear()} CreatorCredits. All rights reserved.
+              © {new Date().getFullYear()} DivinityCoin. All rights reserved.
             </Text>
           </Section>
         </Container>

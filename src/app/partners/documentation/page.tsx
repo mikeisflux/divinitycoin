@@ -80,7 +80,7 @@ const apiSections: Section[] = [
           expiresAt: '2025-01-15T10:30:00Z',
         },
         example: {
-          request: `curl -X POST https://api.creatorcredits.com/api/v1/cards \\
+          request: `curl -X POST https://api.divinitycoin.com/api/v1/cards \\
   -H "Authorization: Bearer sk_live_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{"amount": 5000, "recipientEmail": "john@example.com"}'`,
@@ -144,7 +144,7 @@ const apiSections: Section[] = [
           remainingBalance: 1000,
         },
         example: {
-          request: `curl -X POST https://api.creatorcredits.com/api/v1/cards/gc_abc123/redeem \\
+          request: `curl -X POST https://api.divinitycoin.com/api/v1/cards/gc_abc123/redeem \\
   -H "Authorization: Bearer sk_live_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{"amount": 2500, "orderId": "order_789"}'`,
@@ -266,7 +266,7 @@ export default function PartnerDocumentationPage() {
             </Link>
             <div>
               <h1 className="text-xl font-semibold text-neutral-900">API Documentation</h1>
-              <p className="text-sm text-neutral-500">Complete reference for the CreatorCredits API</p>
+              <p className="text-sm text-neutral-500">Complete reference for the DivinityCoin API</p>
             </div>
           </div>
         </div>
@@ -302,7 +302,7 @@ export default function PartnerDocumentationPage() {
                   Base URL
                 </h3>
                 <code className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-700 block">
-                  https://api.creatorcredits.com
+                  https://api.divinitycoin.com
                 </code>
               </div>
 
@@ -337,7 +337,7 @@ export default function PartnerDocumentationPage() {
             <div className="bg-white rounded-xl border border-neutral-200 p-6">
               <h2 className="text-lg font-semibold text-neutral-900 mb-4">Authentication</h2>
               <p className="text-neutral-600 mb-4">
-                The CreatorCredits API uses API keys or OAuth 2.0 tokens for authentication.
+                The DivinityCoin API uses API keys or OAuth 2.0 tokens for authentication.
                 Include your credentials in the Authorization header:
               </p>
               <div className="bg-neutral-900 rounded-lg p-4 font-mono text-sm text-white">
@@ -436,7 +436,7 @@ export default function PartnerDocumentationPage() {
                 <h3 className="font-semibold text-neutral-900 mb-4">Verifying Webhook Signatures</h3>
                 <p className="text-neutral-600 mb-4">
                   All webhook payloads are signed with your webhook secret. Verify signatures to ensure
-                  requests are from CreatorCredits:
+                  requests are from DivinityCoin:
                 </p>
                 <pre className="bg-neutral-900 rounded-lg p-4 text-sm text-white overflow-x-auto">
 {`const crypto = require('crypto');

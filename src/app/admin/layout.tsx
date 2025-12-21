@@ -7,8 +7,8 @@ import '../globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Admin - CreatorCredits',
-  description: 'CreatorCredits Administration Panel',
+  title: 'Admin - DivinityCoin',
+  description: 'DivinityCoin Administration Panel',
   robots: 'noindex, nofollow',
 };
 

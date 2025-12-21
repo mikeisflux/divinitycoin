@@ -15,7 +15,7 @@ export default function RefundsPage() {
         <div className="prose prose-neutral max-w-none">
           <h2>Overview</h2>
           <p>
-            We want you to be completely satisfied with your CreatorCredits
+            We want you to be completely satisfied with your DivinityCoin
             purchase. This policy outlines when and how you can request a
             refund.
           </p>
@@ -76,7 +76,7 @@ export default function RefundsPage() {
           </div>
 
           <h2>How to Request a Refund</h2>
-          <p>To request a refund, email support@creatorcredits.com with:</p>
+          <p>To request a refund, email support@divinitycoin.com with:</p>
           <ul>
             <li>Your transaction ID or payment confirmation</li>
             <li>Email address used for purchase</li>
@@ -115,7 +115,7 @@ export default function RefundsPage() {
           <p>
             For refund requests or questions:
             <br />
-            Email: support@creatorcredits.com
+            Email: support@divinitycoin.com
             <br />
             Response time: 24-48 hours
           </p>

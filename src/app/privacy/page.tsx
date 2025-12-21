@@ -12,7 +12,7 @@ export default function PrivacyPage() {
         <div className="prose prose-neutral max-w-none">
           <h2>1. Introduction</h2>
           <p>
-            CreatorCredits ("we", "us", "our") is committed to protecting your
+            DivinityCoin ("we", "us", "our") is committed to protecting your
             privacy. This policy explains how we collect, use, and protect your
             personal information.
           </p>
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
             <li>Opt-out of marketing communications</li>
           </ul>
           <p>
-            To exercise these rights, contact us at privacy@creatorcredits.com.
+            To exercise these rights, contact us at privacy@divinitycoin.com.
           </p>
 
           <h2>8. Cookies</h2>
@@ -115,7 +115,7 @@ export default function PrivacyPage() {
           <p>
             California residents have additional rights under the CCPA. We do
             not sell personal information. For CCPA requests, contact us at
-            privacy@creatorcredits.com.
+            privacy@divinitycoin.com.
           </p>
 
           <h2>12. Changes to This Policy</h2>
@@ -128,7 +128,7 @@ export default function PrivacyPage() {
           <p>
             For privacy inquiries:
             <br />
-            Email: privacy@creatorcredits.com
+            Email: privacy@divinitycoin.com
           </p>
         </div>
       </div>

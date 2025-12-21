@@ -18,11 +18,11 @@ interface PasswordResetEmailProps {
 }
 
 export const PasswordResetEmail = ({
-  resetLink = 'https://creatorcredits.com/reset-password?token=xxxxx',
+  resetLink = 'https://divinitycoin.com/reset-password?token=xxxxx',
   email = 'user@example.com',
   expiresIn = '1 hour',
 }: PasswordResetEmailProps) => {
-  const previewText = `Reset your CreatorCredits password`;
+  const previewText = `Reset your DivinityCoin password`;
 
   return (
     <Html>
@@ -31,14 +31,14 @@ export const PasswordResetEmail = ({
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Heading style={logo}>CreatorCredits</Heading>
+            <Heading style={logo}>DivinityCoin</Heading>
           </Section>
 
           <Section style={content}>
             <Heading style={heading}>Reset Your Password</Heading>
 
             <Text style={paragraph}>
-              We received a request to reset the password for your CreatorCredits account associated with {email}.
+              We received a request to reset the password for your DivinityCoin account associated with {email}.
             </Text>
 
             <Section style={buttonSection}>
@@ -59,7 +59,7 @@ export const PasswordResetEmail = ({
                 • Never share this link with anyone
               </Text>
               <Text style={warningText}>
-                • CreatorCredits will never ask for your password via email
+                • DivinityCoin will never ask for your password via email
               </Text>
               <Text style={warningText}>
                 • If you didn't request this reset, your account may be at risk
@@ -75,12 +75,12 @@ export const PasswordResetEmail = ({
           <Section style={footer}>
             <Text style={footerText}>
               Need help?{' '}
-              <Link href="mailto:support@creatorcredits.com" style={link}>
+              <Link href="mailto:support@divinitycoin.com" style={link}>
                 Contact Support
               </Link>
             </Text>
             <Text style={footerText}>
-              © {new Date().getFullYear()} CreatorCredits. All rights reserved.
+              © {new Date().getFullYear()} DivinityCoin. All rights reserved.
             </Text>
           </Section>
         </Container>

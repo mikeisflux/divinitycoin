@@ -11,10 +11,10 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">C</span>
+                <span className="text-white font-bold text-lg">D</span>
               </div>
               <span className="font-semibold text-lg text-white">
-                CreatorCredits
+                DivinityCoin
               </span>
             </div>
             <p className="text-sm">
@@ -126,7 +126,7 @@ export function Footer() {
 
         <div className="border-t border-neutral-800 mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-sm">
-            © {new Date().getFullYear()} CreatorCredits. All rights reserved.
+            © {new Date().getFullYear()} DivinityCoin. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             {/* Visa */}

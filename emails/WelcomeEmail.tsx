@@ -20,7 +20,7 @@ export const WelcomeEmail = ({
   userName = 'Creator',
   email = 'user@example.com',
 }: WelcomeEmailProps) => {
-  const previewText = `Welcome to CreatorCredits - Start supporting creators today!`;
+  const previewText = `Welcome to DivinityCoin - Start supporting creators today!`;
 
   return (
     <Html>
@@ -29,18 +29,18 @@ export const WelcomeEmail = ({
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Heading style={logo}>CreatorCredits</Heading>
+            <Heading style={logo}>DivinityCoin</Heading>
           </Section>
 
           <Section style={content}>
-            <Heading style={heading}>Welcome to CreatorCredits! 🎉</Heading>
+            <Heading style={heading}>Welcome to DivinityCoin! 🎉</Heading>
 
             <Text style={paragraph}>
               Hi {userName},
             </Text>
 
             <Text style={paragraph}>
-              Thanks for joining CreatorCredits! We're excited to have you as part of our community dedicated to supporting creators.
+              Thanks for joining DivinityCoin! We're excited to have you as part of our community dedicated to supporting creators.
             </Text>
 
             <Section style={featuresSection}>
@@ -69,7 +69,7 @@ export const WelcomeEmail = ({
             </Section>
 
             <Section style={buttonSection}>
-              <Link href="https://creatorcredits.com/buy" style={button}>
+              <Link href="https://divinitycoin.com/buy" style={button}>
                 Get Your First Credits
               </Link>
             </Section>
@@ -95,19 +95,19 @@ export const WelcomeEmail = ({
           <Section style={footer}>
             <Text style={footerText}>
               Questions? Contact us at{' '}
-              <Link href="mailto:support@creatorcredits.com" style={link}>
-                support@creatorcredits.com
+              <Link href="mailto:support@divinitycoin.com" style={link}>
+                support@divinitycoin.com
               </Link>
             </Text>
             <Text style={footerText}>
-              © {new Date().getFullYear()} CreatorCredits. All rights reserved.
+              © {new Date().getFullYear()} DivinityCoin. All rights reserved.
             </Text>
             <Text style={footerLinks}>
-              <Link href="https://creatorcredits.com/terms" style={link}>Terms</Link>
+              <Link href="https://divinitycoin.com/terms" style={link}>Terms</Link>
               {' • '}
-              <Link href="https://creatorcredits.com/privacy" style={link}>Privacy</Link>
+              <Link href="https://divinitycoin.com/privacy" style={link}>Privacy</Link>
               {' • '}
-              <Link href="https://creatorcredits.com/faq" style={link}>FAQ</Link>
+              <Link href="https://divinitycoin.com/faq" style={link}>FAQ</Link>
             </Text>
           </Section>
         </Container>

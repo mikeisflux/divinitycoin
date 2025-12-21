@@ -7,23 +7,23 @@ const emailTemplates = [
     name: 'Gift Card Delivery',
     slug: 'gift_card_delivery',
     description: 'Sent when a gift card purchase is completed',
-    subject: 'Your CreatorCredits Gift Card is Ready!',
+    subject: 'Your DivinityCoin Gift Card is Ready!',
     htmlContent: `
       <h1>Your Gift Card is Ready!</h1>
-      <p>Thank you for your purchase! Your \${{amount}} CreatorCredits gift card is now active.</p>
+      <p>Thank you for your purchase! Your \${{amount}} DivinityCoin gift card is now active.</p>
       <div style="background:#f8fafc;border:2px dashed #e2e8f0;padding:24px;text-align:center;margin:24px 0;">
         <p style="color:#64748b;font-size:14px;margin:0 0 8px;">Your Gift Card Code:</p>
         <p style="font-size:28px;font-weight:bold;letter-spacing:2px;margin:0;">{{code}}</p>
       </div>
       <p>Keep this email safe - you'll need this code to redeem your credits.</p>
     `,
-    textContent: `Your CreatorCredits Gift Card is Ready!\n\nThank you for your purchase!\n\nYour Gift Card Code: {{code}}\nAmount: \${{amount}}\nValid Until: {{expiryDate}}\n\nKeep this code safe!`,
+    textContent: `Your DivinityCoin Gift Card is Ready!\n\nThank you for your purchase!\n\nYour Gift Card Code: {{code}}\nAmount: \${{amount}}\nValid Until: {{expiryDate}}\n\nKeep this code safe!`,
   },
   {
     name: 'Refund Confirmation',
     slug: 'refund_confirmation',
     description: 'Sent when a refund is processed',
-    subject: 'Your CreatorCredits Refund Has Been Processed',
+    subject: 'Your DivinityCoin Refund Has Been Processed',
     htmlContent: `
       <h1>Refund Processed</h1>
       <p>We've processed your refund request. The funds should appear in your original payment method within 5-10 business days.</p>
@@ -40,11 +40,11 @@ const emailTemplates = [
     name: 'Welcome Email',
     slug: 'welcome',
     description: 'Sent when a new user creates an account',
-    subject: 'Welcome to CreatorCredits!',
+    subject: 'Welcome to DivinityCoin!',
     htmlContent: `
-      <h1>Welcome to CreatorCredits!</h1>
+      <h1>Welcome to DivinityCoin!</h1>
       <p>Hi {{userName}},</p>
-      <p>Thanks for joining CreatorCredits! We're excited to have you as part of our community.</p>
+      <p>Thanks for joining DivinityCoin! We're excited to have you as part of our community.</p>
       <h3>What You Can Do</h3>
       <ul>
         <li>Purchase Gift Cards - Buy credits instantly with any major credit card</li>
@@ -53,16 +53,16 @@ const emailTemplates = [
       </ul>
       <a href="https://creatorcredits.com/buy" style="display:inline-block;background:#6366f1;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;">Get Your First Credits</a>
     `,
-    textContent: `Welcome to CreatorCredits!\n\nHi {{userName}},\n\nThanks for joining CreatorCredits! We're excited to have you.\n\nGet started at https://creatorcredits.com/buy`,
+    textContent: `Welcome to DivinityCoin!\n\nHi {{userName}},\n\nThanks for joining DivinityCoin! We're excited to have you.\n\nGet started at https://creatorcredits.com/buy`,
   },
   {
     name: 'Password Reset',
     slug: 'password_reset',
     description: 'Sent when a password reset is requested',
-    subject: 'Reset Your CreatorCredits Password',
+    subject: 'Reset Your DivinityCoin Password',
     htmlContent: `
       <h1>Reset Your Password</h1>
-      <p>We received a request to reset the password for your CreatorCredits account associated with {{email}}.</p>
+      <p>We received a request to reset the password for your DivinityCoin account associated with {{email}}.</p>
       <a href="{{resetLink}}" style="display:inline-block;background:#6366f1;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;">Reset Password</a>
       <p>This link will expire in {{expiresIn}}. If you didn't request a password reset, you can safely ignore this email.</p>
     `,
@@ -88,10 +88,10 @@ const emailTemplates = [
     name: 'Unredeemed Reminder',
     slug: 'unredeemed_reminder',
     description: 'Sent to remind users of unredeemed gift cards',
-    subject: 'Don\'t Forget Your ${{amount}} CreatorCredits!',
+    subject: 'Don\'t Forget Your ${{amount}} DivinityCoin!',
     htmlContent: `
       <h1>Don't Forget Your Credits!</h1>
-      <p>You have a \${{amount}} CreatorCredits gift card that hasn't been redeemed yet. It's been {{daysUnredeemed}} days since your purchase!</p>
+      <p>You have a \${{amount}} DivinityCoin gift card that hasn't been redeemed yet. It's been {{daysUnredeemed}} days since your purchase!</p>
       <div style="background:#fef3c7;border:2px dashed #f59e0b;padding:24px;text-align:center;margin:24px 0;">
         <p style="color:#92400e;font-size:14px;margin:0 0 8px;">Your Gift Card Code:</p>
         <p style="font-size:28px;font-weight:bold;letter-spacing:2px;margin:0;color:#78350f;">{{code}}</p>

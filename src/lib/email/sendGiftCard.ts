@@ -21,7 +21,7 @@ export async function sendGiftCardEmail({
 }: SendGiftCardParams): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const formattedCode = formatCodeForDisplay(code);
 
-  const subject = `Your $${amount.toFixed(2)} CreatorCredits Code`;
+  const subject = `Your $${amount.toFixed(2)} DivinityCoin Code`;
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -29,7 +29,7 @@ export async function sendGiftCardEmail({
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your CreatorCredits Code</title>
+  <title>Your DivinityCoin Code</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
@@ -41,10 +41,10 @@ export async function sendGiftCardEmail({
             <td align="center">
               <div style="display: inline-flex; align-items: center; gap: 8px;">
                 <div style="width: 40px; height: 40px; background-color: #6366f1; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                  <span style="color: white; font-weight: bold; font-size: 20px;">C</span>
+                  <span style="color: white; font-weight: bold; font-size: 20px;">D</span>
                 </div>
                 <span style="font-size: 24px; font-weight: 600; color: #111827;">
-                  Creator<span style="color: #6366f1;">Credits</span>
+                  Divinity<span style="color: #6366f1;">Coin</span>
                 </span>
               </div>
             </td>
@@ -106,10 +106,10 @@ export async function sendGiftCardEmail({
           <tr>
             <td align="center">
               <p style="margin: 0 0 10px 0; font-size: 14px; color: #9ca3af;">
-                Need help? Contact us at support@creatorcredits.com
+                Need help? Contact us at support@divinitycoin.com
               </p>
               <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                © ${new Date().getFullYear()} CreatorCredits. All rights reserved.
+                © ${new Date().getFullYear()} DivinityCoin. All rights reserved.
               </p>
             </td>
           </tr>
@@ -122,7 +122,7 @@ export async function sendGiftCardEmail({
   `;
 
   const textContent = `
-Your CreatorCredits Code
+Your DivinityCoin Code
 
 Thank you for your purchase!
 
@@ -137,9 +137,9 @@ How to Redeem:
 
 Important: This code can only be used once. Keep it safe and don't share it with others.
 
-Need help? Contact us at support@creatorcredits.com
+Need help? Contact us at support@divinitycoin.com
 
-© ${new Date().getFullYear()} CreatorCredits. All rights reserved.
+© ${new Date().getFullYear()} DivinityCoin. All rights reserved.
   `;
 
   return sendEmail({

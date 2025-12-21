@@ -12,7 +12,7 @@ export default function TermsPage() {
         <div className="prose prose-neutral max-w-none">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By using CreatorCredits ("Service"), you agree to be bound by these
+            By using DivinityCoin ("Service"), you agree to be bound by these
             Terms of Service. If you do not agree to these terms, please do not
             use our Service.
           </p>
@@ -23,7 +23,7 @@ export default function TermsPage() {
 
           <h2>2. Service Description</h2>
           <p>
-            CreatorCredits provides a digital credit purchase service. Users can
+            DivinityCoin provides a digital credit purchase service. Users can
             purchase credits that can be redeemed on partner platforms to
             support creators. We act as an intermediary between purchasers and
             partner platforms.
@@ -52,7 +52,7 @@ export default function TermsPage() {
           <h2>5. Redemption</h2>
           <p>
             Credits are redeemed on partner platforms according to their
-            respective terms. CreatorCredits is not responsible for the
+            respective terms. DivinityCoin is not responsible for the
             services, content, or policies of partner platforms.
           </p>
 
@@ -79,20 +79,20 @@ export default function TermsPage() {
           <h2>8. Intellectual Property</h2>
           <p>
             All content, trademarks, and intellectual property associated with
-            CreatorCredits are owned by us or our licensors. You may not use our
+            DivinityCoin are owned by us or our licensors. You may not use our
             branding without permission.
           </p>
 
           <h2>9. Limitation of Liability</h2>
           <p>
             The Service is provided "as is" without warranties of any kind.
-            CreatorCredits shall not be liable for any indirect, incidental, or
+            DivinityCoin shall not be liable for any indirect, incidental, or
             consequential damages arising from your use of the Service.
           </p>
 
           <h2>10. Indemnification</h2>
           <p>
-            You agree to indemnify and hold harmless CreatorCredits and its
+            You agree to indemnify and hold harmless DivinityCoin and its
             affiliates from any claims, damages, or expenses arising from your
             use of the Service or violation of these terms.
           </p>
@@ -114,7 +114,7 @@ export default function TermsPage() {
           <p>
             For questions about these terms, contact us at:
             <br />
-            Email: legal@creatorcredits.com
+            Email: legal@divinitycoin.com
           </p>
         </div>
       </div>

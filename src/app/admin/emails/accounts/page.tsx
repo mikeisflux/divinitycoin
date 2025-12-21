@@ -24,7 +24,7 @@ async function getSmtpStatus() {
     user: configMap.get('SMTP_USER') || process.env.SMTP_USER || '',
     hasPassword: !!(configMap.get('SMTP_PASS') || process.env.SMTP_PASS),
     fromEmail: configMap.get('SMTP_FROM_EMAIL') || process.env.SMTP_FROM_EMAIL || '',
-    fromName: configMap.get('SMTP_FROM_NAME') || process.env.SMTP_FROM_NAME || 'CreatorCredits',
+    fromName: configMap.get('SMTP_FROM_NAME') || process.env.SMTP_FROM_NAME || 'DivinityCoin',
   };
 }
 

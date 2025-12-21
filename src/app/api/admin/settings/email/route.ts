@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       user: configMap.get('SMTP_USER') || '',
       pass: '', // Never return password
       fromEmail: configMap.get('SMTP_FROM_EMAIL') || '',
-      fromName: configMap.get('SMTP_FROM_NAME') || 'CreatorCredits',
+      fromName: configMap.get('SMTP_FROM_NAME') || 'DivinityCoin',
       replyTo: configMap.get('SMTP_REPLY_TO') || '',
       testEmailRecipient: '',
     };
@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
       }),
       prisma.systemConfig.upsert({
         where: { key: 'SMTP_FROM_NAME' },
-        update: { value: fromName || 'CreatorCredits', updatedBy: admin!.id },
-        create: { key: 'SMTP_FROM_NAME', value: fromName || 'CreatorCredits', updatedBy: admin!.id },
+        update: { value: fromName || 'DivinityCoin', updatedBy: admin!.id },
+        create: { key: 'SMTP_FROM_NAME', value: fromName || 'DivinityCoin', updatedBy: admin!.id },
       }),
       prisma.systemConfig.upsert({
         where: { key: 'SMTP_REPLY_TO' },

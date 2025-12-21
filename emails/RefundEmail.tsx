@@ -33,7 +33,7 @@ export const RefundEmail = ({
       <Body style={main}>
         <Container style={container}>
           <Section style={logoSection}>
-            <Heading style={logo}>CreatorCredits</Heading>
+            <Heading style={logo}>DivinityCoin</Heading>
           </Section>
 
           <Section style={content}>
@@ -78,7 +78,7 @@ export const RefundEmail = ({
             </Text>
 
             <Section style={buttonSection}>
-              <Link href="mailto:support@creatorcredits.com" style={button}>
+              <Link href="mailto:support@divinitycoin.com" style={button}>
                 Contact Support
               </Link>
             </Section>
@@ -87,12 +87,12 @@ export const RefundEmail = ({
           <Section style={footer}>
             <Text style={footerText}>
               Questions? Contact us at{' '}
-              <Link href="mailto:support@creatorcredits.com" style={link}>
-                support@creatorcredits.com
+              <Link href="mailto:support@divinitycoin.com" style={link}>
+                support@divinitycoin.com
               </Link>
             </Text>
             <Text style={footerText}>
-              © {new Date().getFullYear()} CreatorCredits. All rights reserved.
+              © {new Date().getFullYear()} DivinityCoin. All rights reserved.
             </Text>
           </Section>
         </Container>

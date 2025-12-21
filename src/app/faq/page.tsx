@@ -66,7 +66,7 @@ const faqs = [
       },
       {
         q: 'How do I contact support?',
-        a: 'Email us at support@creatorcredits.com. We typically respond within 24 hours.',
+        a: 'Email us at support@divinitycoin.com. We typically respond within 24 hours.',
       },
     ],
   },
@@ -105,7 +105,7 @@ export default function FAQPage() {
             Frequently Asked Questions
           </h1>
           <p className="mt-4 text-xl text-neutral-600">
-            Everything you need to know about CreatorCredits.
+            Everything you need to know about DivinityCoin.
           </p>
         </div>
       </section>

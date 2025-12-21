@@ -56,7 +56,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{
 }> {
   const config = getSmtpConfig();
   const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
-  const fromName = process.env.SMTP_FROM_NAME || 'CreatorCredits';
+  const fromName = process.env.SMTP_FROM_NAME || 'DivinityCoin';
 
   if (!config.user || !config.pass) {
     console.error('SMTP credentials not configured');
@@ -153,11 +153,11 @@ export async function sendTestEmail(to: string): Promise<{
 }> {
   return sendEmail({
     to,
-    subject: 'Test Email from CreatorCredits',
+    subject: 'Test Email from DivinityCoin',
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #6366f1;">Test Email</h1>
-        <p>This is a test email from your CreatorCredits installation.</p>
+        <p>This is a test email from your DivinityCoin installation.</p>
         <p>If you received this, your SMTP configuration is working correctly!</p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
         <p style="color: #6b7280; font-size: 14px;">
@@ -165,6 +165,6 @@ export async function sendTestEmail(to: string): Promise<{
         </p>
       </div>
     `,
-    text: `Test Email from CreatorCredits\n\nThis is a test email. If you received this, your SMTP configuration is working correctly!\n\nSent at: ${new Date().toISOString()}`,
+    text: `Test Email from DivinityCoin\n\nThis is a test email. If you received this, your SMTP configuration is working correctly!\n\nSent at: ${new Date().toISOString()}`,
   });
 }
