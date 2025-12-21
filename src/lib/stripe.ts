@@ -15,7 +15,7 @@ export const stripe = new Proxy({} as Stripe, {
         typescript: true,
       });
     }
-    return (_stripe as Record<string, unknown>)[prop as string];
+    return (_stripe as unknown as Record<string, unknown>)[prop as string];
   },
 });
 
