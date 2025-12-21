@@ -81,6 +81,7 @@ export default async function ReportsPage() {
     { name: 'Sales Report', description: 'Transaction and sales analytics', href: '/admin/reports/sales' },
     { name: 'Redemption Report', description: 'Gift card redemption patterns', href: '/admin/reports/redemptions' },
     { name: 'Partner Report', description: 'Partner activity and usage', href: '/admin/reports/partners' },
+    { name: 'Settlement Report', description: 'Partner settlement analytics and payouts', href: '/admin/reports/settlements' },
     { name: 'Gift Card Aging', description: 'Unredeemed cards by age', href: '/admin/reports/aging' },
     { name: 'Refund Report', description: 'Refund history and analysis', href: '/admin/reports/refunds' },
   ];

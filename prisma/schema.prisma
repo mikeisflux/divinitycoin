@@ -177,6 +177,9 @@ model CreditHold {
   capturedAt      DateTime?
   releasedAt      DateTime?
 
+  // Relations
+  capture         CreditCapture?
+
   @@index([pledgeId])
   @@index([creditBalanceId])
   @@index([status])
@@ -433,6 +436,22 @@ model Partner {
   // Settings
   settings      Json?         // Partner-specific settings
 
+  // Settlement configuration
+  settlementFrequency   SettlementFrequency @default(WEEKLY)
+  settlementDay         Int                 @default(1)  // Day of week (1=Mon) or month (1-28)
+  minimumSettlement     Decimal             @db.Decimal(10, 2) @default(100)
+  partnerFeeOverride    Decimal?            @db.Decimal(5, 4)  // Override default 6% fee (e.g., 0.0500 = 5%)
+
+  // Payment details
+  paymentMethod         String?             // "wire", "ach", "paypal", "stripe"
+  bankName              String?
+  bankAccountNumber     String?             @db.Text  // Encrypted
+  bankRoutingNumber     String?             // Encrypted
+  bankSwiftCode         String?
+  bankAddress           String?             @db.Text
+  paypalEmail           String?
+  stripeAccountId       String?             // For Stripe Connect payouts
+
   // Timestamps
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -441,9 +460,18 @@ model Partner {
   // Relations
   apiKeys       PartnerApiKey[]
   giftCards     GiftCard[]
+  settlements   PartnerSettlement[]
+  captures      CreditCapture[]
 
   @@index([slug])
   @@index([status])
+}
+
+enum SettlementFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
 }
 
 enum PartnerStatus {
@@ -644,4 +672,101 @@ model EmailTemplateVersion {
   createdAt   DateTime      @default(now())
 
   @@unique([templateId, version])
+}
+
+// ============================================
+// SETTLEMENT SYSTEM
+// ============================================
+
+model PartnerSettlement {
+  id            String            @id @default(cuid())
+
+  // Partner
+  partnerId     String
+  partner       Partner           @relation(fields: [partnerId], references: [id])
+
+  // Period
+  periodStart   DateTime
+  periodEnd     DateTime
+
+  // Amounts
+  grossAmount   Decimal           @db.Decimal(12, 2)  // Total captured credits
+  partnerFee    Decimal           @db.Decimal(12, 2)  // Fee amount (e.g., 6%)
+  feePercentage Decimal           @db.Decimal(5, 4)   // Fee rate used (e.g., 0.0600 = 6%)
+  netAmount     Decimal           @db.Decimal(12, 2)  // Amount to pay partner
+
+  // Currency
+  currency      String            @default("USD")
+
+  // Status
+  status        SettlementStatus  @default(PENDING)
+
+  // Payment details
+  paymentMethod String?           // "wire", "ach", "paypal", "stripe"
+  paymentRef    String?           // External reference (wire ref, PayPal ID)
+  paidAt        DateTime?
+
+  // Notes
+  adminNotes    String?           @db.Text
+  disputeReason String?           @db.Text
+
+  // Approval
+  approvedBy    String?           // Admin who approved
+  approvedAt    DateTime?
+
+  // Timestamps
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relations
+  captures      CreditCapture[]
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([periodEnd])
+  @@index([createdAt])
+}
+
+enum SettlementStatus {
+  PENDING       // Settlement calculated, awaiting approval
+  APPROVED      // Approved, ready for payment
+  PROCESSING    // Payment initiated
+  PAID          // Payment confirmed
+  FAILED        // Payment failed
+  DISPUTED      // Under dispute
+}
+
+model CreditCapture {
+  id              String            @id @default(cuid())
+
+  // Hold reference
+  holdId          String            @unique
+  hold            CreditHold        @relation(fields: [holdId], references: [id])
+
+  // Partner
+  partnerId       String
+  partner         Partner           @relation(fields: [partnerId], references: [id])
+
+  // Creator info (from partner platform)
+  creatorId       String            // Creator's ID on partner platform
+  creatorEmail    String?           // For reference
+  projectId       String            // Project ID on partner platform
+  projectName     String?           // For reference
+
+  // Amount
+  amount          Decimal           @db.Decimal(10, 2)
+
+  // Settlement
+  settlementId    String?
+  settlement      PartnerSettlement? @relation(fields: [settlementId], references: [id])
+  settledAt       DateTime?
+
+  // Timestamps
+  capturedAt      DateTime          @default(now())
+
+  @@index([partnerId])
+  @@index([settlementId])
+  @@index([capturedAt])
+  @@index([creatorId])
+  @@index([projectId])
 }
