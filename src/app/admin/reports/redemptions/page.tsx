@@ -180,7 +180,7 @@ export default async function RedemptionsReportPage() {
           </div>
           <div className="divide-y divide-neutral-200">
             {data.byAmount.length > 0 ? data.byAmount.map((tier) => (
-              <div key={tier.amount} className="p-4 flex items-center justify-between">
+              <div key={String(tier.amount)} className="p-4 flex items-center justify-between">
                 <p className="font-medium text-neutral-900">{formatCurrency(Number(tier.amount))} cards</p>
                 <p className="font-semibold text-neutral-900">{tier.count} redeemed</p>
               </div>
