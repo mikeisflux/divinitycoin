@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         subject: subject || '(no subject)',
         htmlContent: html || '',
         textContent: text || '',
-        status: 'RECEIVED',
+        status: 'DELIVERED',
         statusMessage: `Inbound email from ${from}`,
       },
     });
