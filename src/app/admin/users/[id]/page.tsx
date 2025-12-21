@@ -64,8 +64,8 @@ export default async function UserDetailPage({ params }: { params: { id: string 
     notFound();
   }
 
-  const totalBalance = user.creditBalances.reduce((sum, b) => sum + Number(b.availableBalance), 0);
-  const totalHeld = user.creditBalances.reduce((sum, b) => sum + Number(b.heldBalance), 0);
+  const totalBalance = user.creditBalances.reduce((sum: number, b: { availableBalance: unknown }) => sum + Number(b.availableBalance), 0);
+  const totalHeld = user.creditBalances.reduce((sum: number, b: { heldBalance: unknown }) => sum + Number(b.heldBalance), 0);
 
   return (
     <AdminLayout
