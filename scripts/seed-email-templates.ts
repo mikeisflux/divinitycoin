@@ -4,11 +4,10 @@ const prisma = new PrismaClient();
 
 const emailTemplates = [
   {
-    name: 'gift_card_delivery',
-    subject: 'Your CreatorCredits Gift Card is Ready! 🎉',
+    name: 'Gift Card Delivery',
+    slug: 'gift_card_delivery',
     description: 'Sent when a gift card purchase is completed',
-    category: 'transactional',
-    variables: JSON.stringify(['code', 'amount', 'recipientEmail', 'purchaseDate', 'expiryDate']),
+    subject: 'Your CreatorCredits Gift Card is Ready!',
     htmlContent: `
       <h1>Your Gift Card is Ready!</h1>
       <p>Thank you for your purchase! Your \${{amount}} CreatorCredits gift card is now active.</p>
@@ -21,11 +20,10 @@ const emailTemplates = [
     textContent: `Your CreatorCredits Gift Card is Ready!\n\nThank you for your purchase!\n\nYour Gift Card Code: {{code}}\nAmount: \${{amount}}\nValid Until: {{expiryDate}}\n\nKeep this code safe!`,
   },
   {
-    name: 'refund_confirmation',
-    subject: 'Your CreatorCredits Refund Has Been Processed',
+    name: 'Refund Confirmation',
+    slug: 'refund_confirmation',
     description: 'Sent when a refund is processed',
-    category: 'transactional',
-    variables: JSON.stringify(['amount', 'refundDate', 'transactionId', 'reason']),
+    subject: 'Your CreatorCredits Refund Has Been Processed',
     htmlContent: `
       <h1>Refund Processed</h1>
       <p>We've processed your refund request. The funds should appear in your original payment method within 5-10 business days.</p>
@@ -39,11 +37,10 @@ const emailTemplates = [
     textContent: `Refund Processed\n\nWe've processed your refund request.\n\nRefund Amount: \${{amount}}\nDate Processed: {{refundDate}}\nTransaction ID: {{transactionId}}\n\nAny associated gift card codes have been revoked.`,
   },
   {
-    name: 'welcome',
-    subject: 'Welcome to CreatorCredits! 🎉',
+    name: 'Welcome Email',
+    slug: 'welcome',
     description: 'Sent when a new user creates an account',
-    category: 'transactional',
-    variables: JSON.stringify(['userName', 'email']),
+    subject: 'Welcome to CreatorCredits!',
     htmlContent: `
       <h1>Welcome to CreatorCredits!</h1>
       <p>Hi {{userName}},</p>
@@ -59,30 +56,23 @@ const emailTemplates = [
     textContent: `Welcome to CreatorCredits!\n\nHi {{userName}},\n\nThanks for joining CreatorCredits! We're excited to have you.\n\nGet started at https://creatorcredits.com/buy`,
   },
   {
-    name: 'password_reset',
-    subject: 'Reset Your CreatorCredits Password',
+    name: 'Password Reset',
+    slug: 'password_reset',
     description: 'Sent when a password reset is requested',
-    category: 'transactional',
-    variables: JSON.stringify(['email', 'resetLink', 'expiresIn']),
+    subject: 'Reset Your CreatorCredits Password',
     htmlContent: `
       <h1>Reset Your Password</h1>
       <p>We received a request to reset the password for your CreatorCredits account associated with {{email}}.</p>
       <a href="{{resetLink}}" style="display:inline-block;background:#6366f1;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;">Reset Password</a>
       <p>This link will expire in {{expiresIn}}. If you didn't request a password reset, you can safely ignore this email.</p>
-      <div style="background:#fef2f2;padding:16px;border-left:4px solid #ef4444;margin:20px 0;">
-        <p style="color:#991b1b;margin:0;"><strong>Security Tips:</strong></p>
-        <p style="color:#991b1b;margin:4px 0;">• Never share this link with anyone</p>
-        <p style="color:#991b1b;margin:4px 0;">• CreatorCredits will never ask for your password via email</p>
-      </div>
     `,
     textContent: `Reset Your Password\n\nWe received a request to reset your password.\n\nReset link: {{resetLink}}\n\nThis link expires in {{expiresIn}}.\n\nIf you didn't request this, ignore this email.`,
   },
   {
-    name: 'admin_alert',
-    subject: '[{{severity}}] {{alertType}}',
+    name: 'Admin Alert',
+    slug: 'admin_alert',
     description: 'Sent to admins for system alerts',
-    category: 'admin',
-    variables: JSON.stringify(['alertType', 'severity', 'message', 'details', 'timestamp', 'actionUrl', 'actionLabel']),
+    subject: '[{{severity}}] {{alertType}}',
     htmlContent: `
       <h1>{{alertType}}</h1>
       <div style="background:#fef3c7;padding:16px;border-left:4px solid #f59e0b;margin:20px 0;">
@@ -95,13 +85,12 @@ const emailTemplates = [
     textContent: `[{{severity}}] {{alertType}}\n\nTime: {{timestamp}}\n\n{{message}}\n\nAction: {{actionUrl}}`,
   },
   {
-    name: 'unredeemed_reminder',
-    subject: 'Don\'t Forget Your ${{amount}} CreatorCredits! 🎁',
+    name: 'Unredeemed Reminder',
+    slug: 'unredeemed_reminder',
     description: 'Sent to remind users of unredeemed gift cards',
-    category: 'marketing',
-    variables: JSON.stringify(['code', 'amount', 'purchaseDate', 'daysUnredeemed', 'expiryDate']),
+    subject: 'Don\'t Forget Your ${{amount}} CreatorCredits!',
     htmlContent: `
-      <h1>Don't Forget Your Credits! 🎁</h1>
+      <h1>Don't Forget Your Credits!</h1>
       <p>You have a \${{amount}} CreatorCredits gift card that hasn't been redeemed yet. It's been {{daysUnredeemed}} days since your purchase!</p>
       <div style="background:#fef3c7;border:2px dashed #f59e0b;padding:24px;text-align:center;margin:24px 0;">
         <p style="color:#92400e;font-size:14px;margin:0 0 8px;">Your Gift Card Code:</p>
@@ -115,48 +104,39 @@ const emailTemplates = [
 ];
 
 async function seed() {
-  console.log('🌱 Seeding email templates...\n');
+  console.log('Seeding email templates...\n');
 
   for (const template of emailTemplates) {
     const existing = await prisma.emailTemplate.findUnique({
-      where: { name: template.name },
+      where: { slug: template.slug },
     });
 
     if (existing) {
-      console.log(`⏭️  Skipping "${template.name}" (already exists)`);
+      console.log(`Skipping "${template.name}" (already exists)`);
       continue;
     }
 
     const created = await prisma.emailTemplate.create({
       data: {
         name: template.name,
-        subject: template.subject,
+        slug: template.slug,
         description: template.description,
-        category: template.category,
-        variables: template.variables,
+        subject: template.subject,
+        htmlContent: template.htmlContent,
+        textContent: template.textContent,
         isActive: true,
-        versions: {
-          create: {
-            version: 1,
-            subject: template.subject,
-            htmlContent: template.htmlContent,
-            textContent: template.textContent,
-            isActive: true,
-            createdBy: 'system',
-          },
-        },
       },
     });
 
-    console.log(`✅ Created template: ${created.name}`);
+    console.log(`Created template: ${created.name}`);
   }
 
-  console.log('\n✨ Email template seeding complete!');
+  console.log('\nEmail template seeding complete!');
 }
 
 seed()
   .catch((e) => {
-    console.error('❌ Seeding failed:', e);
+    console.error('Seeding failed:', e);
     process.exit(1);
   })
   .finally(async () => {
