@@ -1,8 +1,10 @@
 // lib/email/smtp.ts
 // SMTP email client using nodemailer for Office 365/GoDaddy
+// Reads configuration from database with fallback to environment variables
 
 import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/db';
+import { getSmtpConfig as getSmtpConfigFromDb, clearConfigCache } from '@/lib/config';
 
 interface SmtpConfig {
   host: string;
@@ -10,21 +12,12 @@ interface SmtpConfig {
   secure: boolean;
   user: string;
   pass: string;
+  fromEmail: string;
+  fromName: string;
+  replyTo: string;
 }
 
-function getSmtpConfig(): SmtpConfig {
-  return {
-    host: process.env.SMTP_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-  };
-}
-
-function createTransporter() {
-  const config = getSmtpConfig();
-
+async function createTransporter(config: SmtpConfig) {
   return nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -54,13 +47,15 @@ export async function sendEmail(params: SendEmailParams): Promise<{
   messageId?: string;
   error?: string;
 }> {
-  const config = getSmtpConfig();
-  const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
-  const fromName = process.env.SMTP_FROM_NAME || 'DivinityCoin';
+  // Load config from database (with fallback to env vars)
+  const config = await getSmtpConfigFromDb();
+
+  const fromEmail = config.fromEmail || config.user;
+  const fromName = config.fromName || 'DivinityCoin';
 
   if (!config.user || !config.pass) {
     console.error('SMTP credentials not configured');
-    return { success: false, error: 'SMTP not configured' };
+    return { success: false, error: 'SMTP not configured. Please configure email settings in the admin panel.' };
   }
 
   try {
@@ -78,12 +73,12 @@ export async function sendEmail(params: SendEmailParams): Promise<{
       },
     });
 
-    const transporter = createTransporter();
+    const transporter = await createTransporter(config);
 
     const result = await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: params.toName ? `"${params.toName}" <${params.to}>` : params.to,
-      replyTo: params.replyTo || fromEmail,
+      replyTo: params.replyTo || config.replyTo || fromEmail,
       subject: params.subject,
       html: params.html,
       text: params.text,
@@ -94,7 +89,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{
       where: { id: emailLog.id },
       data: {
         status: 'SENT',
-        sendgridMessageId: result.messageId, // Reusing field for SMTP message ID
+        sendgridMessageId: result.messageId,
         sentAt: new Date(),
       },
     });
@@ -129,14 +124,14 @@ export async function verifySmtpConnection(): Promise<{
   success: boolean;
   error?: string;
 }> {
-  const config = getSmtpConfig();
+  const config = await getSmtpConfigFromDb();
 
   if (!config.user || !config.pass) {
-    return { success: false, error: 'SMTP credentials not configured' };
+    return { success: false, error: 'SMTP credentials not configured. Please configure email settings in the admin panel.' };
   }
 
   try {
-    const transporter = createTransporter();
+    const transporter = await createTransporter(config);
     await transporter.verify();
     return { success: true };
   } catch (error) {
@@ -168,3 +163,6 @@ export async function sendTestEmail(to: string): Promise<{
     text: `Test Email from DivinityCoin\n\nThis is a test email. If you received this, your SMTP configuration is working correctly!\n\nSent at: ${new Date().toISOString()}`,
   });
 }
+
+// Re-export clearConfigCache for use after saving settings
+export { clearConfigCache };

@@ -6,6 +6,7 @@ import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
 import { encrypt } from '@/lib/encryption';
+import { clearConfigCache } from '@/lib/config';
 
 const SMTP_CONFIG_KEYS = [
   'SMTP_HOST',
@@ -132,6 +133,9 @@ export async function POST(request: NextRequest) {
     }
 
     await prisma.$transaction(operations);
+
+    // Clear config cache so new settings take effect immediately
+    clearConfigCache();
 
     await logAdminAction(
       admin!.id,
