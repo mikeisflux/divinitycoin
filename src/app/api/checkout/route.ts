@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         amount,
         currency: 'USD',
         status: 'PENDING',
-        purchaseEmail: email,
+        purchasedByEmail: email,
       },
     });
 
