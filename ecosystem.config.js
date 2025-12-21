@@ -7,7 +7,7 @@ module.exports = {
       name: 'divinitycoin',
       script: 'node_modules/.bin/next',
       args: 'start',
-      cwd: '/app',
+      cwd: '/root/divinitycoin',
       instances: 1,
       exec_mode: 'cluster',
       autorestart: true,
