@@ -1,7 +1,7 @@
 // lib/email/sendGiftCard.ts
 
 import { formatCodeForDisplay } from '@/lib/giftcard/generate';
-import { sendEmail } from './smtp';
+import { sendEmail } from './sendgrid';
 
 interface SendGiftCardParams {
   to: string;

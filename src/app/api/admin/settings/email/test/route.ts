@@ -1,10 +1,10 @@
 // app/api/admin/settings/email/test/route.ts
-// Send test email via SMTP
+// Send test email via SendGrid
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
-import { sendTestEmail } from '@/lib/email/smtp';
+import { sendTestEmail } from '@/lib/email/sendgrid';
 
 export async function POST(request: NextRequest) {
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);

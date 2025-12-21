@@ -1,10 +1,10 @@
 // app/api/admin/settings/email/verify/route.ts
-// Verify SMTP connection
+// Verify SendGrid configuration
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
-import { verifySmtpConnection } from '@/lib/email/smtp';
+import { verifySendGridConnection } from '@/lib/email/sendgrid';
 
 export async function POST(request: NextRequest) {
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
@@ -14,11 +14,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await verifySmtpConnection();
+    const result = await verifySendGridConnection();
 
     await logAdminAction(
       admin!.id,
-      'SMTP_CONNECTION_VERIFIED',
+      'SENDGRID_CONNECTION_VERIFIED',
       'email',
       undefined,
       { success: result.success, error: result.error || null },
@@ -28,16 +28,16 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json(
-        { error: result.error || 'SMTP connection failed' },
+        { error: result.error || 'SendGrid configuration invalid' },
         { status: 400 }
       );
     }
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error('Failed to verify SMTP connection:', error);
+    console.error('Failed to verify SendGrid configuration:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Connection verification failed' },
+      { error: error instanceof Error ? error.message : 'Configuration verification failed' },
       { status: 500 }
     );
   }
