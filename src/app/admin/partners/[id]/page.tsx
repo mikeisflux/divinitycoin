@@ -1,21 +1,38 @@
 // app/admin/partners/[id]/page.tsx
-// Partner detail page
+// Partner detail page with working actions
 
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { getAdminFromRequest } from '@/lib/admin/auth';
-import { redirect, notFound } from 'next/navigation';
-import { prisma } from '@/lib/db';
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 
-async function getPartner(id: string) {
-  return prisma.partner.findUnique({
-    where: { id },
-    include: {
-      apiKeys: {
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  });
+interface PartnerApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  isActive: boolean;
+  lastUsedAt: string | null;
+  requestCount: bigint | string;
+}
+
+interface Partner {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  website: string | null;
+  vpnIp: string | null;
+  webhookUrl: string | null;
+  description: string | null;
+  createdAt: string;
+  activatedAt: string | null;
+  settings: Record<string, unknown> | null;
+  apiKeys: PartnerApiKey[];
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -33,34 +50,154 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default async function PartnerDetailPage({ params }: { params: { id: string } }) {
-  const admin = await getAdminFromRequest();
+export default function PartnerDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const partnerId = params.id as string;
 
-  if (!admin) {
-    redirect('/admin/login');
+  const [partner, setPartner] = useState<Partner | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activating, setActivating] = useState(false);
+  const [suspending, setSuspending] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [setupUrl, setSetupUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPartner();
+  }, [partnerId]);
+
+  async function fetchPartner() {
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPartner(data.partner);
+      } else if (response.status === 404) {
+        router.push('/admin/partners');
+      }
+    } catch (err) {
+      console.error('Failed to fetch partner:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const partner = await getPartner(params.id);
+  async function handleActivate() {
+    setActivating(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}/approve`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to activate partner' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Partner activated successfully!' });
+      setSetupUrl(data.setupUrl);
+      fetchPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to activate partner' });
+    } finally {
+      setActivating(false);
+    }
+  }
+
+  async function handleSuspend() {
+    if (!confirm('Are you sure you want to suspend this partner?')) return;
+
+    setSuspending(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'SUSPENDED' }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to suspend partner' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Partner suspended' });
+      fetchPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to suspend partner' });
+    } finally {
+      setSuspending(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <AdminLayout title="Loading..." description="Please wait">
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   if (!partner) {
-    notFound();
+    return (
+      <AdminLayout title="Partner Not Found" description="">
+        <div className="text-center py-12">
+          <p className="text-neutral-500 mb-4">This partner does not exist.</p>
+          <Button onClick={() => router.push('/admin/partners')}>Back to Partners</Button>
+        </div>
+      </AdminLayout>
+    );
   }
+
+  const settings = partner.settings as Record<string, unknown> | null;
 
   return (
     <AdminLayout
       title={partner.name}
       description={`Partner details for ${partner.slug}`}
       actions={
-        <div className="flex gap-3">
-          <Link
-            href={`/admin/partners/${partner.id}/edit`}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
-          >
-            Edit Partner
-          </Link>
-        </div>
+        <Link
+          href={`/admin/partners/${partner.id}/edit`}
+          className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
+        >
+          Edit Partner
+        </Link>
       }
     >
+      {message && (
+        <div className={`mb-6 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+          {message.text}
+        </div>
+      )}
+
+      {setupUrl && (
+        <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+          <h4 className="font-medium text-blue-900 mb-2">Partner Setup URL</h4>
+          <p className="text-sm text-blue-800 mb-2">Send this link to the partner to complete their account setup:</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-white px-3 py-2 rounded border text-sm break-all">{setupUrl}</code>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(setupUrl);
+                alert('Copied to clipboard!');
+              }}
+              className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           {/* Partner Info */}
@@ -92,15 +229,77 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
                 <dd className="text-neutral-900">{partner.contactEmail || '-'}</dd>
               </div>
               <div>
+                <dt className="text-sm text-neutral-500">Website</dt>
+                <dd className="text-neutral-900">
+                  {partner.website ? (
+                    <a href={partner.website} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                      {partner.website}
+                    </a>
+                  ) : '-'}
+                </dd>
+              </div>
+              <div>
                 <dt className="text-sm text-neutral-500">VPN IP</dt>
                 <dd className="text-neutral-900 font-mono">{partner.vpnIp || 'Not configured'}</dd>
               </div>
-              <div>
+              <div className="col-span-2">
                 <dt className="text-sm text-neutral-500">Webhook URL</dt>
                 <dd className="text-neutral-900 text-sm break-all">{partner.webhookUrl || 'Not configured'}</dd>
               </div>
+              {partner.description && (
+                <div className="col-span-2">
+                  <dt className="text-sm text-neutral-500">Description</dt>
+                  <dd className="text-neutral-900 text-sm">{partner.description}</dd>
+                </div>
+              )}
             </dl>
           </div>
+
+          {/* Application Details (if pending) */}
+          {settings && (
+            <div className="bg-white rounded-xl border border-neutral-200 p-6">
+              <h2 className="text-lg font-semibold text-neutral-900 mb-4">Application Details</h2>
+              <dl className="grid grid-cols-2 gap-4">
+                {settings.businessType && (
+                  <div>
+                    <dt className="text-sm text-neutral-500">Business Type</dt>
+                    <dd className="text-neutral-900">{String(settings.businessType)}</dd>
+                  </div>
+                )}
+                {settings.taxId && (
+                  <div>
+                    <dt className="text-sm text-neutral-500">Tax ID</dt>
+                    <dd className="text-neutral-900 font-mono">{String(settings.taxId)}</dd>
+                  </div>
+                )}
+                {settings.phone && (
+                  <div>
+                    <dt className="text-sm text-neutral-500">Phone</dt>
+                    <dd className="text-neutral-900">{String(settings.phone)}</dd>
+                  </div>
+                )}
+                {settings.expectedMonthlyVolume && (
+                  <div>
+                    <dt className="text-sm text-neutral-500">Expected Monthly Volume</dt>
+                    <dd className="text-neutral-900">{String(settings.expectedMonthlyVolume)}</dd>
+                  </div>
+                )}
+                {settings.address && typeof settings.address === 'object' && (
+                  <div className="col-span-2">
+                    <dt className="text-sm text-neutral-500">Address</dt>
+                    <dd className="text-neutral-900">
+                      {(settings.address as any).line1}
+                      {(settings.address as any).line2 && `, ${(settings.address as any).line2}`}
+                      <br />
+                      {(settings.address as any).city}, {(settings.address as any).state} {(settings.address as any).zipCode}
+                      <br />
+                      {(settings.address as any).country}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
 
           {/* API Keys */}
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
@@ -142,7 +341,7 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
                       <td className="py-3 text-sm text-neutral-500">
                         {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString() : 'Never'}
                       </td>
-                      <td className="py-3 text-sm text-neutral-600">{key.requestCount.toString()}</td>
+                      <td className="py-3 text-sm text-neutral-600">{String(key.requestCount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -156,22 +355,55 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
             <h3 className="font-semibold text-neutral-900 mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition">
-                Test Webhook
-              </button>
-              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition">
-                View API Logs
-              </button>
               {partner.status === 'PENDING' && (
-                <button className="w-full text-left px-4 py-2 rounded-lg text-sm text-green-600 hover:bg-green-50 transition">
-                  Activate Partner
+                <button
+                  onClick={handleActivate}
+                  disabled={activating}
+                  className="w-full text-left px-4 py-2 rounded-lg text-sm text-green-600 hover:bg-green-50 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {activating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                      Activating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Activate Partner
+                    </>
+                  )}
                 </button>
               )}
               {partner.status === 'ACTIVE' && (
-                <button className="w-full text-left px-4 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition">
-                  Suspend Partner
+                <button
+                  onClick={handleSuspend}
+                  disabled={suspending}
+                  className="w-full text-left px-4 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {suspending ? 'Suspending...' : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                      Suspend Partner
+                    </>
+                  )}
                 </button>
               )}
+              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Test Webhook
+              </button>
+              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                View API Logs
+              </button>
             </div>
           </div>
         </div>
