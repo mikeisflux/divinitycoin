@@ -59,8 +59,22 @@ export default function PartnerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [suspending, setSuspending] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [setupUrl, setSetupUrl] = useState<string | null>(null);
+  const [showLogsModal, setShowLogsModal] = useState(false);
+  const [logs, setLogs] = useState<Array<{
+    id: string;
+    method: string;
+    endpoint: string;
+    path: string;
+    ipAddress: string;
+    statusCode: number;
+    responseTimeMs: number;
+    errorMessage: string | null;
+    timestamp: string;
+  }>>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   useEffect(() => {
     fetchPartner();
@@ -134,6 +148,53 @@ export default function PartnerDetailPage() {
       setMessage({ type: 'error', text: 'Failed to suspend partner' });
     } finally {
       setSuspending(false);
+    }
+  }
+
+  async function handleTestWebhook() {
+    setTestingWebhook(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}/test-webhook`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setMessage({
+          type: 'error',
+          text: data.error || `Webhook test failed (Status: ${data.statusCode || 'unknown'})`,
+        });
+        return;
+      }
+
+      setMessage({
+        type: 'success',
+        text: `Webhook test successful! Response time: ${data.durationMs}ms`,
+      });
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to send test webhook' });
+    } finally {
+      setTestingWebhook(false);
+    }
+  }
+
+  async function fetchLogs() {
+    setLogsLoading(true);
+    setShowLogsModal(true);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}/logs?limit=50`);
+      if (response.ok) {
+        const data = await response.json();
+        setLogs(data.logs);
+      }
+    } catch (err) {
+      console.error('Failed to fetch logs:', err);
+    } finally {
+      setLogsLoading(false);
     }
   }
 
@@ -392,13 +453,29 @@ export default function PartnerDetailPage() {
                   )}
                 </button>
               )}
-              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Test Webhook
+              <button
+                onClick={handleTestWebhook}
+                disabled={testingWebhook || !partner.webhookUrl}
+                className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testingWebhook ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-600"></div>
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Test Webhook
+                  </>
+                )}
               </button>
-              <button className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2">
+              <button
+                onClick={fetchLogs}
+                className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2"
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -408,6 +485,90 @@ export default function PartnerDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* API Logs Modal */}
+      {showLogsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-200">
+              <h3 className="text-lg font-semibold text-neutral-900">API Request Logs</h3>
+              <button
+                onClick={() => setShowLogsModal(false)}
+                className="text-neutral-500 hover:text-neutral-700"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-auto flex-1">
+              {logsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+              ) : logs.length === 0 ? (
+                <p className="text-neutral-500 text-center py-8">No API logs found for this partner.</p>
+              ) : (
+                <table className="min-w-full divide-y divide-neutral-200">
+                  <thead>
+                    <tr>
+                      <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Timestamp</th>
+                      <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Method</th>
+                      <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Endpoint</th>
+                      <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Status</th>
+                      <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Time</th>
+                      <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {logs.map((log) => (
+                      <tr key={log.id}>
+                        <td className="py-2 text-sm text-neutral-600">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </td>
+                        <td className="py-2">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                            log.method === 'GET' ? 'bg-blue-100 text-blue-800' :
+                            log.method === 'POST' ? 'bg-green-100 text-green-800' :
+                            log.method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                            log.method === 'DELETE' ? 'bg-red-100 text-red-800' :
+                            'bg-neutral-100 text-neutral-800'
+                          }`}>
+                            {log.method}
+                          </span>
+                        </td>
+                        <td className="py-2 text-sm font-mono text-neutral-900 max-w-xs truncate">
+                          {log.endpoint}
+                        </td>
+                        <td className="py-2">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                            log.statusCode >= 200 && log.statusCode < 300 ? 'bg-green-100 text-green-800' :
+                            log.statusCode >= 400 && log.statusCode < 500 ? 'bg-yellow-100 text-yellow-800' :
+                            log.statusCode >= 500 ? 'bg-red-100 text-red-800' :
+                            'bg-neutral-100 text-neutral-800'
+                          }`}>
+                            {log.statusCode}
+                          </span>
+                        </td>
+                        <td className="py-2 text-sm text-neutral-600">{log.responseTimeMs}ms</td>
+                        <td className="py-2 text-sm font-mono text-neutral-500">{log.ipAddress}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="p-4 border-t border-neutral-200 bg-neutral-50">
+              <button
+                onClick={() => setShowLogsModal(false)}
+                className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm hover:bg-neutral-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
