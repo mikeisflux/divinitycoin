@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
         data: {
           status,
           statusMessage,
-          updatedAt: new Date(),
         },
       });
     }
