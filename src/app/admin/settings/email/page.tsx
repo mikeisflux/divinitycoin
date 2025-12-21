@@ -239,8 +239,14 @@ export default function EmailSettingsPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={settings.pass}
                   onChange={(e) => setSettings(prev => ({ ...prev, pass: e.target.value }))}
+                  onFocus={(e) => {
+                    // Clear placeholder when focused
+                    if (e.target.value === '••••••••') {
+                      setSettings(prev => ({ ...prev, pass: '' }));
+                    }
+                  }}
                   className="w-full px-4 py-2 pr-12 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  placeholder="••••••••"
+                  placeholder="Enter password"
                 />
                 <button
                   type="button"
@@ -259,7 +265,9 @@ export default function EmailSettingsPage() {
                   )}
                 </button>
               </div>
-              <p className="text-sm text-neutral-500 mt-1">Your Office 365 password or app password</p>
+              <p className="text-sm text-neutral-500 mt-1">
+                {settings.pass === '••••••••' ? 'Password saved. Click to enter a new password.' : 'Your Office 365 password or app password'}
+              </p>
             </div>
           </div>
 
