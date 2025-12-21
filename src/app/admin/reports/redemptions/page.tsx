@@ -28,8 +28,8 @@ async function getRedemptionData() {
       WHERE status = 'REDEEMED' AND redeemed_at IS NOT NULL
     `,
     prisma.giftCard.groupBy({
-      by: ['redeemedByPartnerId'],
-      where: { status: 'REDEEMED', redeemedByPartnerId: { not: null } },
+      by: ['partnerId'],
+      where: { status: 'REDEEMED', partnerId: { not: null } },
       _count: true,
       _sum: { amount: true },
     }),
@@ -43,12 +43,12 @@ async function getRedemptionData() {
       where: { status: 'REDEEMED' },
       orderBy: { redeemedAt: 'desc' },
       take: 20,
-      include: { redeemedByPartner: { select: { name: true } } },
+      include: { partner: { select: { name: true } } },
     }),
   ]);
 
   // Get partner names
-  const partnerIds = redemptionsByPartner.map(r => r.redeemedByPartnerId).filter(Boolean) as string[];
+  const partnerIds = redemptionsByPartner.map(r => r.partnerId).filter(Boolean) as string[];
   const partners = await prisma.partner.findMany({
     where: { id: { in: partnerIds } },
     select: { id: true, name: true },
@@ -67,8 +67,8 @@ async function getRedemptionData() {
       redemptionRate,
     },
     byPartner: redemptionsByPartner.map(r => ({
-      partnerId: r.redeemedByPartnerId,
-      partnerName: r.redeemedByPartnerId ? partnerMap.get(r.redeemedByPartnerId) || 'Unknown' : 'Direct',
+      partnerId: r.partnerId,
+      partnerName: r.partnerId ? partnerMap.get(r.partnerId) || 'Unknown' : 'Direct',
       count: r._count,
       totalValue: Number(r._sum.amount) || 0,
     })),
@@ -81,7 +81,7 @@ async function getRedemptionData() {
       codeLast4: r.codeLast4,
       amount: r.amount,
       redeemedAt: r.redeemedAt,
-      partnerName: r.redeemedByPartner?.name || 'Direct',
+      partnerName: r.partner?.name || 'Direct',
     })),
   };
 }

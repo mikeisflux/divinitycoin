@@ -17,29 +17,29 @@ async function getPartnerData() {
       _count: {
         select: {
           apiKeys: true,
-          redeemedGiftCards: true,
+          giftCards: true,
         },
       },
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  // Get redemption stats for each partner
+  // Get redemption stats for each partner (cards sold by partner that were redeemed)
   const partnerStats = await Promise.all(
     partners.map(async (partner) => {
       const [totalRedemptions, last30DaysRedemptions, totalValue] = await Promise.all([
         prisma.giftCard.count({
-          where: { redeemedByPartnerId: partner.id, status: 'REDEEMED' },
+          where: { partnerId: partner.id, status: 'REDEEMED' },
         }),
         prisma.giftCard.count({
           where: {
-            redeemedByPartnerId: partner.id,
+            partnerId: partner.id,
             status: 'REDEEMED',
             redeemedAt: { gte: last30Days },
           },
         }),
         prisma.giftCard.aggregate({
-          where: { redeemedByPartnerId: partner.id, status: 'REDEEMED' },
+          where: { partnerId: partner.id, status: 'REDEEMED' },
           _sum: { amount: true },
         }),
       ]);
@@ -67,7 +67,7 @@ async function getPartnerData() {
 
   // Total redemption value via partners
   const totalPartnerValue = await prisma.giftCard.aggregate({
-    where: { redeemedByPartnerId: { not: null }, status: 'REDEEMED' },
+    where: { partnerId: { not: null }, status: 'REDEEMED' },
     _sum: { amount: true },
   });
 
