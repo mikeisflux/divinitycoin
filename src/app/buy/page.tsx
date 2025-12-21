@@ -4,9 +4,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AmountSelector } from '@/components/AmountSelector';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { StripeCheckout } from '@/components/checkout/StripeCheckout';
 
 interface User {
   id: string;
@@ -14,12 +16,22 @@ interface User {
   name: string | null;
 }
 
+type CheckoutStep = 'select' | 'payment' | 'success';
+
+interface SuccessData {
+  giftCardId: string;
+  codeLast4: string;
+  amount: number;
+}
+
 export default function BuyPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [amount, setAmount] = useState<number | null>(25);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [step, setStep] = useState<CheckoutStep>('select');
+  const [successData, setSuccessData] = useState<SuccessData | null>(null);
 
   // Auth form state (for inline login/register)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -95,7 +107,7 @@ export default function BuyPage() {
     }
   }
 
-  const handleCheckout = async () => {
+  const handleProceedToPayment = () => {
     if (!user) {
       setError('Please sign in to continue.');
       return;
@@ -106,28 +118,18 @@ export default function BuyPage() {
       return;
     }
 
-    setIsLoading(true);
     setError('');
+    setStep('payment');
+  };
 
-    try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, email: user.email }),
-      });
+  const handlePaymentSuccess = (data: SuccessData) => {
+    setSuccessData(data);
+    setStep('success');
+  };
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Something went wrong');
-      }
-
-      // Redirect to Stripe
-      window.location.href = data.checkoutUrl;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
-      setIsLoading(false);
-    }
+  const handlePaymentCancel = () => {
+    setStep('select');
+    setError('');
   };
 
   if (checkingAuth) {
@@ -138,6 +140,78 @@ export default function BuyPage() {
     );
   }
 
+  // Success step
+  if (step === 'success' && successData) {
+    return (
+      <div className="min-h-screen bg-neutral-50 py-12">
+        <div className="max-w-xl mx-auto px-4 sm:px-6">
+          <Card className="shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+
+              <h1 className="text-2xl font-bold text-neutral-900 mb-2">Payment Successful!</h1>
+              <p className="text-neutral-600 mb-6">
+                Your credit code has been sent to <strong>{user?.email}</strong>
+              </p>
+
+              <div className="bg-neutral-50 rounded-lg p-6 mb-6">
+                <p className="text-sm text-neutral-500 mb-1">Amount</p>
+                <p className="text-3xl font-bold text-primary-600">${successData.amount.toFixed(2)}</p>
+                <p className="text-sm text-neutral-500 mt-4 mb-1">Code ending in</p>
+                <p className="font-mono text-lg">****{successData.codeLast4}</p>
+              </div>
+
+              <p className="text-sm text-neutral-500 mb-6">
+                Check your email for your full redemption code. You can use it on any partner platform.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <Button onClick={() => { setStep('select'); setSuccessData(null); }}>
+                  Buy More Credits
+                </Button>
+                <Link href="/account" className="text-primary-600 hover:underline text-sm">
+                  View My Account
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Payment step
+  if (step === 'payment' && user && amount) {
+    return (
+      <div className="min-h-screen bg-neutral-50 py-12">
+        <div className="max-w-xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-neutral-900">Complete Payment</h1>
+            <p className="mt-2 text-neutral-600">
+              Enter your payment details to complete your purchase.
+            </p>
+          </div>
+
+          <Card className="shadow-lg">
+            <CardContent className="p-6 sm:p-8">
+              <StripeCheckout
+                amount={amount}
+                email={user.email}
+                onSuccess={handlePaymentSuccess}
+                onCancel={handlePaymentCancel}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Select amount step (default)
   return (
     <div className="min-h-screen bg-neutral-50 py-12">
       <div className="max-w-xl mx-auto px-4 sm:px-6">
@@ -206,7 +280,7 @@ export default function BuyPage() {
                     value={authData.password}
                     onChange={(e) => setAuthData({ ...authData, password: e.target.value })}
                     className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors"
-                    placeholder="••••••••"
+                    placeholder="********"
                   />
                 </div>
 
@@ -222,7 +296,7 @@ export default function BuyPage() {
                       value={authData.confirmPassword}
                       onChange={(e) => setAuthData({ ...authData, confirmPassword: e.target.value })}
                       className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors"
-                      placeholder="••••••••"
+                      placeholder="********"
                     />
                   </div>
                 )}
@@ -349,11 +423,10 @@ export default function BuyPage() {
             <Button
               size="lg"
               className="w-full"
-              onClick={handleCheckout}
-              isLoading={isLoading}
+              onClick={handleProceedToPayment}
               disabled={!amount || !user}
             >
-              {isLoading ? 'Redirecting...' : user ? 'Continue to Payment' : 'Sign In to Continue'}
+              {user ? 'Continue to Payment' : 'Sign In to Continue'}
             </Button>
 
             {/* Trust Badges */}
