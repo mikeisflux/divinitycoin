@@ -21,6 +21,10 @@ export const metadata = {
   description:
     'Purchase credits to support your favorite creators across partner platforms.',
   keywords: ['divinity', 'coin', 'credits', 'support', 'crowdfunding', 'gift card'],
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon.svg',
+  },
 };
 
 export default async function RootLayout({
