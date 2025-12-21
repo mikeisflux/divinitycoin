@@ -8,7 +8,7 @@ module.exports = {
       script: 'node_modules/.bin/next',
       args: 'start',
       cwd: '/app',
-      instances: 'max',
+      instances: 1,
       exec_mode: 'cluster',
       autorestart: true,
       watch: false,
