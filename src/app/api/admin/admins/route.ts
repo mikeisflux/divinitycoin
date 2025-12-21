@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     // Log the action
     await prisma.adminAuditLog.create({
       data: {
-        adminUserId: admin.id,
+        adminId: admin.id,
         action: 'CREATE_ADMIN',
         resource: 'AdminUser',
         resourceId: newAdmin.id,

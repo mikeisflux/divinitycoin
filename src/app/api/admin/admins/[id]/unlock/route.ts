@@ -40,7 +40,7 @@ export async function POST(
     // Log the action
     await prisma.adminAuditLog.create({
       data: {
-        adminUserId: admin.id,
+        adminId: admin.id,
         action: 'UNLOCK_ADMIN',
         resource: 'AdminUser',
         resourceId: params.id,

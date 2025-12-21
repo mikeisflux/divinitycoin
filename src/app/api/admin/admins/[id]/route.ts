@@ -133,7 +133,7 @@ export async function PATCH(
     // Log the action
     await prisma.adminAuditLog.create({
       data: {
-        adminUserId: admin.id,
+        adminId: admin.id,
         action: 'UPDATE_ADMIN',
         resource: 'AdminUser',
         resourceId: params.id,
@@ -185,7 +185,7 @@ export async function DELETE(
     // Log the action
     await prisma.adminAuditLog.create({
       data: {
-        adminUserId: admin.id,
+        adminId: admin.id,
         action: 'DELETE_ADMIN',
         resource: 'AdminUser',
         resourceId: params.id,
