@@ -69,6 +69,7 @@ model GiftCard {
 
   // Value
   amount        Decimal        @db.Decimal(10, 2)
+  initialBalance Int           @default(0) // Initial balance in cents for tracking
   currency      String         @default("USD")
 
   // Status
@@ -78,6 +79,10 @@ model GiftCard {
   purchaserId   String?
   purchaser     User?          @relation("PurchasedCards", fields: [purchaserId], references: [id])
   purchasedByEmail String?     // For guest purchases
+
+  // Partner reference
+  partnerId     String?
+  partner       Partner?       @relation(fields: [partnerId], references: [id])
 
   // Stripe
   stripePaymentIntentId String? @unique
@@ -108,6 +113,7 @@ model GiftCard {
   @@index([codeHash])
   @@index([status])
   @@index([purchaserId])
+  @@index([partnerId])
   @@index([stripePaymentIntentId])
 }
 
@@ -417,6 +423,8 @@ model Partner {
   status        PartnerStatus @default(PENDING)
   vpnIp         String?       // Partner's VPN IP (e.g., 10.10.0.2)
   webhookUrl    String?       // Partner's webhook endpoint
+  webhookSecret String?       // HMAC secret for webhook signatures
+  webhookEvents String[]      @default([]) // Subscribed event types
 
   // Branding
   logoUrl       String?
@@ -432,6 +440,7 @@ model Partner {
 
   // Relations
   apiKeys       PartnerApiKey[]
+  giftCards     GiftCard[]
 
   @@index([slug])
   @@index([status])
@@ -471,6 +480,45 @@ model PartnerApiKey {
 
   @@index([keyHash])
   @@index([partnerId])
+}
+
+// ============================================
+// API REQUEST LOGGING
+// ============================================
+
+model ApiRequestLog {
+  id            String    @id @default(cuid())
+
+  // Partner reference
+  partnerId     String?
+  apiKeyId      String?
+
+  // Request details
+  method        String    // GET, POST, etc.
+  endpoint      String    // /api/v1/cards
+  path          String    // Full path with params
+
+  // Client info
+  ipAddress     String
+  userAgent     String?
+
+  // Response
+  statusCode    Int
+  responseTimeMs Int
+
+  // Optional data
+  requestBody   String?   @db.Text
+  responseBody  String?   @db.Text
+  errorMessage  String?
+
+  // Timestamp
+  timestamp     DateTime  @default(now())
+
+  @@index([partnerId])
+  @@index([apiKeyId])
+  @@index([timestamp])
+  @@index([endpoint])
+  @@index([statusCode])
 }
 
 // ============================================
