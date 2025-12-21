@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
   // Add security headers to all responses
-  const securityHeaders = {
+  const securityHeaders: Record<string, string> = {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'X-XSS-Protection': '1; mode=block',

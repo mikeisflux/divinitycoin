@@ -77,11 +77,11 @@ export class RateLimiter {
    */
   private cleanup(): void {
     const now = Date.now();
-    for (const [key, entry] of this.store.entries()) {
+    Array.from(this.store.entries()).forEach(([key, entry]) => {
       if (entry.resetAt <= now) {
         this.store.delete(key);
       }
-    }
+    });
   }
 }
 

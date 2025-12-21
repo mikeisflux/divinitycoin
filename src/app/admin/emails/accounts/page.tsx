@@ -16,7 +16,7 @@ async function getSmtpStatus() {
     },
   });
 
-  const configMap = new Map(configs.map(c => [c.key, c.value]));
+  const configMap = new Map(configs.map((c: { key: string; value: string }) => [c.key, c.value]));
 
   return {
     host: configMap.get('SMTP_HOST') || process.env.SMTP_HOST || 'smtp.office365.com',
