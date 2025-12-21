@@ -63,12 +63,12 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      available: balance.availableBalance,
-      held: balance.heldBalance,
-      total: balance.availableBalance + balance.heldBalance,
-      holds: balance.holds.map(hold => ({
+      available: Number(balance.availableBalance),
+      held: Number(balance.heldBalance),
+      total: Number(balance.availableBalance) + Number(balance.heldBalance),
+      holds: balance.holds.map((hold: { id: string; amount: unknown; pledgeId: string | null; projectId: string | null; expiresAt: Date | null }) => ({
         id: hold.id,
-        amount: hold.amount,
+        amount: Number(hold.amount),
         pledgeId: hold.pledgeId,
         projectId: hold.projectId,
         expiresAt: hold.expiresAt?.toISOString() || null,
