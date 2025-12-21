@@ -1,6 +1,8 @@
 // app/api/balance/route.ts
 // Get credit balance for authenticated user
 
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';

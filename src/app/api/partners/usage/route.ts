@@ -1,6 +1,8 @@
 // app/api/partners/usage/route.ts
 // Partner usage analytics API
 
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { prisma } from '@/lib/db';

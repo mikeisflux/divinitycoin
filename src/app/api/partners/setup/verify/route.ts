@@ -1,6 +1,8 @@
 // app/api/partners/setup/verify/route.ts
 // Verify partner setup token
 
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
