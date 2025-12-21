@@ -6,12 +6,13 @@ import { getAdminFromRequest } from '@/lib/admin/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
+import { EmailStatus } from '@prisma/client';
 
 async function getEmailLogs(page: number = 1, status?: string) {
   const pageSize = 25;
   const skip = (page - 1) * pageSize;
 
-  const where = status ? { status } : {};
+  const where = status ? { status: status as EmailStatus } : {};
 
   const [logs, total] = await Promise.all([
     prisma.emailLog.findMany({
