@@ -17,6 +17,7 @@ interface SmtpSettings {
   fromName: string;
   replyTo: string;
   testEmailRecipient: string;
+  isConfigured: boolean;
 }
 
 export default function EmailSettingsPage() {
@@ -30,6 +31,7 @@ export default function EmailSettingsPage() {
     fromName: 'DivinityCoin',
     replyTo: '',
     testEmailRecipient: '',
+    isConfigured: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,6 +71,8 @@ export default function EmailSettingsPage() {
 
       if (response.ok) {
         setMessage({ type: 'success', text: 'SMTP settings saved successfully' });
+        // Refresh settings to get updated isConfigured status
+        fetchSettings();
       } else {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Failed to save settings' });
@@ -151,6 +155,24 @@ export default function EmailSettingsPage() {
         </Button>
       }
     >
+      {/* Status Banner */}
+      <div className={`mb-6 p-4 rounded-lg border ${settings.isConfigured ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+        <div className="flex items-center gap-3">
+          {settings.isConfigured ? (
+            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <span className={`font-medium ${settings.isConfigured ? 'text-green-800' : 'text-red-800'}`}>
+            {settings.isConfigured ? 'SMTP configured' : 'SMTP credentials not configured'}
+          </span>
+        </div>
+      </div>
+
       {message && (
         <div className={`mb-6 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
           {message.text}

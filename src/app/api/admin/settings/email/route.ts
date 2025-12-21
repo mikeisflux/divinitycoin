@@ -37,16 +37,20 @@ export async function GET(request: NextRequest) {
 
     const configMap = new Map(configs.map(c => [c.key, c.value]));
 
+    const hasPassword = configs.some(c => c.key === 'SMTP_PASS' && c.value);
+    const user = configMap.get('SMTP_USER') || '';
+
     const settings = {
       host: configMap.get('SMTP_HOST') || 'smtp.office365.com',
       port: parseInt(configMap.get('SMTP_PORT') || '587', 10),
       secure: configMap.get('SMTP_SECURE') === 'true',
-      user: configMap.get('SMTP_USER') || '',
-      pass: '', // Never return password
+      user,
+      pass: hasPassword ? '••••••••' : '', // Show placeholder if password exists
       fromEmail: configMap.get('SMTP_FROM_EMAIL') || '',
       fromName: configMap.get('SMTP_FROM_NAME') || 'DivinityCoin',
       replyTo: configMap.get('SMTP_REPLY_TO') || '',
       testEmailRecipient: '',
+      isConfigured: !!(user && hasPassword),
     };
 
     return NextResponse.json({ settings });
