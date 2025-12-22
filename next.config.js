@@ -6,6 +6,12 @@ const nextConfig = {
     // Use timestamp for unique build IDs
     return `build-${Date.now()}`;
   },
+  // Disable Server Actions since we don't use them (prevents stale action errors)
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '1mb',
+    },
+  },
   // Add cache headers for static assets
   headers: async () => [
     {
@@ -14,6 +20,16 @@ const nextConfig = {
         {
           key: 'X-DNS-Prefetch-Control',
           value: 'on',
+        },
+      ],
+    },
+    // Prevent caching of HTML pages to avoid stale deployments
+    {
+      source: '/((?!_next/static|_next/image|favicon.ico).*)',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'no-store, must-revalidate',
         },
       ],
     },

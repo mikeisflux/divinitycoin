@@ -4,10 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
-import { stripe } from '@/lib/stripe';
+import { getStripeClient, getWebhookSecret } from '@/lib/stripe';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,9 +20,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get webhook secret from config
+    const webhookSecret = await getWebhookSecret();
+    if (!webhookSecret) {
+      console.error('Stripe webhook secret not configured');
+      return NextResponse.json(
+        { error: 'Webhook not configured' },
+        { status: 500 }
+      );
+    }
+
     let event: Stripe.Event;
 
     try {
+      const stripe = await getStripeClient();
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
