@@ -265,6 +265,22 @@ export default function PartnerDetailPage() {
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
             <h2 className="text-lg font-semibold text-neutral-900 mb-4">Partner Information</h2>
             <dl className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <dt className="text-sm text-neutral-500">Partner ID</dt>
+                <dd className="flex items-center gap-2">
+                  <code className="text-neutral-900 font-mono text-sm bg-neutral-100 px-2 py-1 rounded">{partner.id}</code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(partner.id);
+                      setMessage({ type: 'success', text: 'Partner ID copied to clipboard!' });
+                      setTimeout(() => setMessage(null), 2000);
+                    }}
+                    className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                  >
+                    Copy
+                  </button>
+                </dd>
+              </div>
               <div>
                 <dt className="text-sm text-neutral-500">Name</dt>
                 <dd className="text-neutral-900 font-medium">{partner.name}</dd>
