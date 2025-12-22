@@ -28,7 +28,16 @@ export async function GET(
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ partner });
+    // Convert BigInt fields to numbers for JSON serialization
+    const serializedPartner = {
+      ...partner,
+      apiKeys: partner.apiKeys.map(key => ({
+        ...key,
+        requestCount: Number(key.requestCount),
+      })),
+    };
+
+    return NextResponse.json({ partner: serializedPartner });
   } catch (error) {
     console.error('Failed to fetch partner:', error);
     return NextResponse.json({ error: 'Failed to fetch partner' }, { status: 500 });
