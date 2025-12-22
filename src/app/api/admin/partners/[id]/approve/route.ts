@@ -179,7 +179,7 @@ export async function POST(
     });
 
     // Generate setup URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = await getConfig('NEXT_PUBLIC_BASE_URL', process.env.NEXT_PUBLIC_APP_URL || 'https://divinitycoin.com');
     const setupUrl = `${baseUrl}/partners/setup?token=${setupToken}`;
 
     // Log the action
