@@ -29,25 +29,13 @@ export async function GET(
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
     }
 
-    // Auto-generate or fix webhook URL and secret for partners
-    const correctWebhookUrl = `https://divinitycoin.com/api/webhooks/partners/${partner.id}`;
-    const needsWebhookUrlFix = !partner.webhookUrl || !partner.webhookUrl.startsWith('https://divinitycoin.com/');
-    const needsWebhookSecretFix = !partner.webhookSecret;
-
-    if (needsWebhookUrlFix || needsWebhookSecretFix) {
-      const updateData: Record<string, string> = {};
-
-      if (needsWebhookUrlFix) {
-        // Always use the public-facing HTTPS URL for webhooks
-        updateData.webhookUrl = correctWebhookUrl;
-      }
-      if (needsWebhookSecretFix) {
-        updateData.webhookSecret = `whsec_${crypto.randomBytes(32).toString('base64url')}`;
-      }
-
+    // Auto-generate webhook secret if missing (used to sign outgoing webhooks to partner)
+    if (!partner.webhookSecret) {
       partner = await prisma.partner.update({
         where: { id: partner.id },
-        data: updateData,
+        data: {
+          webhookSecret: `whsec_${crypto.randomBytes(32).toString('base64url')}`,
+        },
         include: {
           apiKeys: true,
         },

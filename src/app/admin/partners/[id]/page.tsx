@@ -501,7 +501,7 @@ export default function PartnerDetailPage() {
                 <dd className="text-neutral-900 font-mono">{partner.vpnIp || 'Not configured'}</dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-sm text-neutral-500 mb-1">Webhook URL</dt>
+                <dt className="text-sm text-neutral-500 mb-1">Partner Webhook URL <span className="text-neutral-400">(where we send events)</span></dt>
                 <dd>
                   {editingWebhookUrl ? (
                     <div className="flex items-center gap-2">
@@ -509,7 +509,7 @@ export default function PartnerDetailPage() {
                         type="url"
                         value={webhookUrlInput}
                         onChange={(e) => setWebhookUrlInput(e.target.value)}
-                        placeholder="https://your-server.com/webhook/divinitycoin"
+                        placeholder="https://partner-site.com/api/webhooks/divinitycoin"
                         className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                       />
                       <button
@@ -545,7 +545,7 @@ export default function PartnerDetailPage() {
                 </dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-sm text-neutral-500 mb-1">Webhook Secret</dt>
+                <dt className="text-sm text-neutral-500 mb-1">Webhook Secret <span className="text-neutral-400">(for signature verification)</span></dt>
                 <dd className="flex items-center gap-2">
                   {partner.webhookSecret ? (
                     <>
