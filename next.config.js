@@ -6,12 +6,6 @@ const nextConfig = {
     // Use timestamp for unique build IDs
     return `build-${Date.now()}`;
   },
-  // Disable Server Actions since we don't use them (prevents stale action errors)
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '1mb',
-    },
-  },
   // Add cache headers for static assets
   headers: async () => [
     {
