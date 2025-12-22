@@ -114,7 +114,7 @@ export async function sendSettlementWebhook(
     settlement.partner.webhookUrl,
     settlement.partner.webhookSecret,
     eventType,
-    payload as Record<string, unknown>
+    payload as unknown as Record<string, unknown>
   );
 
   // Log webhook attempt
