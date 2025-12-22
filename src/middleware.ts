@@ -10,21 +10,10 @@ const allowedOrigins = [
   'https://www.divinitycoin.com',
 ].filter(Boolean);
 
-// VPN subnet for internal API (WireGuard)
-const VPN_SUBNET = '10.10.0.';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin') || '';
-  const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-                   request.headers.get('x-real-ip') || '';
-
-  // Block /internal routes from public access (only allow VPN)
-  if (pathname.startsWith('/internal') || pathname.startsWith('/api/internal')) {
-    if (!clientIP.startsWith(VPN_SUBNET)) {
-      return new NextResponse(null, { status: 404 });
-    }
-  }
 
   // Create response with pathname header for layout detection
   const requestHeaders = new Headers(request.headers);
