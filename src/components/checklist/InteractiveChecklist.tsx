@@ -151,39 +151,41 @@ export function InteractiveChecklist({
 
         return (
           <Card key={section.id} className={isComplete ? 'border-green-200 bg-green-50/30' : ''}>
-            <CardHeader
+            <div
               className="cursor-pointer hover:bg-neutral-50 transition-colors"
               onClick={() => toggleSection(section.id)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                    isComplete
-                      ? 'bg-green-500 text-white'
-                      : 'bg-neutral-200 text-neutral-600'
-                  }`}>
-                    {isComplete ? '✓' : completed}
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                      isComplete
+                        ? 'bg-green-500 text-white'
+                        : 'bg-neutral-200 text-neutral-600'
+                    }`}>
+                      {isComplete ? '✓' : completed}
+                    </div>
+                    <CardTitle className="text-lg">{section.title}</CardTitle>
                   </div>
-                  <CardTitle className="text-lg">{section.title}</CardTitle>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-neutral-500">
+                      {completed}/{total}
+                    </span>
+                    <svg
+                      className={`w-5 h-5 text-neutral-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-neutral-500">
-                    {completed}/{total}
-                  </span>
-                  <svg
-                    className={`w-5 h-5 text-neutral-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-              {section.description && (
-                <p className="text-sm text-neutral-600 mt-1 ml-9">{section.description}</p>
-              )}
-            </CardHeader>
+                {section.description && (
+                  <p className="text-sm text-neutral-600 mt-1 ml-9">{section.description}</p>
+                )}
+              </CardHeader>
+            </div>
             {isExpanded && (
               <CardContent className="pt-0">
                 <div className="space-y-2 ml-9">
