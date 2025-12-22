@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
+import crypto from 'crypto';
 
 export async function GET(
   request: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
   }
 
   try {
-    const partner = await prisma.partner.findUnique({
+    let partner = await prisma.partner.findUnique({
       where: { id: params.id },
       include: {
         apiKeys: true,
@@ -26,6 +27,27 @@ export async function GET(
 
     if (!partner) {
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
+    }
+
+    // Auto-generate webhook URL and secret for existing partners if missing
+    if (!partner.webhookUrl || !partner.webhookSecret) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://divinitycoin.com';
+      const updateData: Record<string, string> = {};
+
+      if (!partner.webhookUrl) {
+        updateData.webhookUrl = `${baseUrl}/api/webhooks/partners/${partner.id}`;
+      }
+      if (!partner.webhookSecret) {
+        updateData.webhookSecret = `whsec_${crypto.randomBytes(32).toString('base64url')}`;
+      }
+
+      partner = await prisma.partner.update({
+        where: { id: partner.id },
+        data: updateData,
+        include: {
+          apiKeys: true,
+        },
+      });
     }
 
     // Get sandboxMode from settings (default to true)
