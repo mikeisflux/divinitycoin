@@ -135,7 +135,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string; keyId: string } }
 ) {
-  const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN']);
+  const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {
     return response;
