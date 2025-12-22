@@ -65,18 +65,27 @@ export async function POST(request: NextRequest) {
     // Generate webhook secret for the partner
     const webhookSecret = `whsec_${crypto.randomBytes(32).toString('base64url')}`;
 
-    // Create partner
+    // Create partner first to get the ID
     const partner = await prisma.partner.create({
       data: {
         name,
         slug,
         vpnIp: vpnIp || null,
-        webhookUrl: webhookUrl || null,
         webhookSecret,
         contactEmail: contactEmail || null,
         contactName: contactName || null,
         status: 'PENDING',
       },
+    });
+
+    // Auto-generate webhook URL based on partner ID
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://divinitycoin.com';
+    const generatedWebhookUrl = `${baseUrl}/api/webhooks/partners/${partner.id}`;
+
+    // Update partner with the generated webhook URL
+    await prisma.partner.update({
+      where: { id: partner.id },
+      data: { webhookUrl: generatedWebhookUrl },
     });
 
     // Generate initial API key
