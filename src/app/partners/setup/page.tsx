@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -32,7 +32,7 @@ interface FormData {
   paypalEmail: string;
 }
 
-export default function PartnerOnboardingPage() {
+function SetupWizard() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -649,5 +649,21 @@ export default function PartnerOnboardingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SetupFallback() {
+  return (
+    <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    </div>
+  );
+}
+
+export default function PartnerOnboardingPage() {
+  return (
+    <Suspense fallback={<SetupFallback />}>
+      <SetupWizard />
+    </Suspense>
   );
 }
