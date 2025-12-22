@@ -1,5 +1,5 @@
 // app/internal/route.ts
-// Internal API endpoints - accessible only via VPN
+// Internal API endpoints for partner integrations
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAndRedeemCode, checkCodeStatus } from '@/lib/giftcard/redeem';
@@ -7,19 +7,77 @@ import { placeHold, releaseHold, captureHold, getBalance } from '@/lib/credits/h
 import { redemptionRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
 import { getSettlements, getSettlementDetail, getCaptures, createCapture } from '@/lib/settlements';
 import { SettlementStatus } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import { hashApiKey } from '@/lib/encryption';
 
+// Fallback to legacy INTERNAL_API_KEY for backwards compatibility
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
+interface AuthResult {
+  valid: boolean;
+  partnerId?: string;
+  partnerName?: string;
+  error?: string;
+}
+
 /**
- * Validate internal API request
+ * Validate internal API request using partner API keys from database
  */
-function validateInternalRequest(request: NextRequest): boolean {
+async function validateInternalRequest(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
+    return { valid: false, error: 'Missing or invalid Authorization header' };
   }
+
   const token = authHeader.slice(7);
-  return token === INTERNAL_API_KEY;
+
+  // Check legacy internal API key first (for backwards compatibility)
+  if (INTERNAL_API_KEY && token === INTERNAL_API_KEY) {
+    return { valid: true, partnerId: 'internal', partnerName: 'Internal System' };
+  }
+
+  // Hash the provided API key and look it up in the database
+  const keyHash = hashApiKey(token);
+
+  const apiKey = await prisma.partnerApiKey.findFirst({
+    where: {
+      keyHash,
+      isActive: true,
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gt: new Date() } },
+      ],
+    },
+    include: {
+      partner: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (!apiKey) {
+    return { valid: false, error: 'Invalid or expired API key' };
+  }
+
+  if (apiKey.partner.status !== 'ACTIVE') {
+    return { valid: false, error: 'Partner account is not active' };
+  }
+
+  // Update last used timestamp
+  await prisma.partnerApiKey.update({
+    where: { id: apiKey.id },
+    data: { lastUsedAt: new Date() },
+  });
+
+  return {
+    valid: true,
+    partnerId: apiKey.partner.id,
+    partnerName: apiKey.partner.name,
+  };
 }
 
 /**
@@ -33,9 +91,10 @@ function getClientIp(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   // Validate API key
-  if (!validateInternalRequest(request)) {
+  const auth = await validateInternalRequest(request);
+  if (!auth.valid) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
+      { error: auth.error || 'Unauthorized' },
       { status: 401 }
     );
   }
@@ -45,6 +104,7 @@ export async function POST(request: NextRequest) {
     const action = url.searchParams.get('action');
     const body = await request.json();
     const ipAddress = getClientIp(request);
+    const partnerId = auth.partnerId;
 
     switch (action) {
       case 'validate':
@@ -132,16 +192,20 @@ async function handleRecordCapture(body: {
 
 export async function GET(request: NextRequest) {
   // Validate API key
-  if (!validateInternalRequest(request)) {
+  const auth = await validateInternalRequest(request);
+  if (!auth.valid) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
+      { error: auth.error || 'Unauthorized' },
       { status: 401 }
     );
   }
 
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
-  const partnerId = url.searchParams.get('partnerId');
+  // Use authenticated partner's ID, or allow explicit partnerId for internal system
+  const partnerId = auth.partnerId === 'internal'
+    ? url.searchParams.get('partnerId')
+    : auth.partnerId;
 
   switch (action) {
     case 'health':
