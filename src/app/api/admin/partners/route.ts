@@ -79,8 +79,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Auto-generate webhook URL based on partner ID
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://divinitycoin.com';
-    const generatedWebhookUrl = `${baseUrl}/api/webhooks/partners/${partner.id}`;
+    // Always use the public-facing HTTPS URL for webhooks
+    const generatedWebhookUrl = `https://divinitycoin.com/api/webhooks/partners/${partner.id}`;
 
     // Update partner with the generated webhook URL
     await prisma.partner.update({
