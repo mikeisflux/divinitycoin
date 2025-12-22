@@ -23,11 +23,13 @@ interface Partner {
   name: string;
   slug: string;
   status: string;
+  sandboxMode: boolean;
   contactName: string | null;
   contactEmail: string | null;
   website: string | null;
   vpnIp: string | null;
   webhookUrl: string | null;
+  webhookSecret: string | null;
   description: string | null;
   createdAt: string;
   activatedAt: string | null;
@@ -75,6 +77,12 @@ export default function PartnerDetailPage() {
     timestamp: string;
   }>>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [regeneratingSecret, setRegeneratingSecret] = useState(false);
+  const [togglingSandbox, setTogglingSandbox] = useState(false);
+  const [editingWebhookUrl, setEditingWebhookUrl] = useState(false);
+  const [webhookUrlInput, setWebhookUrlInput] = useState('');
+  const [savingWebhookUrl, setSavingWebhookUrl] = useState(false);
 
   useEffect(() => {
     fetchPartner();
@@ -178,6 +186,98 @@ export default function PartnerDetailPage() {
       setMessage({ type: 'error', text: 'Failed to send test webhook' });
     } finally {
       setTestingWebhook(false);
+    }
+  }
+
+  async function handleRegenerateSecret() {
+    if (!confirm('Are you sure? This will invalidate the current webhook secret. The partner will need to update their integration.')) {
+      return;
+    }
+
+    setRegeneratingSecret(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}/webhook-secret`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to regenerate webhook secret' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Webhook secret regenerated! Make sure to share the new secret with the partner.' });
+      setShowWebhookSecret(true);
+      fetchPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to regenerate webhook secret' });
+    } finally {
+      setRegeneratingSecret(false);
+    }
+  }
+
+  async function handleToggleSandbox() {
+    const newMode = !partner?.sandboxMode;
+    const modeText = newMode ? 'sandbox' : 'live';
+
+    if (!newMode && !confirm(`Are you sure you want to switch to LIVE mode? This will enable real transactions.`)) {
+      return;
+    }
+
+    setTogglingSandbox(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sandboxMode: newMode }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to toggle sandbox mode' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: `Partner switched to ${modeText} mode` });
+      fetchPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to toggle sandbox mode' });
+    } finally {
+      setTogglingSandbox(false);
+    }
+  }
+
+  async function handleSaveWebhookUrl() {
+    setSavingWebhookUrl(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: webhookUrlInput }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to save webhook URL' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Webhook URL saved!' });
+      setEditingWebhookUrl(false);
+      fetchPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to save webhook URL' });
+    } finally {
+      setSavingWebhookUrl(false);
     }
   }
 
@@ -294,6 +394,25 @@ export default function PartnerDetailPage() {
                 <dd><StatusBadge status={partner.status} /></dd>
               </div>
               <div>
+                <dt className="text-sm text-neutral-500">Mode</dt>
+                <dd className="flex items-center gap-2">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    partner.sandboxMode
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {partner.sandboxMode ? 'SANDBOX' : 'LIVE'}
+                  </span>
+                  <button
+                    onClick={handleToggleSandbox}
+                    disabled={togglingSandbox}
+                    className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition disabled:opacity-50"
+                  >
+                    {togglingSandbox ? 'Switching...' : partner.sandboxMode ? 'Go Live' : 'Switch to Sandbox'}
+                  </button>
+                </dd>
+              </div>
+              <div>
                 <dt className="text-sm text-neutral-500">Created</dt>
                 <dd className="text-neutral-900">{new Date(partner.createdAt).toLocaleDateString()}</dd>
               </div>
@@ -320,8 +439,86 @@ export default function PartnerDetailPage() {
                 <dd className="text-neutral-900 font-mono">{partner.vpnIp || 'Not configured'}</dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-sm text-neutral-500">Webhook URL</dt>
-                <dd className="text-neutral-900 text-sm break-all">{partner.webhookUrl || 'Not configured'}</dd>
+                <dt className="text-sm text-neutral-500 mb-1">Webhook URL</dt>
+                <dd>
+                  {editingWebhookUrl ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        value={webhookUrlInput}
+                        onChange={(e) => setWebhookUrlInput(e.target.value)}
+                        placeholder="https://your-server.com/webhook/divinitycoin"
+                        className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      />
+                      <button
+                        onClick={handleSaveWebhookUrl}
+                        disabled={savingWebhookUrl}
+                        className="px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        {savingWebhookUrl ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => setEditingWebhookUrl(false)}
+                        className="px-3 py-2 bg-neutral-200 text-neutral-700 text-sm rounded-lg hover:bg-neutral-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-neutral-900 text-sm break-all">
+                        {partner.webhookUrl || 'Not configured'}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setWebhookUrlInput(partner.webhookUrl || '');
+                          setEditingWebhookUrl(true);
+                        }}
+                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                      >
+                        {partner.webhookUrl ? 'Edit' : 'Set URL'}
+                      </button>
+                    </div>
+                  )}
+                </dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-sm text-neutral-500 mb-1">Webhook Secret</dt>
+                <dd className="flex items-center gap-2">
+                  {partner.webhookSecret ? (
+                    <>
+                      <code className="flex-1 text-neutral-900 font-mono text-sm bg-neutral-100 px-3 py-2 rounded break-all">
+                        {showWebhookSecret ? partner.webhookSecret : '••••••••••••••••••••••••••••••••'}
+                      </code>
+                      <button
+                        onClick={() => setShowWebhookSecret(!showWebhookSecret)}
+                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                        title={showWebhookSecret ? 'Hide secret' : 'Show secret'}
+                      >
+                        {showWebhookSecret ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(partner.webhookSecret!);
+                          setMessage({ type: 'success', text: 'Webhook secret copied to clipboard!' });
+                          setTimeout(() => setMessage(null), 2000);
+                        }}
+                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                      >
+                        Copy
+                      </button>
+                      <button
+                        onClick={handleRegenerateSecret}
+                        disabled={regeneratingSecret}
+                        className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 hover:bg-yellow-200 rounded transition disabled:opacity-50"
+                      >
+                        {regeneratingSecret ? 'Regenerating...' : 'Regenerate'}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-neutral-500 text-sm">Not generated</span>
+                  )}
+                </dd>
               </div>
               {partner.description && (
                 <div className="col-span-2">

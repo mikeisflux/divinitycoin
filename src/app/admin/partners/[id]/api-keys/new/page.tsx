@@ -15,9 +15,11 @@ interface Partner {
   slug: string;
 }
 
-// Single key type - the different types were not actually implemented
 const keyTypes = [
-  { id: 'api', name: 'API Key', description: 'Use with X-API-Key header for server-to-server requests' },
+  { id: 'api', name: 'API Key', description: 'Standard API key for server-to-server requests' },
+  { id: 'public', name: 'Public Key', description: 'For client-side SDK initialization (read-only)' },
+  { id: 'private', name: 'Private Key', description: 'Full access key for sensitive operations' },
+  { id: 'oauth', name: 'Webhook Secret', description: 'Secret for HMAC signature verification of webhooks' },
 ];
 
 export default function NewPartnerApiKeyPage() {

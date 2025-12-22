@@ -57,16 +57,19 @@ export async function PUT(
   try {
     const data = await request.json();
 
+    // Build update object with only defined fields
+    const updateData: Record<string, unknown> = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.contactName !== undefined) updateData.contactName = data.contactName;
+    if (data.contactEmail !== undefined) updateData.contactEmail = data.contactEmail;
+    if (data.vpnIp !== undefined) updateData.vpnIp = data.vpnIp;
+    if (data.webhookUrl !== undefined) updateData.webhookUrl = data.webhookUrl;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.sandboxMode !== undefined) updateData.sandboxMode = data.sandboxMode;
+
     const partner = await prisma.partner.update({
       where: { id: params.id },
-      data: {
-        name: data.name,
-        contactName: data.contactName,
-        contactEmail: data.contactEmail,
-        vpnIp: data.vpnIp,
-        webhookUrl: data.webhookUrl,
-        status: data.status,
-      },
+      data: updateData,
     });
 
     await logAdminAction(

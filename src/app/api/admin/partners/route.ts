@@ -6,6 +6,7 @@ import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
 import { generateApiKey, hashApiKey, encrypt } from '@/lib/encryption';
+import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
@@ -61,6 +62,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate webhook secret for the partner
+    const webhookSecret = `whsec_${crypto.randomBytes(32).toString('base64url')}`;
+
     // Create partner
     const partner = await prisma.partner.create({
       data: {
@@ -68,6 +72,7 @@ export async function POST(request: NextRequest) {
         slug,
         vpnIp: vpnIp || null,
         webhookUrl: webhookUrl || null,
+        webhookSecret,
         contactEmail: contactEmail || null,
         contactName: contactName || null,
         status: 'PENDING',
@@ -101,6 +106,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       partner,
       apiKey, // Return the API key only once on creation
+      webhookSecret, // Return the webhook secret only once on creation
     });
   } catch (error) {
     console.error('Failed to create partner:', error);

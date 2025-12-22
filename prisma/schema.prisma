@@ -424,6 +424,7 @@ model Partner {
 
   // Configuration
   status        PartnerStatus @default(PENDING)
+  sandboxMode   Boolean       @default(true)  // Sandbox mode for testing (no real transactions)
   vpnIp         String?       // Partner's VPN IP (e.g., 10.10.0.2)
   webhookUrl    String?       // Partner's webhook endpoint
   webhookSecret String?       // HMAC secret for webhook signatures
