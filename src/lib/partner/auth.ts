@@ -27,11 +27,20 @@ export async function createPartnerSession(partnerId: string, ipAddress: string,
   const token = generateSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000);
 
-  // Store in partner's session (we'll use a simple approach - store in partner metadata)
+  // Get existing settings to preserve them (especially passwordHash!)
+  const partner = await prisma.partner.findUnique({
+    where: { id: partnerId },
+    select: { settings: true },
+  });
+
+  const existingSettings = (partner?.settings as Record<string, unknown>) || {};
+
+  // Merge session data with existing settings
   await prisma.partner.update({
     where: { id: partnerId },
     data: {
       settings: {
+        ...existingSettings,
         sessionToken: token,
         sessionExpires: expiresAt.toISOString(),
         lastLoginIp: ipAddress,
