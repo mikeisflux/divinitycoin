@@ -203,9 +203,9 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
   // Use authenticated partner's ID, or allow explicit partnerId for internal system
-  const partnerId = auth.partnerId === 'internal'
+  const partnerId: string | null = auth.partnerId === 'internal'
     ? url.searchParams.get('partnerId')
-    : auth.partnerId;
+    : (auth.partnerId ?? null);
 
   switch (action) {
     case 'health':
