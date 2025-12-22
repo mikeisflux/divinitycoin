@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 
 interface ChecklistItem {
   id: string;
@@ -107,7 +107,7 @@ export function InteractiveChecklist({
   return (
     <div className="space-y-6">
       {/* Progress Overview */}
-      <Card>
+      <Card className="p-0">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -150,44 +150,42 @@ export function InteractiveChecklist({
         const isComplete = completed === total;
 
         return (
-          <Card key={section.id} className={isComplete ? 'border-green-200 bg-green-50/30' : ''}>
+          <Card key={section.id} className={`p-0 ${isComplete ? 'border-green-200 bg-green-50/30' : ''}`}>
             <div
-              className="cursor-pointer hover:bg-neutral-50 transition-colors"
+              className="cursor-pointer hover:bg-neutral-50 transition-colors rounded-t-xl p-6 pb-4"
               onClick={() => toggleSection(section.id)}
             >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                      isComplete
-                        ? 'bg-green-500 text-white'
-                        : 'bg-neutral-200 text-neutral-600'
-                    }`}>
-                      {isComplete ? '✓' : completed}
-                    </div>
-                    <CardTitle className="text-lg">{section.title}</CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                    isComplete
+                      ? 'bg-green-500 text-white'
+                      : 'bg-neutral-200 text-neutral-600'
+                  }`}>
+                    {isComplete ? '✓' : completed}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-neutral-500">
-                      {completed}/{total}
-                    </span>
-                    <svg
-                      className={`w-5 h-5 text-neutral-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
+                  <h3 className="text-lg font-semibold text-neutral-900">{section.title}</h3>
                 </div>
-                {section.description && (
-                  <p className="text-sm text-neutral-600 mt-1 ml-9">{section.description}</p>
-                )}
-              </CardHeader>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-neutral-500">
+                    {completed}/{total}
+                  </span>
+                  <svg
+                    className={`w-5 h-5 text-neutral-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+              {section.description && (
+                <p className="text-sm text-neutral-600 mt-1 ml-9">{section.description}</p>
+              )}
             </div>
             {isExpanded && (
-              <CardContent className="pt-0">
+              <div className="px-6 pb-6">
                 <div className="space-y-2 ml-9">
                   {section.items.map((item) => {
                     const isChecked = completedItems.has(item.id);
@@ -220,7 +218,7 @@ export function InteractiveChecklist({
                     );
                   })}
                 </div>
-              </CardContent>
+              </div>
             )}
           </Card>
         );
