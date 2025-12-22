@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import crypto from 'crypto';
+import { checkCodeStatus, validateAndRedeemCode } from '@/lib/giftcard/redeem';
 
 // Verify webhook signature
 function verifySignature(payload: string, signature: string, secret: string): boolean {
@@ -111,107 +112,67 @@ export async function POST(
           sandboxMode,
         });
 
-      case 'card.validate':
+      case 'card.validate': {
         // Gift card validation request
         const { cardCode } = payload.data || {};
         if (!cardCode) {
           return NextResponse.json({ error: 'Card code required' }, { status: 400 });
         }
 
-        // Look up the gift card
-        const card = await prisma.giftCard.findFirst({
-          where: {
-            code: cardCode,
-            partnerId: partner.id,
-          },
-          select: {
-            id: true,
-            code: true,
-            originalAmount: true,
-            currentBalance: true,
-            status: true,
-            expiresAt: true,
-          },
-        });
-
-        if (!card) {
-          return NextResponse.json({
-            valid: false,
-            error: 'Card not found',
-          });
-        }
+        // Use the existing checkCodeStatus function
+        const result = await checkCodeStatus(cardCode);
 
         return NextResponse.json({
-          valid: card.status === 'ACTIVE' && (!card.expiresAt || new Date(card.expiresAt) > new Date()),
-          card: {
-            id: card.id,
-            code: card.code,
-            originalAmount: Number(card.originalAmount),
-            currentBalance: Number(card.currentBalance),
-            status: card.status,
-            expiresAt: card.expiresAt,
-          },
+          valid: result.valid,
+          status: result.status,
+          amount: result.amount,
+          error: result.error,
         });
+      }
 
-      case 'card.redeem':
+      case 'card.redeem': {
         // Gift card redemption request
-        const { cardCode: redeemCode, amount } = payload.data || {};
-        if (!redeemCode || amount === undefined) {
-          return NextResponse.json({ error: 'Card code and amount required' }, { status: 400 });
+        const { cardCode, platformUserId } = payload.data || {};
+        if (!cardCode) {
+          return NextResponse.json({ error: 'Card code required' }, { status: 400 });
         }
 
-        // Find and update the card
-        const redeemCard = await prisma.giftCard.findFirst({
-          where: {
-            code: redeemCode,
-            partnerId: partner.id,
-            status: 'ACTIVE',
-          },
-        });
-
-        if (!redeemCard) {
-          return NextResponse.json({
-            success: false,
-            error: 'Card not found or inactive',
-          });
-        }
-
-        const currentBalance = Number(redeemCard.currentBalance);
-        const redeemAmount = Number(amount);
-
-        if (redeemAmount > currentBalance) {
-          return NextResponse.json({
-            success: false,
-            error: 'Insufficient balance',
-            currentBalance,
-          });
-        }
-
-        // In sandbox mode, don't actually redeem
+        // In sandbox mode, just validate without redeeming
         if (sandboxMode) {
+          const checkResult = await checkCodeStatus(cardCode);
           return NextResponse.json({
-            success: true,
+            success: checkResult.valid,
             sandboxMode: true,
             message: 'Sandbox mode - no actual redemption performed',
-            newBalance: currentBalance - redeemAmount,
+            amount: checkResult.amount,
+            status: checkResult.status,
+            error: checkResult.error,
           });
         }
 
-        // Perform actual redemption
-        const newBalance = currentBalance - redeemAmount;
-        await prisma.giftCard.update({
-          where: { id: redeemCard.id },
-          data: {
-            currentBalance: newBalance,
-            status: newBalance === 0 ? 'REDEEMED' : 'ACTIVE',
-          },
+        // Get client info for logging
+        const ipAddress = request.headers.get('x-forwarded-for') ||
+                         request.headers.get('x-real-ip') ||
+                         'unknown';
+        const userAgent = request.headers.get('user-agent') || undefined;
+
+        // Use the existing validateAndRedeemCode function
+        const result = await validateAndRedeemCode({
+          code: cardCode,
+          platformUserId: platformUserId || `partner_${partner.id}`,
+          ipAddress,
+          userAgent,
+          partnerId: partner.id,
         });
 
         return NextResponse.json({
-          success: true,
-          newBalance,
-          fullyRedeemed: newBalance === 0,
+          success: result.success,
+          amount: result.amount,
+          newBalance: result.newBalance,
+          error: result.error,
+          message: result.message,
         });
+      }
 
       default:
         // Unknown event type - log and acknowledge
