@@ -83,6 +83,7 @@ export default function PartnerDetailPage() {
   const [editingWebhookUrl, setEditingWebhookUrl] = useState(false);
   const [webhookUrlInput, setWebhookUrlInput] = useState('');
   const [savingWebhookUrl, setSavingWebhookUrl] = useState(false);
+  const [keyActionLoading, setKeyActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPartner();
@@ -278,6 +279,67 @@ export default function PartnerDetailPage() {
       setMessage({ type: 'error', text: 'Failed to save webhook URL' });
     } finally {
       setSavingWebhookUrl(false);
+    }
+  }
+
+  async function handleToggleKeyStatus(keyId: string, currentlyActive: boolean) {
+    const action = currentlyActive ? 'revoke' : 'reactivate';
+    if (currentlyActive && !confirm(`Are you sure you want to revoke this API key? It will immediately stop working.`)) {
+      return;
+    }
+
+    setKeyActionLoading(keyId);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}/api-keys/${keyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !currentlyActive }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || `Failed to ${action} API key` });
+        return;
+      }
+
+      setMessage({ type: 'success', text: `API key ${action}d successfully` });
+      fetchPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: `Failed to ${action} API key` });
+    } finally {
+      setKeyActionLoading(null);
+    }
+  }
+
+  async function handleDeleteKey(keyId: string, keyName: string) {
+    if (!confirm(`Are you sure you want to permanently delete the API key "${keyName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setKeyActionLoading(keyId);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/partners/${partnerId}/api-keys/${keyId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to delete API key' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'API key deleted successfully' });
+      fetchPartner();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to delete API key' });
+    } finally {
+      setKeyActionLoading(null);
     }
   }
 
@@ -598,6 +660,7 @@ export default function PartnerDetailPage() {
                     <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Status</th>
                     <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Last Used</th>
                     <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Requests</th>
+                    <th className="text-right text-xs font-medium text-neutral-500 uppercase py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -616,6 +679,28 @@ export default function PartnerDetailPage() {
                         {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString() : 'Never'}
                       </td>
                       <td className="py-3 text-sm text-neutral-600">{String(key.requestCount)}</td>
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleToggleKeyStatus(key.id, key.isActive)}
+                            disabled={keyActionLoading === key.id}
+                            className={`text-xs px-2 py-1 rounded transition disabled:opacity-50 ${
+                              key.isActive
+                                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                                : 'bg-green-100 text-green-800 hover:bg-green-200'
+                            }`}
+                          >
+                            {keyActionLoading === key.id ? '...' : key.isActive ? 'Revoke' : 'Reactivate'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteKey(key.id, key.name)}
+                            disabled={keyActionLoading === key.id}
+                            className="text-xs px-2 py-1 bg-red-100 text-red-800 hover:bg-red-200 rounded transition disabled:opacity-50"
+                          >
+                            {keyActionLoading === key.id ? '...' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
