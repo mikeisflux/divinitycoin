@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
-import { generateApiKey, hashApiKey, encrypt } from '@/lib/encryption';
+import { hashApiKey, encrypt } from '@/lib/encryption';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -79,17 +79,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Generate initial API key
-    const apiKey = generateApiKey('pk');
+    // Generate API key (secret key for server-to-server API calls)
+    const apiKey = `sk_${slug}_${crypto.randomBytes(24).toString('base64url')}`;
     const keyHash = hashApiKey(apiKey);
 
     await prisma.partnerApiKey.create({
       data: {
         partnerId: partner.id,
         keyHash,
-        keyPrefix: apiKey.slice(0, 10),
-        name: 'Default API Key',
+        keyPrefix: apiKey.slice(0, 15),
+        name: 'API Key',
         encryptedKey: encrypt(apiKey),
+        permissions: { fullAccess: true },
       },
     });
 

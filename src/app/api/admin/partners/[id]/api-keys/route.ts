@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
-import { generateApiKey, hashApiKey, encrypt } from '@/lib/encryption';
+import { hashApiKey, encrypt } from '@/lib/encryption';
 import crypto from 'crypto';
 
 export async function GET(
@@ -75,36 +75,16 @@ export async function POST(
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
     }
 
-    const { name, type } = await request.json();
+    const { name } = await request.json();
 
-    if (!name || !type) {
-      return NextResponse.json({ error: 'Name and type are required' }, { status: 400 });
+    if (!name) {
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    // Generate appropriate key based on type
-    let key: string;
-    let permissions: any = { type };
-
-    switch (type) {
-      case 'public':
-        key = `pk_${partner.slug}_${crypto.randomBytes(16).toString('base64url')}`;
-        permissions.readonly = true;
-        permissions.allowedEndpoints = ['validate', 'balance'];
-        break;
-      case 'private':
-        key = `sk_${partner.slug}_${crypto.randomBytes(24).toString('base64url')}`;
-        permissions.fullAccess = true;
-        break;
-      case 'oauth':
-        key = `oauth_${partner.slug}_${crypto.randomBytes(32).toString('base64url')}`;
-        permissions.oauth = true;
-        permissions.clientSecret = crypto.randomBytes(32).toString('base64url');
-        break;
-      default: // 'api'
-        key = generateApiKey(`${partner.slug}`);
-        permissions.standard = true;
-        break;
-    }
+    // Generate secret API key for server-to-server calls
+    const key = `sk_${partner.slug}_${crypto.randomBytes(24).toString('base64url')}`;
+    const permissions = { fullAccess: true };
+    const type = 'api';
 
     const keyHash = hashApiKey(key);
     const keyPrefix = key.slice(0, 12);

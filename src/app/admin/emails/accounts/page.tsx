@@ -7,7 +7,16 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 
-async function getSmtpStatus() {
+interface SmtpStatus {
+  host: string;
+  port: string;
+  user: string;
+  hasPassword: boolean;
+  fromEmail: string;
+  fromName: string;
+}
+
+async function getSmtpStatus(): Promise<SmtpStatus> {
   const configs = await prisma.systemConfig.findMany({
     where: {
       key: {
@@ -90,13 +99,13 @@ export default async function EmailAccountsPage() {
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">SMTP Server</label>
               <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 font-mono">
-                {smtp.host}:{smtp.port}
+                {`${smtp.host}:${smtp.port}`}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Username</label>
               <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900">
-                {smtp.user || <span className="text-neutral-400">Not set</span>}
+                {smtp.user ? smtp.user : <span className="text-neutral-400">Not set</span>}
               </div>
             </div>
           </div>
@@ -105,7 +114,7 @@ export default async function EmailAccountsPage() {
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">From Email</label>
               <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900">
-                {smtp.fromEmail || <span className="text-neutral-400">Not set</span>}
+                {smtp.fromEmail ? smtp.fromEmail : <span className="text-neutral-400">Not set</span>}
               </div>
             </div>
             <div>

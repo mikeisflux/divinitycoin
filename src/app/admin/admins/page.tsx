@@ -7,7 +7,17 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 
-async function getAdmins() {
+interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  mfaEnabled: boolean;
+  lastLoginAt: Date | null;
+  createdAt: Date;
+}
+
+async function getAdmins(): Promise<AdminUser[]> {
   return prisma.adminUser.findMany({
     orderBy: { createdAt: 'desc' },
     select: {

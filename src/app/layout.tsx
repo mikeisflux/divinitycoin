@@ -1,20 +1,9 @@
 // app/layout.tsx
 
-import { Inter, JetBrains_Mono } from 'next/font/google';
 import { headers } from 'next/headers';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import './globals.css';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
-});
 
 export const metadata = {
   title: 'DivinityCoin - Support Creators Seamlessly',
@@ -41,7 +30,7 @@ export default async function RootLayout({
   const hideHeaderFooter = isAdminRoute || isPartnerDashboardRoute;
 
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en">
       <body className="min-h-screen flex flex-col bg-white text-neutral-900 antialiased font-sans">
         {!hideHeaderFooter && <Header />}
         <main className="flex-1">{children}</main>
