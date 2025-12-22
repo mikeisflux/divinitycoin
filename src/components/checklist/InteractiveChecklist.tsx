@@ -66,7 +66,7 @@ export function InteractiveChecklist({
       }
       // Save to localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem(storageKey, JSON.stringify([...next]));
+        localStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
       }
       return next;
     });
