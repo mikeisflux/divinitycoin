@@ -28,9 +28,14 @@ export async function GET(
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
     }
 
+    // Get sandboxMode from settings (default to true)
+    const partnerSettings = (partner.settings as Record<string, unknown>) || {};
+    const sandboxMode = partnerSettings.sandboxMode !== false;
+
     // Convert BigInt fields to numbers for JSON serialization
     const serializedPartner = {
       ...partner,
+      sandboxMode, // Add sandboxMode from settings
       apiKeys: partner.apiKeys.map(key => ({
         ...key,
         requestCount: Number(key.requestCount),
@@ -65,7 +70,19 @@ export async function PUT(
     if (data.vpnIp !== undefined) updateData.vpnIp = data.vpnIp;
     if (data.webhookUrl !== undefined) updateData.webhookUrl = data.webhookUrl;
     if (data.status !== undefined) updateData.status = data.status;
-    if (data.sandboxMode !== undefined) updateData.sandboxMode = data.sandboxMode;
+
+    // Handle sandboxMode - store in settings JSON until schema is migrated
+    if (data.sandboxMode !== undefined) {
+      const existingPartner = await prisma.partner.findUnique({
+        where: { id: params.id },
+        select: { settings: true },
+      });
+      const existingSettings = (existingPartner?.settings as Record<string, unknown>) || {};
+      updateData.settings = {
+        ...existingSettings,
+        sandboxMode: data.sandboxMode,
+      };
+    }
 
     const partner = await prisma.partner.update({
       where: { id: params.id },

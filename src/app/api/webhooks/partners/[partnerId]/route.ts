@@ -53,14 +53,18 @@ export async function POST(
         name: true,
         status: true,
         webhookSecret: true,
-        sandboxMode: true,
         webhookEvents: true,
+        settings: true,
       },
     });
 
     if (!partner) {
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
     }
+
+    // Get sandbox mode from settings (default to true for safety)
+    const partnerSettings = (partner.settings as Record<string, unknown>) || {};
+    const sandboxMode = partnerSettings.sandboxMode !== false;
 
     if (partner.status !== 'ACTIVE') {
       return NextResponse.json({ error: 'Partner is not active' }, { status: 403 });
@@ -93,7 +97,7 @@ export async function POST(
     console.log(`Webhook received for partner ${partner.name}: ${event}`, {
       partnerId: partner.id,
       event,
-      sandboxMode: partner.sandboxMode,
+      sandboxMode,
     });
 
     // Process based on event type
@@ -104,7 +108,7 @@ export async function POST(
           success: true,
           message: 'Webhook received successfully',
           partnerId: partner.id,
-          sandboxMode: partner.sandboxMode,
+          sandboxMode,
         });
 
       case 'card.validate':
@@ -184,7 +188,7 @@ export async function POST(
         }
 
         // In sandbox mode, don't actually redeem
-        if (partner.sandboxMode) {
+        if (sandboxMode) {
           return NextResponse.json({
             success: true,
             sandboxMode: true,
@@ -235,19 +239,23 @@ export async function GET(
   try {
     const partner = await prisma.partner.findUnique({
       where: { id: params.partnerId },
-      select: { id: true, name: true, status: true, sandboxMode: true },
+      select: { id: true, name: true, status: true, settings: true },
     });
 
     if (!partner) {
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
     }
 
+    // Get sandbox mode from settings (default to true for safety)
+    const partnerSettings = (partner.settings as Record<string, unknown>) || {};
+    const sandboxMode = partnerSettings.sandboxMode !== false;
+
     return NextResponse.json({
       status: 'ok',
       partnerId: partner.id,
       partnerName: partner.name,
       partnerStatus: partner.status,
-      sandboxMode: partner.sandboxMode,
+      sandboxMode,
       supportedEvents: [
         'test.ping',
         'card.validate',
