@@ -1,77 +1,206 @@
 // app/api/partners/setup/route.ts
-// Complete partner account setup
+// Multi-step partner account onboarding
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { encrypt } from '@/lib/encryption';
 import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 12;
 
+interface SetupRequest {
+  token: string;
+  step: 'password' | 'company' | 'banking';
+  // Password step
+  password?: string;
+  // Company step
+  contactName?: string;
+  website?: string;
+  description?: string;
+  // Banking step
+  paymentMethod?: 'ach' | 'wire' | 'paypal';
+  bankName?: string;
+  bankRoutingNumber?: string;
+  bankAccountNumber?: string;
+  paypalEmail?: string;
+}
+
+async function findPartnerByToken(token: string) {
+  const partner = await prisma.partner.findFirst({
+    where: {
+      settings: {
+        path: ['setupToken'],
+        equals: token,
+      },
+    },
+  });
+
+  if (!partner) {
+    return { partner: null, error: 'Invalid setup token' };
+  }
+
+  const settings = partner.settings as Record<string, unknown> | null;
+
+  // Check if token is expired
+  if (settings?.setupTokenExpires && new Date(settings.setupTokenExpires as string) < new Date()) {
+    return { partner: null, error: 'Setup link has expired' };
+  }
+
+  return { partner, settings, error: null };
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { token, password } = await request.json();
+    const body: SetupRequest = await request.json();
+    const { token, step } = body;
 
-    if (!token || !password) {
+    if (!token || !step) {
       return NextResponse.json(
-        { error: 'Token and password are required' },
+        { error: 'Token and step are required' },
         { status: 400 }
       );
     }
 
-    // Validate password
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
-        { status: 400 }
-      );
+    const { partner, settings, error } = await findPartnerByToken(token);
+
+    if (error || !partner) {
+      return NextResponse.json({ error: error || 'Partner not found' }, { status: 404 });
     }
 
-    // Find partner with this setup token
-    const partner = await prisma.partner.findFirst({
-      where: {
-        settings: {
-          path: ['setupToken'],
-          equals: token,
-        },
-      },
-    });
+    // Handle each step
+    switch (step) {
+      case 'password': {
+        const { password } = body;
 
-    if (!partner) {
-      return NextResponse.json({ error: 'Invalid setup token' }, { status: 404 });
+        if (!password || password.length < 8) {
+          return NextResponse.json(
+            { error: 'Password must be at least 8 characters' },
+            { status: 400 }
+          );
+        }
+
+        // Check if already has password (can skip if resuming)
+        if (settings?.passwordHash && partner.onboardingStep >= 1) {
+          return NextResponse.json({ success: true, message: 'Password already set' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+        await prisma.partner.update({
+          where: { id: partner.id },
+          data: {
+            onboardingStep: 1,
+            settings: {
+              ...(settings || {}),
+              passwordHash,
+            },
+          },
+        });
+
+        return NextResponse.json({ success: true });
+      }
+
+      case 'company': {
+        const { contactName, website, description } = body;
+
+        await prisma.partner.update({
+          where: { id: partner.id },
+          data: {
+            contactName: contactName || partner.contactName,
+            website: website || partner.website,
+            description: description || partner.description,
+            onboardingStep: 2,
+          },
+        });
+
+        return NextResponse.json({ success: true });
+      }
+
+      case 'banking': {
+        const { paymentMethod, bankName, bankRoutingNumber, bankAccountNumber, paypalEmail } = body;
+
+        if (!paymentMethod) {
+          return NextResponse.json(
+            { error: 'Payment method is required' },
+            { status: 400 }
+          );
+        }
+
+        // Prepare update data
+        const updateData: Record<string, unknown> = {
+          paymentMethod,
+          onboardingStep: 4,
+          onboardingComplete: true,
+          settings: {
+            ...(settings || {}),
+            setupToken: null, // Clear token after completion
+            setupTokenExpires: null,
+            onboardingCompletedAt: new Date().toISOString(),
+          },
+        };
+
+        if (paymentMethod === 'paypal') {
+          if (!paypalEmail || !paypalEmail.includes('@')) {
+            return NextResponse.json(
+              { error: 'Valid PayPal email is required' },
+              { status: 400 }
+            );
+          }
+          updateData.paypalEmail = paypalEmail;
+        } else {
+          // ACH or Wire - requires bank details
+          if (!bankName || !bankRoutingNumber || !bankAccountNumber) {
+            return NextResponse.json(
+              { error: 'Bank details are required' },
+              { status: 400 }
+            );
+          }
+
+          // Validate routing number (9 digits)
+          if (!/^\d{9}$/.test(bankRoutingNumber)) {
+            return NextResponse.json(
+              { error: 'Routing number must be 9 digits' },
+              { status: 400 }
+            );
+          }
+
+          // Validate account number (4-17 digits)
+          if (!/^\d{4,17}$/.test(bankAccountNumber)) {
+            return NextResponse.json(
+              { error: 'Account number must be 4-17 digits' },
+              { status: 400 }
+            );
+          }
+
+          updateData.bankName = bankName;
+          updateData.bankAccountLast4 = bankAccountNumber.slice(-4);
+
+          // Encrypt sensitive data
+          try {
+            updateData.bankAccountEncrypted = encrypt(bankAccountNumber);
+            updateData.bankRoutingEncrypted = encrypt(bankRoutingNumber);
+          } catch (encryptError) {
+            console.error('Encryption error:', encryptError);
+            return NextResponse.json(
+              { error: 'Failed to securely store bank details' },
+              { status: 500 }
+            );
+          }
+        }
+
+        await prisma.partner.update({
+          where: { id: partner.id },
+          data: updateData,
+        });
+
+        return NextResponse.json({ success: true });
+      }
+
+      default:
+        return NextResponse.json({ error: 'Invalid step' }, { status: 400 });
     }
-
-    const settings = partner.settings as any;
-
-    // Check if token is expired
-    if (settings?.setupTokenExpires && new Date(settings.setupTokenExpires) < new Date()) {
-      return NextResponse.json({ error: 'Setup link has expired' }, { status: 410 });
-    }
-
-    // Check if already set up
-    if (settings?.passwordHash) {
-      return NextResponse.json({ error: 'Account already set up' }, { status: 409 });
-    }
-
-    // Hash the password
-    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-
-    // Update partner with password and clear setup token
-    const updatedSettings = {
-      ...settings,
-      passwordHash,
-      setupToken: null,
-      setupTokenExpires: null,
-      setupCompletedAt: new Date().toISOString(),
-    };
-
-    await prisma.partner.update({
-      where: { id: partner.id },
-      data: { settings: updatedSettings },
-    });
-
-    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to complete setup:', error);
+    console.error('Failed to complete setup step:', error);
     return NextResponse.json({ error: 'Setup failed' }, { status: 500 });
   }
 }

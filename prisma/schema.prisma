@@ -436,7 +436,13 @@ model Partner {
   paymentMethod       String?             // wire, ach, paypal, etc.
   bankName            String?
   bankAccountLast4    String?
+  bankAccountEncrypted String?   @db.Text  // AES-256-GCM encrypted account number
+  bankRoutingEncrypted String?   @db.Text  // AES-256-GCM encrypted routing number
   paypalEmail         String?
+
+  // Onboarding
+  onboardingStep      Int       @default(0)  // 0=not started, 1=password, 2=company, 3=banking, 4=complete
+  onboardingComplete  Boolean   @default(false)
 
   // Branding
   logoUrl       String?

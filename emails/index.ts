@@ -4,3 +4,4 @@ export { default as WelcomeEmail } from './WelcomeEmail';
 export { default as PasswordResetEmail } from './PasswordResetEmail';
 export { default as AdminAlertEmail } from './AdminAlertEmail';
 export { default as UnredeemedReminderEmail } from './UnredeemedReminderEmail';
+export { default as PartnerOnboardingEmail } from './PartnerOnboardingEmail';

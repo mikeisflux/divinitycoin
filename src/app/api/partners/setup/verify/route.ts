@@ -1,5 +1,5 @@
 // app/api/partners/setup/verify/route.ts
-// Verify partner setup token
+// Verify partner setup token and return partner info
 
 export const dynamic = 'force-dynamic';
 
@@ -29,21 +29,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid setup token' }, { status: 404 });
     }
 
-    const settings = partner.settings as any;
+    const settings = partner.settings as Record<string, unknown> | null;
 
     // Check if token is expired
-    if (settings?.setupTokenExpires && new Date(settings.setupTokenExpires) < new Date()) {
+    if (settings?.setupTokenExpires && new Date(settings.setupTokenExpires as string) < new Date()) {
       return NextResponse.json({ error: 'Setup link has expired' }, { status: 410 });
     }
 
-    // Check if already set up
-    if (settings?.passwordHash) {
-      return NextResponse.json({ error: 'Account already set up' }, { status: 409 });
+    // Check if fully set up (onboarding complete)
+    if (partner.onboardingComplete) {
+      return NextResponse.json({ error: 'Account already set up. Please login.' }, { status: 409 });
     }
 
+    // Return partner info for onboarding form pre-fill
     return NextResponse.json({
       name: partner.name,
       email: partner.contactEmail,
+      contactName: partner.contactName,
+      website: partner.website,
+      description: partner.description,
+      currentStep: partner.onboardingStep,
     });
   } catch (error) {
     console.error('Failed to verify setup token:', error);

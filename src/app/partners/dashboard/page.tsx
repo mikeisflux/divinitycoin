@@ -1,5 +1,5 @@
 // app/partners/dashboard/page.tsx
-// Partner dashboard
+// Partner dashboard with settlements
 
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { redirect } from 'next/navigation';
@@ -7,9 +7,17 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 
 async function getPartnerStats(partnerId: string) {
-  const [apiKeys, activeApiKeys] = await Promise.all([
+  const [apiKeys, activeApiKeys, settlements, paidSettlements] = await Promise.all([
     prisma.partnerApiKey.count({ where: { partnerId } }),
     prisma.partnerApiKey.count({ where: { partnerId, isActive: true } }),
+    prisma.partnerSettlement.findMany({
+      where: { partnerId },
+      select: { netAmount: true, status: true },
+    }),
+    prisma.partnerSettlement.aggregate({
+      where: { partnerId, status: 'PAID' },
+      _sum: { netAmount: true },
+    }),
   ]);
 
   // Get total API requests
@@ -19,7 +27,27 @@ async function getPartnerStats(partnerId: string) {
   });
   const totalRequests = keys.reduce((sum, k) => sum + Number(k.requestCount), 0);
 
-  return { apiKeys, activeApiKeys, totalRequests };
+  // Calculate settlement stats
+  const totalPaid = Number(paidSettlements._sum.netAmount || 0);
+  const pendingSettlements = settlements.filter(s => s.status === 'PENDING' || s.status === 'APPROVED');
+  const pendingAmount = pendingSettlements.reduce((sum, s) => sum + Number(s.netAmount), 0);
+
+  return {
+    apiKeys,
+    activeApiKeys,
+    totalRequests,
+    totalSettlements: settlements.length,
+    totalPaid,
+    pendingAmount,
+    pendingCount: pendingSettlements.length,
+  };
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
 }
 
 export default async function PartnerDashboard() {
@@ -61,11 +89,28 @@ export default async function PartnerDashboard() {
         {/* Welcome */}
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-neutral-900">Welcome, {partner.name || partner.partnerName}</h2>
-          <p className="text-neutral-600 mt-1">Manage your API keys and integration settings.</p>
+          <p className="text-neutral-600 mt-1">Manage your API keys, view payouts, and integration settings.</p>
+        </div>
+
+        {/* Payout Summary */}
+        <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl p-6 mb-8 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-primary-100">Total Paid Out</h3>
+              <p className="text-3xl font-bold mt-1">{formatCurrency(stats.totalPaid)}</p>
+            </div>
+            {stats.pendingAmount > 0 && (
+              <div className="text-right">
+                <p className="text-primary-100 text-sm">Pending</p>
+                <p className="text-xl font-semibold">{formatCurrency(stats.pendingAmount)}</p>
+                <p className="text-primary-200 text-sm">{stats.pendingCount} settlement{stats.pendingCount !== 1 ? 's' : ''}</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Stats */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
             <h3 className="text-sm font-medium text-neutral-600">API Keys</h3>
             <p className="text-3xl font-semibold text-neutral-900 mt-2">{stats.apiKeys}</p>
@@ -77,6 +122,11 @@ export default async function PartnerDashboard() {
             <p className="text-sm text-neutral-500 mt-1">All time</p>
           </div>
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
+            <h3 className="text-sm font-medium text-neutral-600">Settlements</h3>
+            <p className="text-3xl font-semibold text-neutral-900 mt-2">{stats.totalSettlements}</p>
+            <p className="text-sm text-neutral-500 mt-1">{stats.pendingCount} pending</p>
+          </div>
+          <div className="bg-white rounded-xl border border-neutral-200 p-6">
             <h3 className="text-sm font-medium text-neutral-600">Account Status</h3>
             <p className="text-xl font-semibold text-green-600 mt-2">Active</p>
             <p className="text-sm text-neutral-500 mt-1">{partner.partnerSlug}</p>
@@ -84,7 +134,25 @@ export default async function PartnerDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-4">Quick Actions</h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Link
+            href="/partners/settlements"
+            className="bg-white rounded-xl border border-neutral-200 p-6 hover:border-primary-300 hover:shadow-md transition"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900">Settlements & Payouts</h3>
+                <p className="text-neutral-600 mt-1">View your settlement history and payment details</p>
+              </div>
+            </div>
+          </Link>
+
           <Link
             href="/partners/api-keys"
             className="bg-white rounded-xl border border-neutral-200 p-6 hover:border-primary-300 hover:shadow-md transition"
