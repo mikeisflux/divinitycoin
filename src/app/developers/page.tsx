@@ -127,11 +127,11 @@ export default function DevelopersPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-neutral-600 mb-4">
-                      Include your API key in all requests using the <code className="bg-neutral-100 px-2 py-1 rounded">X-Internal-Key</code> header:
+                      Include your API key in all requests using the <code className="bg-neutral-100 px-2 py-1 rounded">Authorization: Bearer</code> header:
                     </p>
                     <div className="bg-neutral-900 text-neutral-100 p-4 rounded-lg overflow-x-auto">
-                      <pre className="text-sm">{`curl -X POST https://api.divinitycoin.com/internal/validate \\
-  -H "X-Internal-Key: YOUR_API_KEY" \\
+                      <pre className="text-sm">{`curl -X POST "https://divinitycoin.com/internal?action=validate" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"code": "XXXX-XXXX-XXXX-XXXX", "platformUserId": "user123"}'`}</pre>
                     </div>
@@ -151,7 +151,7 @@ export default function DevelopersPage() {
                       When a user wants to add credits, call the validation endpoint:
                     </p>
                     <div className="bg-neutral-900 text-neutral-100 p-4 rounded-lg overflow-x-auto">
-                      <pre className="text-sm">{`POST /internal/validate
+                      <pre className="text-sm">{`POST /internal?action=validate
 {
   "code": "XXXX-XXXX-XXXX-XXXX",
   "platformUserId": "your-platform-user-id"
@@ -283,88 +283,42 @@ Response:
             </div>
           </section>
 
-          {/* SDKs */}
-          <section id="sdks" className="py-16 bg-neutral-50">
+          {/* API Base URL */}
+          <section id="api-base" className="py-16 bg-neutral-50">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-              <h2 className="text-3xl font-bold text-neutral-900 mb-8">SDKs & Libraries</h2>
+              <h2 className="text-3xl font-bold text-neutral-900 mb-8">API Configuration</h2>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <span className="text-yellow-800 font-bold">JS</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">JavaScript / Node.js</h3>
-                        <code className="text-sm text-neutral-500">npm install @divinitycoin/sdk</code>
-                      </div>
-                    </div>
-                    <p className="text-sm text-neutral-600">
-                      Full-featured SDK for Node.js and browser environments.
-                    </p>
-                  </CardContent>
-                </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-lg mb-4">Base URL</h3>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-6">
+                    <code className="text-primary-600 font-mono">https://divinitycoin.com</code>
+                  </div>
 
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <span className="text-blue-800 font-bold">PY</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Python</h3>
-                        <code className="text-sm text-neutral-500">pip install divinitycoin</code>
-                      </div>
-                    </div>
-                    <p className="text-sm text-neutral-600">
-                      Python SDK with async support for Django, FastAPI, and more.
-                    </p>
-                  </CardContent>
-                </Card>
+                  <h3 className="font-semibold text-lg mb-4">Authentication</h3>
+                  <p className="text-neutral-600 mb-4">
+                    All API requests require a Bearer token in the Authorization header:
+                  </p>
+                  <div className="bg-neutral-900 text-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`Authorization: Bearer YOUR_API_KEY`}</pre>
+                  </div>
 
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <span className="text-purple-800 font-bold">PHP</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">PHP</h3>
-                        <code className="text-sm text-neutral-500">composer require divinitycoin/sdk</code>
-                      </div>
-                    </div>
-                    <p className="text-sm text-neutral-600">
-                      PHP SDK for Laravel, WordPress, and other PHP frameworks.
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                        <span className="text-red-800 font-bold">RB</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Ruby</h3>
-                        <code className="text-sm text-neutral-500">gem install divinitycoin</code>
-                      </div>
-                    </div>
-                    <p className="text-sm text-neutral-600">
-                      Ruby gem for Rails and Sinatra applications.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <p className="mt-6 text-neutral-600 text-center">
-                Don&apos;t see your language?{' '}
-                <a href="mailto:developers@divinitycoin.com" className="text-primary-600 hover:underline">
-                  Let us know
-                </a>{' '}
-                and we&apos;ll prioritize it.
-              </p>
+                  <h3 className="font-semibold text-lg mt-6 mb-4">Request Format</h3>
+                  <p className="text-neutral-600 mb-4">
+                    All endpoints use query parameters for the action type:
+                  </p>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`POST /internal?action=validate
+POST /internal?action=balance
+POST /internal?action=hold
+POST /internal?action=capture
+POST /internal?action=release
+GET  /internal?action=health
+GET  /internal?action=settlements&partnerId=xxx
+GET  /internal?action=captures&partnerId=xxx`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </section>
         </>
@@ -382,7 +336,7 @@ Response:
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
-                    /internal/validate
+                    /internal?action=validate
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -412,7 +366,7 @@ Response:
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
-                    /internal/balance
+                    /internal?action=balance
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -428,9 +382,18 @@ Response:
                   <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
                     <pre className="text-sm">{`{
-  "platformUserId": "user123",
-  "availableBalance": 50.00,
-  "heldBalance": 10.00
+  "available": 50.00,
+  "held": 10.00,
+  "total": 60.00,
+  "holds": [
+    {
+      "id": "hold_xyz",
+      "amount": 10.00,
+      "pledgeId": "pledge123",
+      "projectId": "project456",
+      "expiresAt": "2025-02-15T00:00:00Z"
+    }
+  ]
 }`}</pre>
                   </div>
                 </CardContent>
@@ -441,7 +404,7 @@ Response:
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
-                    /internal/hold
+                    /internal?action=hold
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -475,7 +438,7 @@ Response:
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
-                    /internal/capture
+                    /internal?action=capture
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -484,11 +447,7 @@ Response:
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
-  "pledgeId": string,       // Required. The pledge ID with the hold
-  "creatorId": string,      // Required. Creator's ID on your platform
-  "creatorEmail": string,   // Optional. Creator's email
-  "projectId": string,      // Optional. Project ID
-  "projectName": string     // Optional. Project name for reference
+  "pledgeId": string  // Required. The pledge ID with the hold
 }`}</pre>
                   </div>
 
@@ -496,8 +455,46 @@ Response:
                   <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
                     <pre className="text-sm">{`{
   "success": true,
-  "capturedAmount": 25.00,
-  "captureId": "cap_abc123"
+  "capturedAmount": 25.00
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Record Capture (for settlements) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=record_capture
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">Record capture metadata for settlement tracking (call after capturing a hold).</p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "holdId": string,        // Required. The hold ID that was captured
+  "partnerId": string,     // Required. Your partner ID
+  "creatorId": string,     // Required. Creator's ID on your platform
+  "creatorEmail": string,  // Optional. Creator's email
+  "projectId": string,     // Required. Project ID
+  "projectName": string,   // Optional. Project name for reference
+  "amount": number         // Required. Amount captured
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "capture": {
+    "id": "cap_abc123",
+    "holdId": "hold_xyz",
+    "amount": 25.00,
+    "capturedAt": "2025-01-08T10:00:00Z"
+  }
 }`}</pre>
                   </div>
                 </CardContent>
@@ -508,7 +505,7 @@ Response:
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
-                    /internal/release
+                    /internal?action=release
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -537,7 +534,7 @@ Response:
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
-                    /internal/health
+                    /internal?action=health
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -671,7 +668,7 @@ Response:
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
-                    /internal/settlements
+                    /internal?action=settlements
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -679,11 +676,12 @@ Response:
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Query Parameters</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
-                    <pre className="text-sm">{`status   - Filter by status (optional)
-limit    - Max results (default 20, max 100)
-offset   - Pagination offset
-from     - Period start after date (ISO)
-to       - Period end before date (ISO)`}</pre>
+                    <pre className="text-sm">{`partnerId - Required. Your partner ID
+status    - Filter by status (optional)
+limit     - Max results (default 20, max 100)
+offset    - Pagination offset
+from      - Period start after date (ISO)
+to        - Period end before date (ISO)`}</pre>
                   </div>
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
@@ -714,7 +712,7 @@ to       - Period end before date (ISO)`}</pre>
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
-                    /internal/settlements/:id
+                    /internal?action=settlement&amp;partnerId=xxx&amp;id=yyy
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -758,7 +756,7 @@ to       - Period end before date (ISO)`}</pre>
                 <CardHeader>
                   <CardTitle>
                     <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
-                    /internal/captures
+                    /internal?action=captures
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -766,7 +764,8 @@ to       - Period end before date (ISO)`}</pre>
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Query Parameters</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
-                    <pre className="text-sm">{`settled    - Filter by settlement status (boolean)
+                    <pre className="text-sm">{`partnerId  - Required. Your partner ID
+settled    - Filter by settlement status (boolean)
 creatorId  - Filter by creator
 projectId  - Filter by project
 from       - Captured after date (ISO)
@@ -825,8 +824,8 @@ to         - Captured before date (ISO)`}</pre>
   }
 }
 
-// Signature header for verification
-X-Webhook-Signature: sha256=<hmac-sha256-of-body-with-secret>`}</pre>
+// Signature header for verification (format: t=timestamp,v1=signature)
+X-Webhook-Signature: t=1704672000,v1=<hmac-sha256-of-timestamp.body>`}</pre>
                   </div>
 
                   <h4 className="font-semibold text-neutral-900 mb-3">Settlement Events</h4>
@@ -857,12 +856,29 @@ X-Webhook-Signature: sha256=<hmac-sha256-of-body-with-secret>`}</pre>
                     <pre className="text-sm">{`const crypto = require('crypto');
 
 function verifyWebhook(payload, signature, secret) {
+  // Parse signature header: t=timestamp,v1=signature
+  const parts = signature.split(',');
+  const timestampPart = parts.find(p => p.startsWith('t='));
+  const sigPart = parts.find(p => p.startsWith('v1='));
+
+  if (!timestampPart || !sigPart) return false;
+
+  const timestamp = timestampPart.slice(2);
+  const receivedSig = sigPart.slice(3);
+
+  // Verify timestamp is within 5 minutes (replay protection)
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parseInt(timestamp)) > 300) return false;
+
+  // Compute expected signature
+  const signaturePayload = timestamp + '.' + payload;
   const expected = crypto
     .createHmac('sha256', secret)
-    .update(payload)
+    .update(signaturePayload)
     .digest('hex');
+
   return crypto.timingSafeEqual(
-    Buffer.from(signature.replace('sha256=', '')),
+    Buffer.from(receivedSig),
     Buffer.from(expected)
   );
 }
@@ -870,8 +886,10 @@ function verifyWebhook(payload, signature, secret) {
 // Usage
 app.post('/webhooks/divinitycoin', (req, res) => {
   const signature = req.headers['x-webhook-signature'];
+  const rawBody = JSON.stringify(req.body);
+
   const isValid = verifyWebhook(
-    JSON.stringify(req.body),
+    rawBody,
     signature,
     process.env.DIVINITYCOIN_WEBHOOK_SECRET
   );
@@ -885,7 +903,6 @@ app.post('/webhooks/divinitycoin', (req, res) => {
 
   switch (event) {
     case 'settlement.paid':
-      // Update creator balances, send notifications, etc.
       handleSettlementPaid(data);
       break;
   }
