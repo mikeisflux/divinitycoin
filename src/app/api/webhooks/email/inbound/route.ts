@@ -3,9 +3,32 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Verify webhook secret (passed as URL parameter from SendGrid config)
+    const webhookSecret = process.env.SENDGRID_INBOUND_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      logger.error('SENDGRID_INBOUND_WEBHOOK_SECRET not configured');
+      return NextResponse.json(
+        { error: 'Webhook security not configured' },
+        { status: 503 }
+      );
+    }
+
+    const url = new URL(request.url);
+    const providedSecret = url.searchParams.get('secret');
+
+    if (!providedSecret || !crypto.timingSafeEqual(
+      Buffer.from(providedSecret),
+      Buffer.from(webhookSecret)
+    )) {
+      logger.warn('Invalid inbound email webhook secret');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // SendGrid sends inbound emails as multipart/form-data
     const formData = await request.formData();
 
@@ -42,23 +65,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log('Inbound email received:', {
+    logger.info('Inbound email received', {
       from,
       to,
       subject,
       senderIp,
-      spamScore,
     });
-
-    // You can add custom handling here:
-    // - Auto-reply
-    // - Forward to support system
-    // - Create support ticket
-    // - etc.
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Inbound email webhook error:', error);
+    logger.apiError('/api/webhooks/email/inbound', error);
     return NextResponse.json(
       { error: 'Failed to process inbound email' },
       { status: 500 }

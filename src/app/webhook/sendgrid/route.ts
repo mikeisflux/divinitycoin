@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 
 interface SendGridEvent {
@@ -29,9 +30,10 @@ function verifySignature(
   signature: string,
   timestamp: string
 ): boolean {
-  if (!process.env.SENDGRID_WEBHOOK_SECRET) {
-    console.warn('SENDGRID_WEBHOOK_SECRET not set, skipping verification');
-    return true;
+  // SECURITY: Signature verification is mandatory
+  if (!publicKey) {
+    logger.error('SENDGRID_WEBHOOK_VERIFICATION_KEY not configured');
+    return false;
   }
 
   try {
@@ -51,7 +53,7 @@ function verifySignature(
       decodedSignature
     );
   } catch (error) {
-    console.error('Signature verification error:', error);
+    logger.error('SendGrid signature verification failed', { error });
     return false;
   }
 }
@@ -77,22 +79,29 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('X-Twilio-Email-Event-Webhook-Signature') || '';
     const timestamp = request.headers.get('X-Twilio-Email-Event-Webhook-Timestamp') || '';
 
-    // Verify signature if secret is set
-    if (process.env.SENDGRID_WEBHOOK_SECRET) {
-      const isValid = verifySignature(
-        process.env.SENDGRID_WEBHOOK_VERIFICATION_KEY || '',
-        rawBody,
-        signature,
-        timestamp
+    // SECURITY: Signature verification is MANDATORY
+    const verificationKey = process.env.SENDGRID_WEBHOOK_VERIFICATION_KEY;
+    if (!verificationKey) {
+      logger.error('SENDGRID_WEBHOOK_VERIFICATION_KEY not configured');
+      return NextResponse.json(
+        { error: 'Webhook security not configured' },
+        { status: 503 }
       );
+    }
 
-      if (!isValid) {
-        console.error('Invalid SendGrid webhook signature');
-        return NextResponse.json(
-          { error: 'Invalid signature' },
-          { status: 401 }
-        );
-      }
+    const isValid = verifySignature(
+      verificationKey,
+      rawBody,
+      signature,
+      timestamp
+    );
+
+    if (!isValid) {
+      logger.warn('Invalid SendGrid webhook signature');
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401 }
+      );
     }
 
     const events: SendGridEvent[] = JSON.parse(rawBody);
@@ -131,13 +140,13 @@ export async function POST(request: NextRequest) {
           });
         }
       } catch (eventError) {
-        console.error('Error processing SendGrid event:', eventError, event);
+        logger.error('Error processing SendGrid event', { error: eventError, eventId: event.sg_event_id });
       }
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('SendGrid webhook error:', error);
+    logger.apiError('/webhook/sendgrid', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

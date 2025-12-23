@@ -86,7 +86,8 @@ export async function validatePartnerSession(token: string): Promise<PartnerUser
 }
 
 export async function getPartnerFromRequest(): Promise<PartnerUser | null> {
-  const cookieStore = cookies();
+  // SECURITY: Must await cookies() in Next.js 14+
+  const cookieStore = await cookies();
   const sessionToken = cookieStore.get('partner_session')?.value;
 
   if (!sessionToken) return null;

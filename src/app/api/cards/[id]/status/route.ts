@@ -3,12 +3,34 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import { apiRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // SECURITY: Rate limiting to prevent enumeration attacks
+    const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                     request.headers.get('x-real-ip') ||
+                     'unknown';
+    const rateLimitKey = createRateLimitKey('card-status', clientIP);
+    const rateLimit = apiRateLimiter.check(rateLimitKey);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfter || 60),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
+    }
+
     const { id } = params;
 
     if (!id) {
@@ -50,7 +72,7 @@ export async function GET(
       expiresAt: giftCard.expiresAt?.toISOString() || null,
     });
   } catch (error) {
-    console.error('Error checking card status:', error);
+    logger.apiError('/api/cards/[id]/status', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

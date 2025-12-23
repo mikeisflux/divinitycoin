@@ -3,9 +3,28 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createUser, createSession, setSessionCookie, getUserByEmail } from '@/lib/auth/user';
+import { logger } from '@/lib/logger';
+import { apiRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Rate limiting to prevent enumeration attacks
+    const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                     request.headers.get('x-real-ip') ||
+                     'unknown';
+    const rateLimitKey = createRateLimitKey('register', clientIP);
+    const rateLimit = apiRateLimiter.check(rateLimitKey);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rateLimit.retryAfter || 60) },
+        }
+      );
+    }
+
     const { email, password, name } = await request.json();
 
     // Validate input
@@ -33,13 +52,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already exists
+    // SECURITY: Check if user already exists but return generic message
+    // to prevent email enumeration attacks
     const existingUser = await getUserByEmail(email);
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 409 }
-      );
+      // SECURITY: Return success even for existing users to prevent enumeration
+      // In production, you would send an email saying "you already have an account"
+      logger.info('Registration attempted for existing email', { emailDomain: email.split('@')[1] });
+      return NextResponse.json({
+        success: true,
+        message: 'If this email is not already registered, check your inbox to complete registration.',
+      });
     }
 
     // Create user
@@ -51,6 +74,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      message: 'If this email is not already registered, check your inbox to complete registration.',
       user: {
         id: user.id,
         email: user.email,
@@ -58,7 +82,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.apiError('/api/auth/register', error);
     return NextResponse.json(
       { error: 'Failed to create account' },
       { status: 500 }

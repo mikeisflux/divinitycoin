@@ -4,10 +4,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logoutAdmin } from '@/lib/admin/auth';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    // SECURITY: Must await cookies() in Next.js 14+
+    const cookieStore = await cookies();
     const token = cookieStore.get('admin_session')?.value;
 
     if (token) {
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Admin logout error:', error);
+    logger.apiError('/api/admin/auth/logout', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

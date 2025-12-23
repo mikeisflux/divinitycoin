@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Set session cookie
-    const cookieStore = cookies();
+    // SECURITY: Must await cookies() in Next.js 14+
+    const cookieStore = await cookies();
     cookieStore.set('admin_session', result.token!, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
