@@ -79,7 +79,8 @@ export async function validateAdminSession(token: string): Promise<AdminUser | n
 }
 
 export async function getAdminFromRequest(): Promise<AdminUser | null> {
-  const cookieStore = cookies();
+  // SECURITY: Must await cookies() in Next.js 14+
+  const cookieStore = await cookies();
   const sessionToken = cookieStore.get('admin_session')?.value;
 
   if (!sessionToken) return null;

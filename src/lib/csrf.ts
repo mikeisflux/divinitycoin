@@ -22,6 +22,18 @@ export function generateCSRFToken(): string {
 }
 
 /**
+ * Get CSRF secret - throws error if not configured
+ * SECURITY: Never use hardcoded fallback secrets
+ */
+function getCSRFSecret(): string {
+  const secret = process.env.CSRF_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('CSRF_SECRET or NEXTAUTH_SECRET environment variable must be set');
+  }
+  return secret;
+}
+
+/**
  * Create a signed CSRF token with timestamp
  */
 export function createSignedToken(): string {
@@ -29,7 +41,7 @@ export function createSignedToken(): string {
   const timestamp = Date.now();
   const data = `${token}:${timestamp}`;
   const signature = crypto
-    .createHmac('sha256', process.env.CSRF_SECRET || process.env.NEXTAUTH_SECRET || 'csrf-secret-key')
+    .createHmac('sha256', getCSRFSecret())
     .update(data)
     .digest('hex');
   return `${data}:${signature}`;
@@ -55,7 +67,7 @@ export function verifySignedToken(signedToken: string): boolean {
   // Verify signature
   const data = `${token}:${timestamp}`;
   const expectedSignature = crypto
-    .createHmac('sha256', process.env.CSRF_SECRET || process.env.NEXTAUTH_SECRET || 'csrf-secret-key')
+    .createHmac('sha256', getCSRFSecret())
     .update(data)
     .digest('hex');
 

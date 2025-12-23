@@ -46,9 +46,10 @@ export function middleware(request: NextRequest) {
 
   // Handle CORS for API routes
   if (pathname.startsWith('/api/')) {
-    // Allow requests from allowed origins
-    if (allowedOrigins.includes(origin) || !origin) {
-      response.headers.set('Access-Control-Allow-Origin', origin || '*');
+    // SECURITY: Only allow requests from explicitly allowed origins
+    // Do NOT allow empty origin or set wildcard - this prevents CORS bypass attacks
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set('Access-Control-Allow-Origin', origin);
     }
 
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

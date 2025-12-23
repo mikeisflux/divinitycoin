@@ -27,6 +27,25 @@ export async function POST(request: NextRequest) {
   try {
     const body: PartnerApplicationData = await request.json();
 
+    // SECURITY: Define field constraints to prevent DoS via large payloads
+    const fieldLimits: Record<string, number> = {
+      contactName: 255,
+      contactEmail: 255,
+      contactPhone: 50,
+      businessName: 255,
+      businessType: 100,
+      taxId: 50,
+      addressLine1: 255,
+      addressLine2: 255,
+      city: 100,
+      state: 100,
+      zipCode: 20,
+      country: 100,
+      websiteUrl: 500,
+      platformDescription: 2000,
+      expectedMonthlyVolume: 100,
+    };
+
     // Validate required fields
     const requiredFields = [
       'contactName',
@@ -47,6 +66,17 @@ export async function POST(request: NextRequest) {
       if (!body[field as keyof PartnerApplicationData]) {
         return NextResponse.json(
           { error: `Missing required field: ${field}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // SECURITY: Validate field lengths to prevent DoS attacks
+    for (const [field, maxLength] of Object.entries(fieldLimits)) {
+      const value = body[field as keyof PartnerApplicationData];
+      if (typeof value === 'string' && value.length > maxLength) {
+        return NextResponse.json(
+          { error: `${field} exceeds maximum length of ${maxLength} characters` },
           { status: 400 }
         );
       }

@@ -10,8 +10,9 @@ import { cookies } from 'next/headers';
 export async function GET(request: NextRequest) {
   try {
     // Get session token from cookies
-    const cookieStore = cookies();
-    const sessionToken = cookieStore.get('session_token')?.value;
+    // SECURITY: Must await cookies() in Next.js 14+ and use correct cookie name
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get('user_session')?.value;
 
     if (!sessionToken) {
       return NextResponse.json(

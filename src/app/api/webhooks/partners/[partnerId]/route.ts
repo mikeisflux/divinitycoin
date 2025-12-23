@@ -75,13 +75,20 @@ export async function POST(
     const rawBody = await request.text();
     const signature = request.headers.get('X-Webhook-Signature') || '';
 
-    // Verify signature if webhook secret is set
-    if (partner.webhookSecret) {
-      const isValid = verifySignature(rawBody, signature, partner.webhookSecret);
-      if (!isValid) {
-        console.error(`Invalid webhook signature for partner ${partner.id}`);
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
+    // SECURITY: Webhook signature verification is MANDATORY
+    // Partners must have a webhook secret configured
+    if (!partner.webhookSecret) {
+      console.error(`Webhook secret not configured for partner ${partner.id}`);
+      return NextResponse.json(
+        { error: 'Webhook security not configured. Please set up a webhook secret.' },
+        { status: 403 }
+      );
+    }
+
+    const isValid = verifySignature(rawBody, signature, partner.webhookSecret);
+    if (!isValid) {
+      console.error(`Invalid webhook signature for partner ${partner.id}`);
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     // Parse the webhook payload

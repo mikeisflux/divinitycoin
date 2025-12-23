@@ -9,6 +9,7 @@ import { getSettlements, getSettlementDetail, getCaptures, createCapture } from 
 import { SettlementStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { hashApiKey } from '@/lib/encryption';
+import crypto from 'crypto';
 
 // Fallback to legacy INTERNAL_API_KEY for backwards compatibility
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
@@ -32,8 +33,19 @@ async function validateInternalRequest(request: NextRequest): Promise<AuthResult
   const token = authHeader.slice(7);
 
   // Check legacy internal API key first (for backwards compatibility)
-  if (INTERNAL_API_KEY && token === INTERNAL_API_KEY) {
-    return { valid: true, partnerId: 'internal', partnerName: 'Internal System' };
+  // SECURITY: Use timing-safe comparison to prevent timing attacks
+  if (INTERNAL_API_KEY && token.length === INTERNAL_API_KEY.length) {
+    try {
+      const isMatch = crypto.timingSafeEqual(
+        Buffer.from(token),
+        Buffer.from(INTERNAL_API_KEY)
+      );
+      if (isMatch) {
+        return { valid: true, partnerId: 'internal', partnerName: 'Internal System' };
+      }
+    } catch {
+      // Length mismatch or other error - continue to database lookup
+    }
   }
 
   // Hash the provided API key and look it up in the database
