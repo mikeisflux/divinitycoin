@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAndRedeemCode, checkCodeStatus } from '@/lib/giftcard/redeem';
 import { placeHold, releaseHold, captureHold, getBalance } from '@/lib/credits/holds';
-import { redemptionRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
+import { redemptionRateLimiter, payRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
 import { getSettlements, getSettlementDetail, getCaptures, createCapture } from '@/lib/settlements';
 import { SettlementStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
@@ -114,13 +114,13 @@ export async function POST(request: NextRequest) {
         return handleBalance(body);
 
       case 'hold':
-        return handleHold(body);
+        return handleHold(body, ipAddress);
 
       case 'release':
-        return handleRelease(body);
+        return handleRelease(body, ipAddress);
 
       case 'capture':
-        return handleCapture(body);
+        return handleCapture(body, ipAddress);
 
       case 'record_capture':
         return handleRecordCapture(body);
@@ -412,6 +412,7 @@ async function handleGetCaptures(url: URL, partnerId: string | null) {
 
 /**
  * Validate and redeem a gift card code
+ * SECURITY: Includes rate limiting and lockout after failed attempts
  */
 async function handleValidate(
   body: { code: string; platformUserId: string },
@@ -427,9 +428,22 @@ async function handleValidate(
     );
   }
 
-  // Check rate limit
+  // Check rate limit and lockout status
   const rateLimitKey = createRateLimitKey('redeem', ipAddress, platformUserId);
   const rateLimit = redemptionRateLimiter.check(rateLimitKey);
+
+  // SECURITY: Check if locked out due to too many failed attempts
+  if (rateLimit.lockedOut) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'LOCKED_OUT',
+        message: `Account temporarily locked due to too many failed attempts. Try again in ${rateLimit.lockoutRemaining} seconds.`,
+        retryAfter: rateLimit.lockoutRemaining,
+      },
+      { status: 429 }
+    );
+  }
 
   if (!rateLimit.allowed) {
     return NextResponse.json(
@@ -451,9 +465,28 @@ async function handleValidate(
     userAgent: request.headers.get('user-agent') || undefined,
   });
 
+  // SECURITY: Track success/failure for lockout mechanism
   if (!result.success) {
+    const lockoutResult = redemptionRateLimiter.recordFailure(rateLimitKey);
+
+    // Add lockout info to response if triggered
+    if (lockoutResult.lockedOut) {
+      return NextResponse.json(
+        {
+          ...result,
+          lockedOut: true,
+          lockoutRemaining: lockoutResult.lockoutRemaining,
+          message: `${result.message} Account locked for ${lockoutResult.lockoutRemaining} seconds due to repeated failed attempts.`,
+        },
+        { status: 429 }
+      );
+    }
+
     return NextResponse.json(result, { status: 400 });
   }
+
+  // Reset lockout tracking on successful redemption
+  redemptionRateLimiter.recordSuccess(rateLimitKey);
 
   return NextResponse.json(result);
 }
@@ -487,14 +520,18 @@ async function handleBalance(body: { platformUserId: string }) {
 
 /**
  * Place a hold on credits
+ * SECURITY: Rate limited to 10 requests/minute
  */
-async function handleHold(body: {
-  platformUserId: string;
-  amount: number;
-  pledgeId: string;
-  projectId: string;
-  expiresAt?: string;
-}) {
+async function handleHold(
+  body: {
+    platformUserId: string;
+    amount: number;
+    pledgeId: string;
+    projectId: string;
+    expiresAt?: string;
+  },
+  ipAddress: string
+) {
   const { platformUserId, amount, pledgeId, projectId, expiresAt } = body;
 
   if (!platformUserId || !amount || !pledgeId || !projectId) {
@@ -504,12 +541,29 @@ async function handleHold(body: {
     );
   }
 
+  // SECURITY: Rate limit pay/hold endpoint
+  const rateLimitKey = createRateLimitKey('hold', ipAddress, platformUserId);
+  const rateLimit = payRateLimiter.check(rateLimitKey);
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'RATE_LIMITED',
+        message: `Too many requests. Try again in ${rateLimit.retryAfter} seconds.`,
+        retryAfter: rateLimit.retryAfter,
+      },
+      { status: 429 }
+    );
+  }
+
   const result = await placeHold({
     platformUserId,
     amount,
     pledgeId,
     projectId,
     expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    ipAddress,
   });
 
   if (!result.success) {
@@ -521,8 +575,9 @@ async function handleHold(body: {
 
 /**
  * Release a hold
+ * Includes IP address in audit trail
  */
-async function handleRelease(body: { pledgeId: string }) {
+async function handleRelease(body: { pledgeId: string }, ipAddress: string) {
   const { pledgeId } = body;
 
   if (!pledgeId) {
@@ -532,7 +587,7 @@ async function handleRelease(body: { pledgeId: string }) {
     );
   }
 
-  const result = await releaseHold(pledgeId);
+  const result = await releaseHold(pledgeId, ipAddress);
 
   if (!result.success) {
     return NextResponse.json(result, { status: 400 });
@@ -543,8 +598,9 @@ async function handleRelease(body: { pledgeId: string }) {
 
 /**
  * Capture a hold
+ * Includes IP address in audit trail
  */
-async function handleCapture(body: { pledgeId: string }) {
+async function handleCapture(body: { pledgeId: string }, ipAddress: string) {
   const { pledgeId } = body;
 
   if (!pledgeId) {
@@ -554,7 +610,7 @@ async function handleCapture(body: { pledgeId: string }) {
     );
   }
 
-  const result = await captureHold(pledgeId);
+  const result = await captureHold(pledgeId, ipAddress);
 
   if (!result.success) {
     return NextResponse.json(result, { status: 400 });

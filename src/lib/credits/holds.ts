@@ -1,8 +1,9 @@
 // lib/credits/holds.ts
+// SECURITY: Uses SERIALIZABLE transactions with row-level locking to prevent race conditions
 
-import { PrismaClient, HoldStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { HoldStatus, Prisma } from '@prisma/client';
+import { prisma } from '@/lib/db';
+import crypto from 'crypto';
 
 // Error codes
 export const HoldErrors = {
@@ -11,6 +12,8 @@ export const HoldErrors = {
   HOLD_NOT_ACTIVE: 'HOLD_NOT_ACTIVE',
   USER_NOT_FOUND: 'USER_NOT_FOUND',
   INVALID_AMOUNT: 'INVALID_AMOUNT',
+  DUPLICATE_HOLD: 'DUPLICATE_HOLD',
+  TRANSACTION_CONFLICT: 'TRANSACTION_CONFLICT',
 } as const;
 
 export type HoldErrorCode = typeof HoldErrors[keyof typeof HoldErrors];
@@ -20,6 +23,7 @@ interface HoldResult {
   holdId?: string;
   error?: HoldErrorCode;
   message?: string;
+  requestId?: string;
 }
 
 interface CaptureResult {
@@ -27,6 +31,7 @@ interface CaptureResult {
   amount?: number;
   error?: HoldErrorCode;
   message?: string;
+  requestId?: string;
 }
 
 interface PlaceHoldParams {
@@ -35,10 +40,19 @@ interface PlaceHoldParams {
   pledgeId: string;
   projectId: string;
   expiresAt?: Date;
+  ipAddress?: string;
+}
+
+/**
+ * Generate a unique request ID for audit tracking
+ */
+function generateRequestId(): string {
+  return `req_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
 /**
  * Place a hold on credits for a pledge
+ * SECURITY: Uses SERIALIZABLE isolation + SELECT FOR UPDATE to prevent double-spend
  */
 export async function placeHold({
   platformUserId,
@@ -46,36 +60,74 @@ export async function placeHold({
   pledgeId,
   projectId,
   expiresAt,
+  ipAddress,
 }: PlaceHoldParams): Promise<HoldResult> {
+  const requestId = generateRequestId();
+
   if (amount <= 0) {
     return {
       success: false,
       error: HoldErrors.INVALID_AMOUNT,
       message: 'Amount must be positive.',
+      requestId,
     };
   }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Get or create credit balance
-      let creditBalance = await tx.creditBalance.findUnique({
-        where: { platformUserId },
+      // Check for duplicate hold first (idempotency)
+      const existingHold = await tx.creditHold.findUnique({
+        where: { pledgeId },
       });
 
-      if (!creditBalance) {
+      if (existingHold) {
+        if (existingHold.status === HoldStatus.ACTIVE) {
+          return {
+            success: true,
+            holdId: existingHold.id,
+            message: 'Hold already exists for this pledge.',
+            requestId,
+          };
+        }
+        return {
+          success: false,
+          error: HoldErrors.DUPLICATE_HOLD,
+          message: `A hold already exists for this pledge with status: ${existingHold.status}`,
+          requestId,
+        };
+      }
+
+      // SECURITY: Use raw SQL with FOR UPDATE to lock the row and prevent race conditions
+      const balanceRows = await tx.$queryRaw<Array<{
+        id: string;
+        availableBalance: Prisma.Decimal;
+        heldBalance: Prisma.Decimal;
+      }>>`
+        SELECT id, "availableBalance", "heldBalance"
+        FROM "CreditBalance"
+        WHERE "platformUserId" = ${platformUserId}
+        FOR UPDATE
+      `;
+
+      if (balanceRows.length === 0) {
         return {
           success: false,
           error: HoldErrors.USER_NOT_FOUND,
           message: 'User credit balance not found.',
+          requestId,
         };
       }
 
-      // Check available balance
-      if (Number(creditBalance.availableBalance) < amount) {
+      const creditBalance = balanceRows[0];
+      const previousBalance = Number(creditBalance.availableBalance);
+
+      // Check available balance (now with row locked - race condition prevented)
+      if (previousBalance < amount) {
         return {
           success: false,
           error: HoldErrors.INSUFFICIENT_BALANCE,
-          message: `Insufficient balance. Available: ${creditBalance.availableBalance}, Required: ${amount}`,
+          message: `Insufficient balance. Available: ${previousBalance}, Required: ${amount}`,
+          requestId,
         };
       }
 
@@ -91,8 +143,8 @@ export async function placeHold({
         },
       });
 
-      // Update balances
-      creditBalance = await tx.creditBalance.update({
+      // Update balances atomically
+      const updatedBalance = await tx.creditBalance.update({
         where: { id: creditBalance.id },
         data: {
           availableBalance: { decrement: amount },
@@ -100,56 +152,93 @@ export async function placeHold({
         },
       });
 
-      // Create ledger entry
+      // Create ledger entry with full audit trail
       await tx.creditLedger.create({
         data: {
           creditBalanceId: creditBalance.id,
           type: 'HOLD_PLACED',
-          amount: -amount, // Negative because it reduces available
-          balanceAfter: creditBalance.availableBalance,
+          amount: -amount,
+          balanceAfter: updatedBalance.availableBalance,
           holdId: hold.id,
           description: `Hold placed for pledge ${pledgeId}`,
+          metadata: {
+            requestId,
+            ipAddress,
+            previousBalance,
+            newBalance: Number(updatedBalance.availableBalance),
+            pledgeId,
+            projectId,
+          },
         },
       });
 
       return {
         success: true,
         holdId: hold.id,
+        requestId,
       };
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10000, // 10 second timeout
     });
 
     return result;
   } catch (error) {
-    console.error('Place hold error:', error);
+    console.error('Place hold error:', error, { requestId, platformUserId, amount, pledgeId });
+
+    // Handle serialization failures (concurrent transaction conflicts)
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      return {
+        success: false,
+        error: HoldErrors.TRANSACTION_CONFLICT,
+        message: 'Transaction conflict. Please retry.',
+        requestId,
+      };
+    }
+
     throw error;
   }
 }
 
 /**
  * Release a hold (project failed or pledge cancelled)
+ * SECURITY: Uses SERIALIZABLE isolation + SELECT FOR UPDATE to prevent race conditions
  */
-export async function releaseHold(pledgeId: string): Promise<CaptureResult> {
+export async function releaseHold(pledgeId: string, ipAddress?: string): Promise<CaptureResult> {
+  const requestId = generateRequestId();
+
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Find the hold
-      const hold = await tx.creditHold.findUnique({
-        where: { pledgeId },
-        include: { creditBalance: true },
-      });
+      // SECURITY: Lock the hold row with FOR UPDATE
+      const holdRows = await tx.$queryRaw<Array<{
+        id: string;
+        creditBalanceId: string;
+        amount: Prisma.Decimal;
+        status: string;
+      }>>`
+        SELECT id, "creditBalanceId", amount, status
+        FROM "CreditHold"
+        WHERE "pledgeId" = ${pledgeId}
+        FOR UPDATE
+      `;
 
-      if (!hold) {
+      if (holdRows.length === 0) {
         return {
           success: false,
           error: HoldErrors.HOLD_NOT_FOUND,
           message: 'Hold not found for this pledge.',
+          requestId,
         };
       }
+
+      const hold = holdRows[0];
 
       if (hold.status !== HoldStatus.ACTIVE) {
         return {
           success: false,
           error: HoldErrors.HOLD_NOT_ACTIVE,
           message: `Hold is not active. Current status: ${hold.status}`,
+          requestId,
         };
       }
 
@@ -173,56 +262,90 @@ export async function releaseHold(pledgeId: string): Promise<CaptureResult> {
         },
       });
 
-      // Create ledger entry
+      // Create ledger entry with audit trail
       await tx.creditLedger.create({
         data: {
           creditBalanceId: creditBalance.id,
           type: 'HOLD_RELEASED',
-          amount: amount, // Positive because credits returned
+          amount: amount,
           balanceAfter: creditBalance.availableBalance,
           holdId: hold.id,
           description: `Hold released for pledge ${pledgeId}`,
+          metadata: {
+            requestId,
+            ipAddress,
+            releasedAmount: amount,
+            newAvailableBalance: Number(creditBalance.availableBalance),
+          },
         },
       });
 
       return {
         success: true,
         amount,
+        requestId,
       };
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10000,
     });
 
     return result;
   } catch (error) {
-    console.error('Release hold error:', error);
+    console.error('Release hold error:', error, { requestId, pledgeId });
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      return {
+        success: false,
+        error: HoldErrors.TRANSACTION_CONFLICT,
+        message: 'Transaction conflict. Please retry.',
+        requestId,
+      };
+    }
+
     throw error;
   }
 }
 
 /**
  * Capture a hold (project funded successfully)
+ * SECURITY: Uses SERIALIZABLE isolation + SELECT FOR UPDATE to prevent race conditions
  */
-export async function captureHold(pledgeId: string): Promise<CaptureResult> {
+export async function captureHold(pledgeId: string, ipAddress?: string): Promise<CaptureResult> {
+  const requestId = generateRequestId();
+
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Find the hold
-      const hold = await tx.creditHold.findUnique({
-        where: { pledgeId },
-        include: { creditBalance: true },
-      });
+      // SECURITY: Lock the hold row with FOR UPDATE
+      const holdRows = await tx.$queryRaw<Array<{
+        id: string;
+        creditBalanceId: string;
+        amount: Prisma.Decimal;
+        status: string;
+      }>>`
+        SELECT id, "creditBalanceId", amount, status
+        FROM "CreditHold"
+        WHERE "pledgeId" = ${pledgeId}
+        FOR UPDATE
+      `;
 
-      if (!hold) {
+      if (holdRows.length === 0) {
         return {
           success: false,
           error: HoldErrors.HOLD_NOT_FOUND,
           message: 'Hold not found for this pledge.',
+          requestId,
         };
       }
+
+      const hold = holdRows[0];
 
       if (hold.status !== HoldStatus.ACTIVE) {
         return {
           success: false,
           error: HoldErrors.HOLD_NOT_ACTIVE,
           message: `Hold is not active. Current status: ${hold.status}`,
+          requestId,
         };
       }
 
@@ -245,27 +368,47 @@ export async function captureHold(pledgeId: string): Promise<CaptureResult> {
         },
       });
 
-      // Create ledger entry
+      // Create ledger entry with audit trail
       await tx.creditLedger.create({
         data: {
           creditBalanceId: creditBalance.id,
           type: 'HOLD_CAPTURED',
-          amount: -amount, // Negative because credits are gone
+          amount: -amount,
           balanceAfter: creditBalance.availableBalance,
           holdId: hold.id,
           description: `Hold captured for pledge ${pledgeId}`,
+          metadata: {
+            requestId,
+            ipAddress,
+            capturedAmount: amount,
+            remainingHeldBalance: Number(creditBalance.heldBalance),
+          },
         },
       });
 
       return {
         success: true,
         amount,
+        requestId,
       };
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10000,
     });
 
     return result;
   } catch (error) {
-    console.error('Capture hold error:', error);
+    console.error('Capture hold error:', error, { requestId, pledgeId });
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      return {
+        success: false,
+        error: HoldErrors.TRANSACTION_CONFLICT,
+        message: 'Transaction conflict. Please retry.',
+        requestId,
+      };
+    }
+
     throw error;
   }
 }
