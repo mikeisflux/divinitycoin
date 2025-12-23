@@ -35,15 +35,17 @@ async function findPartnerByToken(token: string) {
     },
   });
 
+  // SECURITY: Use same error message for all token validation failures
+  // This prevents enumeration of valid tokens
   if (!partner) {
-    return { partner: null, error: 'Invalid setup token' };
+    return { partner: null, error: 'Invalid or expired token' };
   }
 
   const settings = partner.settings as Record<string, unknown> | null;
 
-  // Check if token is expired
+  // Check if token is expired - use same error message
   if (settings?.setupTokenExpires && new Date(settings.setupTokenExpires as string) < new Date()) {
-    return { partner: null, error: 'Setup link has expired' };
+    return { partner: null, error: 'Invalid or expired token' };
   }
 
   return { partner, settings, error: null };
@@ -63,8 +65,9 @@ export async function POST(request: NextRequest) {
 
     const { partner, settings, error } = await findPartnerByToken(token);
 
+    // SECURITY: Use 400 status to prevent token enumeration via status codes
     if (error || !partner) {
-      return NextResponse.json({ error: error || 'Partner not found' }, { status: 404 });
+      return NextResponse.json({ error: error || 'Invalid or expired token' }, { status: 400 });
     }
 
     // Handle each step

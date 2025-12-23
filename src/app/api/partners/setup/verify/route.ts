@@ -25,20 +25,22 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // SECURITY: Use same error response for all token validation failures
+    // This prevents enumeration of valid tokens via different status codes
     if (!partner) {
-      return NextResponse.json({ error: 'Invalid setup token' }, { status: 404 });
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 400 });
     }
 
     const settings = partner.settings as Record<string, unknown> | null;
 
-    // Check if token is expired
+    // Check if token is expired - use same error message
     if (settings?.setupTokenExpires && new Date(settings.setupTokenExpires as string) < new Date()) {
-      return NextResponse.json({ error: 'Setup link has expired' }, { status: 410 });
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 400 });
     }
 
-    // Check if fully set up (onboarding complete)
+    // Check if fully set up (onboarding complete) - use same error message
     if (partner.onboardingComplete) {
-      return NextResponse.json({ error: 'Account already set up. Please login.' }, { status: 409 });
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 400 });
     }
 
     // Return partner info for onboarding form pre-fill

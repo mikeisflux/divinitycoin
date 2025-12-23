@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
 import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
+import { logger } from '@/lib/logger';
 
 interface ConfirmRequest {
   paymentIntentId: string;
@@ -51,6 +52,17 @@ export async function POST(request: NextRequest) {
     if (transaction.stripePaymentIntentId !== paymentIntentId) {
       return NextResponse.json(
         { error: 'Payment intent mismatch' },
+        { status: 400 }
+      );
+    }
+
+    // SECURITY: Validate payment amount matches transaction amount
+    // Stripe amounts are in cents, transaction amounts are in dollars
+    const expectedAmountCents = Math.round(Number(transaction.amount) * 100);
+    if (paymentIntent.amount !== expectedAmountCents) {
+      console.error(`Payment amount mismatch: expected ${expectedAmountCents}, got ${paymentIntent.amount}`);
+      return NextResponse.json(
+        { error: 'Payment amount mismatch' },
         { status: 400 }
       );
     }
@@ -116,7 +128,8 @@ export async function POST(request: NextRequest) {
       amount: Number(transaction.amount),
     });
   } catch (error) {
-    console.error('Payment confirmation error:', error);
+    // SECURITY: Use sanitized logger to prevent sensitive data exposure
+    logger.apiError('/api/payment-confirm', error);
     return NextResponse.json(
       { error: 'Failed to confirm payment. Please contact support.' },
       { status: 500 }

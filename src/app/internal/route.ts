@@ -9,6 +9,7 @@ import { getSettlements, getSettlementDetail, getCaptures, createCapture } from 
 import { SettlementStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { hashApiKey } from '@/lib/encryption';
+import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 
 // Fallback to legacy INTERNAL_API_KEY for backwards compatibility
@@ -144,7 +145,8 @@ export async function POST(request: NextRequest) {
         );
     }
   } catch (error) {
-    console.error('Internal API error:', error);
+    // SECURITY: Use sanitized logger to prevent sensitive data exposure
+    logger.apiError('/internal', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
