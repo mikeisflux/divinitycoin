@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { encrypt } from '@/lib/encryption';
+import { logger } from '@/lib/logger';
 import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 12;
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid step' }, { status: 400 });
     }
   } catch (error) {
-    console.error('Failed to complete setup step:', error);
+    logger.apiError('/api/partners/setup', error);
     return NextResponse.json({ error: 'Setup failed' }, { status: 500 });
   }
 }

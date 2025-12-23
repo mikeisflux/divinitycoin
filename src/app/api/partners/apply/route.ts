@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 interface PartnerApplicationData {
   contactName: string;
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
       partnerId: partner.id,
     });
   } catch (error) {
-    console.error('Partner application error:', error);
+    logger.apiError('/api/partners/apply', error);
     return NextResponse.json(
       { error: 'Failed to submit application' },
       { status: 500 }

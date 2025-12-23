@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       currentStep: partner.onboardingStep,
     });
   } catch (error) {
-    console.error('Failed to verify setup token:', error);
+    logger.apiError('/api/partners/setup/verify', error);
     return NextResponse.json({ error: 'Verification failed' }, { status: 500 });
   }
 }

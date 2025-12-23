@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 import { checkCodeStatus, validateAndRedeemCode } from '@/lib/giftcard/redeem';
 
@@ -78,7 +79,7 @@ export async function POST(
     // SECURITY: Webhook signature verification is MANDATORY
     // Partners must have a webhook secret configured
     if (!partner.webhookSecret) {
-      console.error(`Webhook secret not configured for partner ${partner.id}`);
+      logger.warn(`Webhook secret not configured for partner ${partner.id}`);
       return NextResponse.json(
         { error: 'Webhook security not configured. Please set up a webhook secret.' },
         { status: 403 }
@@ -87,7 +88,7 @@ export async function POST(
 
     const isValid = verifySignature(rawBody, signature, partner.webhookSecret);
     if (!isValid) {
-      console.error(`Invalid webhook signature for partner ${partner.id}`);
+      logger.warn(`Invalid webhook signature for partner ${partner.id}`);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
@@ -183,7 +184,7 @@ export async function POST(
 
       default:
         // Unknown event type - log and acknowledge
-        console.log(`Unknown webhook event: ${event}`);
+        logger.info(`Unknown webhook event: ${event}`);
         return NextResponse.json({
           received: true,
           event,
@@ -191,7 +192,7 @@ export async function POST(
         });
     }
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    logger.apiError('/api/webhooks/partners', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
