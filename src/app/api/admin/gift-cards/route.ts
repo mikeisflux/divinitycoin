@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/admin/middleware';
 import { prisma } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch gift cards:', error);
+    logger.apiError('/api/admin/gift-cards', error);
     return NextResponse.json({ error: 'Failed to fetch gift cards' }, { status: 500 });
   }
 }

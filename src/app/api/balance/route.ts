@@ -3,6 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('Error fetching balance:', error);
+    logger.apiError('Error fetching balance:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

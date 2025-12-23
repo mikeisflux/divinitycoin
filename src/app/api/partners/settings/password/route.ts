@@ -1,6 +1,7 @@
 // app/api/partners/settings/password/route.ts
 // Partner password change
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest, verifyPartnerPassword, setPartnerPassword } from '@/lib/partner/auth';
 
@@ -42,7 +43,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to change password:', error);
+    logger.apiError('Failed to change password:', error);
     return NextResponse.json({ error: 'Failed to change password' }, { status: 500 });
   }
 }

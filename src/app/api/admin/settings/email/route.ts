@@ -1,6 +1,7 @@
 // app/api/admin/settings/email/route.ts
 // API for SendGrid email settings
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ settings });
   } catch (error) {
-    console.error('Failed to fetch email settings:', error);
+    logger.apiError('Failed to fetch email settings:', error);
     return NextResponse.json(
       { error: 'Failed to fetch settings' },
       { status: 500 }
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to save email settings:', error);
+    logger.apiError('Failed to save email settings:', error);
     return NextResponse.json(
       { error: 'Failed to save settings' },
       { status: 500 }

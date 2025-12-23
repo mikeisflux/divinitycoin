@@ -1,6 +1,7 @@
 // app/api/admin/settings/settlements/route.ts
 // Settlement system configuration API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { getConfig, setConfig } from '@/lib/admin/config';
@@ -64,7 +65,7 @@ export async function GET() {
 
     return NextResponse.json({ settings });
   } catch (error) {
-    console.error('Failed to fetch settlement settings:', error);
+    logger.apiError('Failed to fetch settlement settings:', error);
     return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
   }
 }
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to save settlement settings:', error);
+    logger.apiError('Failed to save settlement settings:', error);
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
   }
 }

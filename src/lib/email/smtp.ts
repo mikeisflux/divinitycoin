@@ -5,6 +5,7 @@
 import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/db';
 import { getSmtpConfig as getSmtpConfigFromDb, clearConfigCache } from '@/lib/config';
+import { logger } from '@/lib/logger';
 
 interface SmtpConfig {
   host: string;
@@ -54,7 +55,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{
   const fromName = config.fromName || 'DivinityCoin';
 
   if (!config.user || !config.pass) {
-    console.error('SMTP credentials not configured');
+    logger.warn('SMTP credentials not configured');
     return { success: false, error: 'SMTP not configured. Please configure email settings in the admin panel.' };
   }
 
@@ -96,7 +97,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{
 
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('SMTP error:', error);
+    logger.error('SMTP email send failed', { error, to: params.to });
 
     // Log failure
     await prisma.emailLog.create({

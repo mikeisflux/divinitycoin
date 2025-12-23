@@ -1,6 +1,7 @@
 // app/api/admin/auth/login/route.ts
 // Admin login API endpoint
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { loginAdmin } from '@/lib/admin/auth';
 import { getClientIP, getUserAgent } from '@/lib/admin/middleware';
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       admin: result.admin,
     });
   } catch (error) {
-    console.error('Admin login error:', error);
+    logger.apiError('Admin login error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

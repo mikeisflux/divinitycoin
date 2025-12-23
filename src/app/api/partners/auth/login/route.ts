@@ -1,6 +1,7 @@
 // app/api/partners/auth/login/route.ts
 // Partner login API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { loginPartner } from '@/lib/partner/auth';
 import { cookies } from 'next/headers';
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       partner: result.partner,
     });
   } catch (error) {
-    console.error('Partner login error:', error);
+    logger.apiError('Partner login error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

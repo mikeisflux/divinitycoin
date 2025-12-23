@@ -1,6 +1,7 @@
 // app/api/admin/gift-cards/[id]/resend/route.ts
 // Resend gift card code email
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -79,13 +80,13 @@ export async function POST(
 
       return NextResponse.json({ success: true });
     } catch (stripeError) {
-      console.error('Stripe error retrieving session:', stripeError);
+      logger.apiError('Stripe error retrieving session:', error);
       return NextResponse.json({
         error: 'Cannot resend email - payment records not accessible.'
       }, { status: 400 });
     }
   } catch (error) {
-    console.error('Failed to resend gift card email:', error);
+    logger.apiError('Failed to resend gift card email:', error);
     return NextResponse.json({ error: 'Failed to resend email' }, { status: 500 });
   }
 }

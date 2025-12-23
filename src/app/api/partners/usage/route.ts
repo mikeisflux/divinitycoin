@@ -3,6 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { prisma } from '@/lib/db';
@@ -156,7 +157,7 @@ export async function GET(request: NextRequest) {
       errorBreakdown,
     });
   } catch (error) {
-    console.error('Failed to fetch usage data:', error);
+    logger.apiError('Failed to fetch usage data:', error);
     return NextResponse.json({ error: 'Failed to fetch usage data' }, { status: 500 });
   }
 }

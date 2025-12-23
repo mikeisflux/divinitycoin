@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/logs/route.ts
 // Get API logs for a partner
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/admin/middleware';
 import { prisma } from '@/lib/db';
@@ -62,7 +63,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Failed to fetch partner logs:', error);
+    logger.apiError('Failed to fetch partner logs:', error);
     return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
   }
 }

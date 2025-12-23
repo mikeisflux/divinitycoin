@@ -1,6 +1,7 @@
 // app/api/partners/settings/webhook-secret/route.ts
 // Regenerate partner webhook secret
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { prisma } from '@/lib/db';
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ secret });
   } catch (error) {
-    console.error('Failed to regenerate webhook secret:', error);
+    logger.apiError('Failed to regenerate webhook secret:', error);
     return NextResponse.json({ error: 'Failed to regenerate secret' }, { status: 500 });
   }
 }

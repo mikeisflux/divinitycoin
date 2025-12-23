@@ -6,6 +6,7 @@ import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
 import { hashApiKey, encrypt } from '@/lib/encryption';
+import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ partners });
   } catch (error) {
-    console.error('Failed to fetch partners:', error);
+    logger.apiError('/api/admin/partners', error);
     return NextResponse.json(
       { error: 'Failed to fetch partners' },
       { status: 500 }
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       webhookSecret, // Return the webhook secret only once on creation
     });
   } catch (error) {
-    console.error('Failed to create partner:', error);
+    logger.apiError('/api/admin/partners', error);
     return NextResponse.json(
       { error: 'Failed to create partner' },
       { status: 500 }

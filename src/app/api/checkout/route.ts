@@ -1,5 +1,6 @@
 // app/api/checkout/route.ts
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
     });
   } catch (error) {
-    console.error('Checkout error:', error);
+    logger.apiError('Checkout error:', error);
 
     // Return more specific error messages
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

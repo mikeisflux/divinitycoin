@@ -1,6 +1,7 @@
 // app/api/partners/api-keys/[id]/route.ts
 // Partner API key revocation
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { prisma } from '@/lib/db';
@@ -39,7 +40,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to revoke API key:', error);
+    logger.apiError('Failed to revoke API key:', error);
     return NextResponse.json({ error: 'Failed to revoke API key' }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 // app/api/admin/settings/email/verify/route.ts
 // Verify SendGrid configuration
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error('Failed to verify SendGrid configuration:', error);
+    logger.apiError('Failed to verify SendGrid configuration:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Configuration verification failed' },
       { status: 500 }

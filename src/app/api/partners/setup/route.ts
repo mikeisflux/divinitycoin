@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
             updateData.bankAccountEncrypted = encrypt(bankAccountNumber);
             updateData.bankRoutingEncrypted = encrypt(bankRoutingNumber);
           } catch (encryptError) {
-            console.error('Encryption error:', encryptError);
+            logger.apiError('Encryption error:', error);
             return NextResponse.json(
               { error: 'Failed to securely store bank details' },
               { status: 500 }

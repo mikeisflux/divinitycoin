@@ -3,6 +3,7 @@
 
 import { prisma } from '@/lib/db';
 import { decrypt } from '@/lib/encryption';
+import { logger } from '@/lib/logger';
 
 // Cache for config values to avoid repeated DB calls
 let configCache: Map<string, string> | null = null;
@@ -25,7 +26,7 @@ async function loadConfigFromDatabase(): Promise<Map<string, string>> {
         configMap.set(config.key, config.value);
       }
     } catch (error) {
-      console.error(`Failed to process config ${config.key}:`, error);
+      logger.error('Failed to process config', { key: config.key, error });
     }
   }
 
@@ -43,7 +44,7 @@ export async function getConfig(key: string, defaultValue: string = ''): Promise
       configCache = await loadConfigFromDatabase();
       cacheExpiry = now + CACHE_TTL;
     } catch (error) {
-      console.error('Failed to load config from database:', error);
+      logger.error('Failed to load config from database', { error });
       configCache = new Map();
     }
   }

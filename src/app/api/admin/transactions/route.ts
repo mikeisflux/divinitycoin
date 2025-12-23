@@ -1,6 +1,7 @@
 // app/api/admin/transactions/route.ts
 // Transaction list API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/admin/middleware';
 import { prisma } from '@/lib/db';
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch transactions:', error);
+    logger.apiError('Failed to fetch transactions:', error);
     return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });
   }
 }

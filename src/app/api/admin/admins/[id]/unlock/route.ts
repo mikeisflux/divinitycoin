@@ -1,6 +1,7 @@
 // app/api/admin/admins/[id]/unlock/route.ts
 // Unlock admin account API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAdminFromRequest, canManageAdmins } from '@/lib/admin/auth';
@@ -51,7 +52,7 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error unlocking admin:', error);
+    logger.apiError('Error unlocking admin:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

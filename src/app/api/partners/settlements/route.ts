@@ -3,6 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { getSettlements, getSettlementStats } from '@/lib/settlements';
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch settlements:', error);
+    logger.apiError('Failed to fetch settlements:', error);
     return NextResponse.json({ error: 'Failed to fetch settlements' }, { status: 500 });
   }
 }

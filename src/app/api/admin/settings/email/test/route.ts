@@ -1,6 +1,7 @@
 // app/api/admin/settings/email/test/route.ts
 // Send test email via SendGrid
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error('Failed to send test email:', error);
+    logger.apiError('Failed to send test email:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to send test email' },
       { status: 500 }

@@ -5,6 +5,7 @@ import { GiftCardStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { hashCode, isValidCodeFormat, normalizeCode } from './generate';
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
 
 // Error codes
 export const RedemptionErrors = {
@@ -243,7 +244,7 @@ export async function validateAndRedeemCode({
 
     return result;
   } catch (error) {
-    console.error('Redemption error:', error, { requestId, platformUserId });
+    logger.error('Redemption error', { error, requestId, platformUserId });
 
     // Handle serialization failures (concurrent transaction conflicts)
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
@@ -316,7 +317,7 @@ async function logRedemptionAttempt({
       },
     });
   } catch (error) {
-    console.error('Failed to log redemption attempt:', error, { requestId });
+    logger.error('Failed to log redemption attempt', { error, requestId });
   }
 }
 

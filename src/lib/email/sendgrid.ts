@@ -4,6 +4,7 @@
 import sgMail from '@sendgrid/mail';
 import { prisma } from '@/lib/db';
 import { getConfig, clearConfigCache } from '@/lib/config';
+import { logger } from '@/lib/logger';
 
 interface SendGridConfig {
   apiKey: string;
@@ -38,12 +39,12 @@ export async function sendEmail(params: SendEmailParams): Promise<{
   const config = await getSendGridConfig();
 
   if (!config.apiKey) {
-    console.error('SendGrid API key not configured');
+    logger.warn('SendGrid API key not configured');
     return { success: false, error: 'Email not configured. Please add SendGrid API key in admin settings.' };
   }
 
   if (!config.fromEmail) {
-    console.error('SendGrid from email not configured');
+    logger.warn('SendGrid from email not configured');
     return { success: false, error: 'From email not configured. Please configure in admin settings.' };
   }
 
@@ -89,7 +90,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{
 
     return { success: true, messageId };
   } catch (error: unknown) {
-    console.error('SendGrid error:', error);
+    logger.error('SendGrid email send failed', { error, to: params.to });
 
     const errorMessage = error instanceof Error ? error.message : 'Failed to send email';
 

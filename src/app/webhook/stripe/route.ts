@@ -6,6 +6,7 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 import { getStripeClient, getWebhookSecret } from '@/lib/stripe';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     // Get webhook secret from config
     const webhookSecret = await getWebhookSecret();
     if (!webhookSecret) {
-      console.error('Stripe webhook secret not configured');
+      logger.error('Stripe webhook secret not configured');
       return NextResponse.json(
         { error: 'Webhook not configured' },
         { status: 500 }
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       const stripe = await getStripeClient();
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (err) {
-      console.error('Webhook signature verification failed:', err);
+      logger.warn('Webhook signature verification failed', { error: err });
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400 }
@@ -58,12 +59,12 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.debug(`Unhandled Stripe event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Webhook error:', error);
+    logger.apiError('/webhook/stripe', error);
     return NextResponse.json(
       { error: 'Webhook handler failed' },
       { status: 500 }
@@ -78,7 +79,7 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
   const { giftCardId, giftCardCode } = session.metadata || {};
 
   if (!giftCardId || !giftCardCode) {
-    console.error('Missing metadata in checkout session');
+    logger.error('Missing metadata in checkout session', { sessionId: session.id });
     return;
   }
 
@@ -110,7 +111,7 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
         amount: Number(giftCard.amount),
       });
     } catch (error) {
-      console.error('Failed to send gift card email:', error);
+      logger.error('Failed to send gift card email', { error, giftCardId });
     }
   }
 }
@@ -158,7 +159,7 @@ async function handleRefund(charge: Stripe.Charge) {
   });
 
   if (!giftCard) {
-    console.error('Gift card not found for refund:', paymentIntentId);
+    logger.warn('Gift card not found for refund', { paymentIntentId });
     return;
   }
 

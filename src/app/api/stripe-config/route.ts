@@ -1,6 +1,7 @@
 // app/api/stripe-config/route.ts
 // Returns the Stripe publishable key for the frontend
 
+import { logger } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { getStripeConfig } from '@/lib/config';
 
@@ -19,7 +20,7 @@ export async function GET() {
       publishableKey: config.publishableKey,
     });
   } catch (error) {
-    console.error('Failed to get Stripe config:', error);
+    logger.apiError('Failed to get Stripe config:', error);
     return NextResponse.json(
       { error: 'Failed to load payment configuration' },
       { status: 500 }

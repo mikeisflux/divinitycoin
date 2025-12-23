@@ -1,6 +1,7 @@
 // app/api/admin/admins/[id]/route.ts
 // Single admin user management API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAdminFromRequest, canManageAdmins } from '@/lib/admin/auth';
@@ -38,7 +39,7 @@ export async function GET(
 
     return NextResponse.json(targetAdmin);
   } catch (error) {
-    console.error('Error fetching admin:', error);
+    logger.apiError('Error fetching admin:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -144,7 +145,7 @@ export async function PATCH(
 
     return NextResponse.json(updatedAdmin);
   } catch (error) {
-    console.error('Error updating admin:', error);
+    logger.apiError('Error updating admin:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -196,7 +197,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting admin:', error);
+    logger.apiError('Error deleting admin:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

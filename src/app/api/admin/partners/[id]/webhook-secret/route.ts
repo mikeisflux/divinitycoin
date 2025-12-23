@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/webhook-secret/route.ts
 // Admin API to regenerate partner webhook secret
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -49,7 +50,7 @@ export async function POST(
       webhookSecret,
     });
   } catch (error) {
-    console.error('Failed to regenerate webhook secret:', error);
+    logger.apiError('Failed to regenerate webhook secret:', error);
     return NextResponse.json({ error: 'Failed to regenerate webhook secret' }, { status: 500 });
   }
 }

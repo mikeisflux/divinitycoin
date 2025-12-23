@@ -1,6 +1,7 @@
 // app/api/admin/gift-cards/[id]/route.ts
 // Gift card detail and actions API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -32,7 +33,7 @@ export async function GET(
 
     return NextResponse.json({ giftCard });
   } catch (error) {
-    console.error('Failed to fetch gift card:', error);
+    logger.apiError('Failed to fetch gift card:', error);
     return NextResponse.json({ error: 'Failed to fetch gift card' }, { status: 500 });
   }
 }
@@ -128,7 +129,7 @@ export async function PUT(
 
     return NextResponse.json({ giftCard });
   } catch (error) {
-    console.error('Failed to update gift card:', error);
+    logger.apiError('Failed to update gift card:', error);
     return NextResponse.json({ error: 'Failed to update gift card' }, { status: 500 });
   }
 }
@@ -190,7 +191,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete gift card:', error);
+    logger.apiError('Failed to delete gift card:', error);
     return NextResponse.json({ error: 'Failed to delete gift card' }, { status: 500 });
   }
 }

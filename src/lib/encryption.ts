@@ -2,6 +2,7 @@
 // Encryption utilities for sensitive data like API keys
 
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -119,7 +120,7 @@ export function decryptConfigValue(encryptedValue: string): string {
   try {
     return decrypt(encryptedValue);
   } catch (error) {
-    console.error('Failed to decrypt config value:', error);
+    logger.error('Failed to decrypt config value', { error });
     throw new Error('Failed to decrypt configuration value');
   }
 }

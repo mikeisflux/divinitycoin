@@ -196,7 +196,7 @@ async function handleRecordCapture(body: {
       },
     });
   } catch (error) {
-    console.error('Failed to record capture:', error);
+    logger.error('Failed to record capture', { error, holdId });
     return NextResponse.json(
       { error: 'Failed to record capture' },
       { status: 500 }

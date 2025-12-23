@@ -4,6 +4,7 @@
 import { HoldStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
 
 // Error codes
 export const HoldErrors = {
@@ -184,7 +185,7 @@ export async function placeHold({
 
     return result;
   } catch (error) {
-    console.error('Place hold error:', error, { requestId, platformUserId, amount, pledgeId });
+    logger.error('Place hold error', { error, requestId, platformUserId, amount, pledgeId });
 
     // Handle serialization failures (concurrent transaction conflicts)
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
@@ -292,7 +293,7 @@ export async function releaseHold(pledgeId: string, ipAddress?: string): Promise
 
     return result;
   } catch (error) {
-    console.error('Release hold error:', error, { requestId, pledgeId });
+    logger.error('Release hold error', { error, requestId, pledgeId });
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
       return {
@@ -398,7 +399,7 @@ export async function captureHold(pledgeId: string, ipAddress?: string): Promise
 
     return result;
   } catch (error) {
-    console.error('Capture hold error:', error, { requestId, pledgeId });
+    logger.error('Capture hold error', { error, requestId, pledgeId });
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
       return {

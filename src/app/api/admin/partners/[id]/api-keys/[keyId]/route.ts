@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/api-keys/[keyId]/route.ts
 // Admin API for managing individual partner API keys
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -48,7 +49,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Failed to fetch API key:', error);
+    logger.apiError('Failed to fetch API key:', error);
     return NextResponse.json({ error: 'Failed to fetch API key' }, { status: 500 });
   }
 }
@@ -126,7 +127,7 @@ export async function PUT(
       },
     });
   } catch (error) {
-    console.error('Failed to update API key:', error);
+    logger.apiError('Failed to update API key:', error);
     return NextResponse.json({ error: 'Failed to update API key' }, { status: 500 });
   }
 }
@@ -169,7 +170,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete API key:', error);
+    logger.apiError('Failed to delete API key:', error);
     return NextResponse.json({ error: 'Failed to delete API key' }, { status: 500 });
   }
 }

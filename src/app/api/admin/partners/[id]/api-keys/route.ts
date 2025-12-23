@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/api-keys/route.ts
 // Admin API for managing partner API keys
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -51,7 +52,7 @@ export async function GET(
 
     return NextResponse.json({ apiKeys: keysWithType });
   } catch (error) {
-    console.error('Failed to fetch partner API keys:', error);
+    logger.apiError('Failed to fetch partner API keys:', error);
     return NextResponse.json({ error: 'Failed to fetch API keys' }, { status: 500 });
   }
 }
@@ -117,7 +118,7 @@ export async function POST(
       keyId: apiKey.id,
     });
   } catch (error) {
-    console.error('Failed to create API key:', error);
+    logger.apiError('Failed to create API key:', error);
     return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
   }
 }

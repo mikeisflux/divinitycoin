@@ -1,6 +1,7 @@
 // app/api/cards/check/route.ts
 // Check gift card status by code (public endpoint with rate limiting)
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashCode, isValidCodeFormat } from '@/lib/giftcard/generate';
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
       headers: { 'X-RateLimit-Remaining': remaining.toString() },
     });
   } catch (error) {
-    console.error('Error checking card:', error);
+    logger.apiError('Error checking card:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

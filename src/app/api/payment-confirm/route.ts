@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Stripe amounts are in cents, transaction amounts are in dollars
     const expectedAmountCents = Math.round(Number(transaction.amount) * 100);
     if (paymentIntent.amount !== expectedAmountCents) {
-      console.error(`Payment amount mismatch: expected ${expectedAmountCents}, got ${paymentIntent.amount}`);
+      logger.error('Payment amount mismatch: expected ${expectedAmountCents}, got ${paymentIntent.amount}');
       return NextResponse.json(
         { error: 'Payment amount mismatch' },
         { status: 400 }
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
           amount: Number(transaction.amount),
         });
       } catch (emailError) {
-        console.error('Failed to send gift card email:', emailError);
+        logger.apiError('Failed to send gift card email:', error);
         // Don't fail the request - gift card was created successfully
       }
     }

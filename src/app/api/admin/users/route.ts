@@ -6,6 +6,7 @@ import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/auth/user';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch users:', error);
+    logger.apiError('/api/admin/users', error);
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
   }
 }
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ user });
   } catch (error) {
-    console.error('Failed to create user:', error);
+    logger.apiError('/api/admin/users', error);
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
   }
 }

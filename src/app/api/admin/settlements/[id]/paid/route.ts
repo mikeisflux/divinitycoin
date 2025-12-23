@@ -1,4 +1,5 @@
 // app/api/admin/settlements/[id]/paid/route.ts
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { markSettlementPaid, getSettlementDetail } from '@/lib/settlements';
@@ -47,7 +48,7 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to mark settlement as paid:', error);
+    logger.apiError('Failed to mark settlement as paid:', error);
     return NextResponse.json({ error: 'Failed to mark settlement as paid' }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 // app/api/partners/api-keys/route.ts
 // Partner API key management
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { prisma } from '@/lib/db';
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ apiKeys: keysWithType });
   } catch (error) {
-    console.error('Failed to fetch API keys:', error);
+    logger.apiError('Failed to fetch API keys:', error);
     return NextResponse.json({ error: 'Failed to fetch API keys' }, { status: 500 });
   }
 }
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       type,
     });
   } catch (error) {
-    console.error('Failed to create API key:', error);
+    logger.apiError('Failed to create API key:', error);
     return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
   }
 }

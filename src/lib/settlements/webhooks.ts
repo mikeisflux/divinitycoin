@@ -4,6 +4,7 @@
 import { prisma } from '@/lib/db';
 import { sendWebhook } from '@/lib/partner/webhook';
 import { SettlementStatus } from '@prisma/client';
+import { logger } from '@/lib/logger';
 
 // ============================================
 // WEBHOOK EVENT TYPES
@@ -189,7 +190,7 @@ async function logWebhookAttempt(entry: WebhookLogEntry): Promise<void> {
       },
     });
   } catch (logError) {
-    console.error('Failed to log webhook attempt:', logError);
+    logger.error('Failed to log webhook attempt', { error: logError });
   }
 }
 

@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/approve/route.ts
 // Approve partner and send onboarding email
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
@@ -221,7 +222,7 @@ export async function POST(
         : 'Partner approved. Setup link generated (email not sent).',
     });
   } catch (error) {
-    console.error('Failed to approve partner:', error);
+    logger.apiError('Failed to approve partner:', error);
     return NextResponse.json({ error: 'Failed to approve partner' }, { status: 500 });
   }
 }

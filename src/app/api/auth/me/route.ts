@@ -1,6 +1,7 @@
 // app/api/auth/me/route.ts
 // Get current user endpoint
 
+import { logger } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/user';
 import { prisma } from '@/lib/db';
@@ -56,7 +57,7 @@ export async function GET() {
       } : null,
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.apiError('Get user error:', error);
     return NextResponse.json(
       { error: 'Failed to get user' },
       { status: 500 }

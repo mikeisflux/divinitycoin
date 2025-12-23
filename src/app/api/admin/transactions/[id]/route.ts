@@ -1,6 +1,7 @@
 // app/api/admin/transactions/[id]/route.ts
 // Transaction detail and actions API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -32,7 +33,7 @@ export async function GET(
 
     return NextResponse.json({ transaction });
   } catch (error) {
-    console.error('Failed to fetch transaction:', error);
+    logger.apiError('Failed to fetch transaction:', error);
     return NextResponse.json({ error: 'Failed to fetch transaction' }, { status: 500 });
   }
 }
@@ -124,7 +125,7 @@ export async function POST(
 
         return NextResponse.json({ success: true, refundId: refund.id });
       } catch (stripeError: any) {
-        console.error('Stripe refund error:', stripeError);
+        logger.apiError('Stripe refund error:', error);
         return NextResponse.json({
           error: stripeError.message || 'Failed to process refund with Stripe'
         }, { status: 500 });
@@ -133,7 +134,7 @@ export async function POST(
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    console.error('Failed to process transaction action:', error);
+    logger.apiError('Failed to process transaction action:', error);
     return NextResponse.json({ error: 'Failed to process action' }, { status: 500 });
   }
 }

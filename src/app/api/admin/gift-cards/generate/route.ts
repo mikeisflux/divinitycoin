@@ -1,6 +1,7 @@
 // app/api/admin/gift-cards/generate/route.ts
 // Manual gift card generation API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to generate gift card:', error);
+    logger.apiError('Failed to generate gift card:', error);
     return NextResponse.json(
       { error: 'Failed to generate gift card' },
       { status: 500 }

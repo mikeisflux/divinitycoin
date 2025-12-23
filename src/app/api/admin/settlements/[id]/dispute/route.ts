@@ -1,4 +1,5 @@
 // app/api/admin/settlements/[id]/dispute/route.ts
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { disputeSettlement, getSettlementDetail } from '@/lib/settlements';
@@ -47,7 +48,7 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to dispute settlement:', error);
+    logger.apiError('Failed to dispute settlement:', error);
     return NextResponse.json({ error: 'Failed to dispute settlement' }, { status: 500 });
   }
 }

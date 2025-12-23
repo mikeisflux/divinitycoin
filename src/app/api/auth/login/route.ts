@@ -1,6 +1,7 @@
 // app/api/auth/login/route.ts
 // User login endpoint
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { validateLogin, createSession, setSessionCookie } from '@/lib/auth/user';
 
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.apiError('Login error:', error);
     return NextResponse.json(
       { error: 'Login failed' },
       { status: 500 }

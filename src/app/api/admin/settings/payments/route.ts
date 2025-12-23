@@ -1,6 +1,7 @@
 // app/api/admin/settings/payments/route.ts
 // API for payment settings
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ settings });
   } catch (error) {
-    console.error('Failed to fetch payment settings:', error);
+    logger.apiError('Failed to fetch payment settings:', error);
     return NextResponse.json(
       { error: 'Failed to fetch settings' },
       { status: 500 }
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to save payment settings:', error);
+    logger.apiError('Failed to save payment settings:', error);
     return NextResponse.json(
       { error: 'Failed to save settings' },
       { status: 500 }

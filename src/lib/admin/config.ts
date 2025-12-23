@@ -3,6 +3,7 @@
 
 import { prisma } from '@/lib/db';
 import { encrypt, decrypt, maskApiKey } from '@/lib/encryption';
+import { logger } from '@/lib/logger';
 
 // Keys that should be encrypted in the database
 const ENCRYPTED_KEYS = [
@@ -56,7 +57,7 @@ export async function getConfig(key: string): Promise<string | null> {
     try {
       return decrypt(config.value);
     } catch (error) {
-      console.error(`Failed to decrypt config ${key}:`, error);
+      logger.error('Failed to decrypt config', { key, error });
       return null;
     }
   }

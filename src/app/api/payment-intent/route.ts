@@ -1,6 +1,7 @@
 // app/api/payment-intent/route.ts
 // Creates a PaymentIntent for Stripe Elements (embedded checkout)
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
       transactionId: transaction.id,
     });
   } catch (error) {
-    console.error('PaymentIntent error:', error);
+    logger.apiError('PaymentIntent error:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 

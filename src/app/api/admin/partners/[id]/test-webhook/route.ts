@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/test-webhook/route.ts
 // Send test webhook to partner
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -91,7 +92,7 @@ export async function POST(
       durationMs: result.durationMs,
     });
   } catch (error) {
-    console.error('Test webhook error:', error);
+    logger.apiError('Test webhook error:', error);
     return NextResponse.json(
       { error: 'Failed to send test webhook' },
       { status: 500 }

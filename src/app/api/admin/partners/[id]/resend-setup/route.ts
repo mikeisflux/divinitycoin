@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/resend-setup/route.ts
 // Resend partner setup link
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
@@ -73,7 +74,7 @@ export async function POST(
       setupUrl,
     });
   } catch (error) {
-    console.error('Failed to resend setup link:', error);
+    logger.apiError('Failed to resend setup link:', error);
     return NextResponse.json({ error: 'Failed to resend setup link' }, { status: 500 });
   }
 }

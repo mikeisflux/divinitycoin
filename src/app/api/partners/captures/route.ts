@@ -3,6 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { getCaptures } from '@/lib/settlements';
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch captures:', error);
+    logger.apiError('Failed to fetch captures:', error);
     return NextResponse.json({ error: 'Failed to fetch captures' }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 // app/api/admin/partners/[id]/route.ts
 // Partner detail and update API
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -58,7 +59,7 @@ export async function GET(
 
     return NextResponse.json({ partner: serializedPartner });
   } catch (error) {
-    console.error('Failed to fetch partner:', error);
+    logger.apiError('Failed to fetch partner:', error);
     return NextResponse.json({ error: 'Failed to fetch partner' }, { status: 500 });
   }
 }
@@ -115,7 +116,7 @@ export async function PUT(
 
     return NextResponse.json({ partner });
   } catch (error) {
-    console.error('Failed to update partner:', error);
+    logger.apiError('Failed to update partner:', error);
     return NextResponse.json({ error: 'Failed to update partner' }, { status: 500 });
   }
 }
@@ -147,7 +148,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete partner:', error);
+    logger.apiError('Failed to delete partner:', error);
     return NextResponse.json({ error: 'Failed to delete partner' }, { status: 500 });
   }
 }

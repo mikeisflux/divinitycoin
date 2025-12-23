@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAdminFromRequest, canManageAdmins } from '@/lib/admin/auth';
+import { logger } from '@/lib/logger';
 import bcrypt from 'bcryptjs';
 
 export async function GET() {
@@ -29,7 +30,7 @@ export async function GET() {
 
     return NextResponse.json(admins);
   } catch (error) {
-    console.error('Error fetching admins:', error);
+    logger.apiError('/api/admin/admins', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(newAdmin, { status: 201 });
   } catch (error) {
-    console.error('Error creating admin:', error);
+    logger.apiError('/api/admin/admins', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

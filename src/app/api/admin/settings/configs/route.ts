@@ -1,6 +1,7 @@
 // app/api/admin/settings/configs/route.ts
 // API for managing system configuration (API keys, etc.)
 
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ configs: maskedConfigs });
   } catch (error) {
-    console.error('Failed to fetch configs:', error);
+    logger.apiError('Failed to fetch configs:', error);
     return NextResponse.json(
       { error: 'Failed to fetch configurations' },
       { status: 500 }
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to save config:', error);
+    logger.apiError('Failed to save config:', error);
     return NextResponse.json(
       { error: 'Failed to save configuration' },
       { status: 500 }
@@ -171,7 +172,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete config:', error);
+    logger.apiError('Failed to delete config:', error);
     return NextResponse.json(
       { error: 'Failed to delete configuration' },
       { status: 500 }
