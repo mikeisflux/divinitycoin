@@ -116,15 +116,30 @@ export async function POST(request: NextRequest) {
     // Send gift card email
     if (email) {
       try {
-        await sendGiftCardEmail({
+        const emailResult = await sendGiftCardEmail({
           to: email,
           code: code,
           amount: Number(transaction.amount),
         });
+
+        if (!emailResult.success) {
+          logger.error('Gift card email send failed', {
+            error: emailResult.error,
+            giftCardId: giftCard.id,
+            email: email,
+          });
+        } else {
+          logger.info('Gift card email sent successfully', {
+            giftCardId: giftCard.id,
+            messageId: emailResult.messageId,
+          });
+        }
       } catch (emailError) {
-        logger.error('Failed to send gift card email', { error: emailError, giftCardId: giftCard.id });
+        logger.error('Failed to send gift card email (exception)', { error: emailError, giftCardId: giftCard.id });
         // Don't fail the request - gift card was created successfully
       }
+    } else {
+      logger.warn('No email address for gift card, skipping email send', { giftCardId: giftCard.id });
     }
 
     return NextResponse.json({
