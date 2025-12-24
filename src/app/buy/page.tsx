@@ -16,13 +16,26 @@ interface User {
   name: string | null;
 }
 
+interface Partner {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 type CheckoutStep = 'select' | 'payment' | 'success';
 
 interface SuccessData {
   giftCardId: string;
   codeLast4: string;
   amount: number;
+  partnerId?: string;
+  partnerSlug?: string;
 }
+
+// Partner redirect URLs for post-checkout
+const PARTNER_REDIRECT_URLS: Record<string, string> = {
+  'indiecrowdfund': 'https://indiecrowdfund.com/dashboard/backer',
+};
 
 export default function BuyPage() {
   const router = useRouter();
@@ -32,6 +45,11 @@ export default function BuyPage() {
   const [error, setError] = useState('');
   const [step, setStep] = useState<CheckoutStep>('select');
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
+
+  // Partner selection state
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
+  const [loadingPartners, setLoadingPartners] = useState(true);
 
   // Auth form state (for inline login/register)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -46,7 +64,60 @@ export default function BuyPage() {
 
   useEffect(() => {
     checkAuth();
+    fetchPartners();
   }, []);
+
+  // Fetch available partners and detect referer for default selection
+  async function fetchPartners() {
+    try {
+      const response = await fetch('/api/partners/public');
+      if (response.ok) {
+        const data = await response.json();
+        // Add "Divinity Comics" as a static option if not already in the list
+        const partnerList: Partner[] = data.partners || [];
+
+        // Check if Divinity Comics exists, if not add it
+        const hasDivinityComics = partnerList.some(p => p.slug === 'divinitycomics');
+        if (!hasDivinityComics) {
+          partnerList.push({
+            id: 'divinitycomics',
+            name: 'Divinity Comics',
+            slug: 'divinitycomics',
+          });
+        }
+
+        setPartners(partnerList);
+
+        // Detect referer and set default partner
+        const referer = typeof document !== 'undefined' ? document.referrer : '';
+        let defaultPartnerId = '';
+
+        // Check if referer is from indiecrowdfund
+        if (referer.includes('indiecrowdfund.com')) {
+          const indiecrowdfund = partnerList.find(p => p.slug === 'indiecrowdfund');
+          if (indiecrowdfund) {
+            defaultPartnerId = indiecrowdfund.id;
+          }
+        }
+
+        // If no referer match, default to Indiecrowdfund
+        if (!defaultPartnerId) {
+          const indiecrowdfund = partnerList.find(p => p.slug === 'indiecrowdfund');
+          if (indiecrowdfund) {
+            defaultPartnerId = indiecrowdfund.id;
+          } else if (partnerList.length > 0) {
+            defaultPartnerId = partnerList[0].id;
+          }
+        }
+
+        setSelectedPartnerId(defaultPartnerId);
+      }
+    } catch (err) {
+      console.error('Failed to fetch partners:', err);
+    } finally {
+      setLoadingPartners(false);
+    }
+  }
 
   async function checkAuth() {
     try {
@@ -118,13 +189,31 @@ export default function BuyPage() {
       return;
     }
 
+    if (!selectedPartnerId) {
+      setError('Please select which partner sent you.');
+      return;
+    }
+
     setError('');
     setStep('payment');
   };
 
-  const handlePaymentSuccess = (data: SuccessData) => {
-    setSuccessData(data);
+  const handlePaymentSuccess = (data: { giftCardId: string; codeLast4: string; amount: number }) => {
+    const selectedPartner = partners.find(p => p.id === selectedPartnerId);
+    setSuccessData({
+      ...data,
+      partnerId: selectedPartnerId,
+      partnerSlug: selectedPartner?.slug,
+    });
     setStep('success');
+  };
+
+  // Get redirect URL for the selected partner
+  const getPartnerRedirectUrl = () => {
+    if (successData?.partnerSlug) {
+      return PARTNER_REDIRECT_URLS[successData.partnerSlug];
+    }
+    return null;
   };
 
   const handlePaymentCancel = () => {
@@ -142,6 +231,9 @@ export default function BuyPage() {
 
   // Success step
   if (step === 'success' && successData) {
+    const partnerRedirectUrl = getPartnerRedirectUrl();
+    const selectedPartner = partners.find(p => p.id === successData.partnerId);
+
     return (
       <div className="min-h-screen bg-neutral-50 py-12">
         <div className="max-w-xl mx-auto px-4 sm:px-6">
@@ -169,8 +261,26 @@ export default function BuyPage() {
                 Check your email for your full redemption code. You can use it on any partner platform.
               </p>
 
+              {/* Partner-specific redirect section */}
+              {partnerRedirectUrl && (
+                <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-primary-800 mb-3">
+                    Return to your backer dashboard to redeem your code
+                  </p>
+                  <a
+                    href={partnerRedirectUrl}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors w-full"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Go to {selectedPartner?.name || 'Partner'} Dashboard
+                  </a>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
-                <Button onClick={() => { setStep('select'); setSuccessData(null); }}>
+                <Button onClick={() => { setStep('select'); setSuccessData(null); }} variant={partnerRedirectUrl ? 'outline' : 'default'}>
                   Buy More Credits
                 </Button>
                 <Link href="/account" className="text-primary-600 hover:underline text-sm">
@@ -201,6 +311,7 @@ export default function BuyPage() {
               <StripeCheckout
                 amount={amount}
                 email={user.email}
+                partnerId={selectedPartnerId}
                 onSuccess={handlePaymentSuccess}
                 onCancel={handlePaymentCancel}
               />
@@ -380,6 +491,37 @@ export default function BuyPage() {
               </label>
               <AmountSelector value={amount} onChange={setAmount} />
             </div>
+
+            {/* Partner Selection Dropdown */}
+            {user && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Which one of our partners did you get sent from? <span className="text-red-500">*</span>
+                </label>
+                {loadingPartners ? (
+                  <div className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 bg-neutral-50 text-neutral-400">
+                    Loading partners...
+                  </div>
+                ) : (
+                  <select
+                    value={selectedPartnerId}
+                    onChange={(e) => setSelectedPartnerId(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors bg-white"
+                  >
+                    <option value="">Select a partner...</option>
+                    {partners.map((partner) => (
+                      <option key={partner.id} value={partner.id}>
+                        {partner.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="mt-2 text-sm text-neutral-500">
+                  Let us know which platform referred you to us.
+                </p>
+              </div>
+            )}
 
             {/* Email display for logged in users */}
             {user && (

@@ -84,7 +84,12 @@ export async function POST(request: NextRequest) {
     const codeLast4 = getCodeLast4(code);
     const email = transaction.guestEmail || paymentIntent.receipt_email || '';
 
-    // Create gift card
+    // Extract partnerId from metadata
+    const partnerId = paymentIntent.metadata.partnerId ||
+      (transaction.metadata as { partnerId?: string } | null)?.partnerId ||
+      null;
+
+    // Create gift card with partner reference
     const giftCard = await prisma.giftCard.create({
       data: {
         codeHash,
@@ -94,6 +99,7 @@ export async function POST(request: NextRequest) {
         status: 'ACTIVE',
         purchasedByEmail: email,
         activatedAt: new Date(),
+        partnerId: partnerId || undefined,
       },
     });
 
@@ -116,7 +122,7 @@ export async function POST(request: NextRequest) {
           amount: Number(transaction.amount),
         });
       } catch (emailError) {
-        logger.apiError('Failed to send gift card email:', error);
+        logger.error('Failed to send gift card email', { error: emailError, giftCardId: giftCard.id });
         // Don't fail the request - gift card was created successfully
       }
     }

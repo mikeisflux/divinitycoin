@@ -117,11 +117,12 @@ function CheckoutForm({ amount, transactionId, onSuccess, onError }: CheckoutFor
 interface StripeCheckoutProps {
   amount: number;
   email: string;
+  partnerId?: string;
   onSuccess: (data: { giftCardId: string; codeLast4: string; amount: number }) => void;
   onCancel: () => void;
 }
 
-export function StripeCheckout({ amount, email, onSuccess, onCancel }: StripeCheckoutProps) {
+export function StripeCheckout({ amount, email, partnerId, onSuccess, onCancel }: StripeCheckoutProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
@@ -151,7 +152,7 @@ export function StripeCheckout({ amount, email, onSuccess, onCancel }: StripeChe
     fetch('/api/payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, email }),
+      body: JSON.stringify({ amount, email, partnerId }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -168,7 +169,7 @@ export function StripeCheckout({ amount, email, onSuccess, onCancel }: StripeChe
       .finally(() => {
         setLoading(false);
       });
-  }, [stripePromise, amount, email]);
+  }, [stripePromise, amount, email, partnerId]);
 
   if (loading) {
     return (

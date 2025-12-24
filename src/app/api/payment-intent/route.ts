@@ -16,12 +16,13 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface PaymentIntentRequest {
   amount: number;
   email: string;
+  partnerId?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: PaymentIntentRequest = await request.json();
-    const { amount, email } = body;
+    const { amount, email, partnerId } = body;
 
     // Validate amount
     if (typeof amount !== 'number' || isNaN(amount)) {
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
         amount,
         currency: 'USD',
         status: 'PENDING',
+        metadata: partnerId ? { partnerId } : undefined,
       },
     });
 
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
         transactionId: transaction.id,
         email: email,
         amount: amount.toString(),
+        partnerId: partnerId || '',
       },
     });
 
