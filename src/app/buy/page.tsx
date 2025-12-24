@@ -30,6 +30,7 @@ interface SuccessData {
   amount: number;
   partnerId?: string;
   partnerSlug?: string;
+  purchaseDate?: string;
 }
 
 // Partner redirect URLs for post-checkout
@@ -50,6 +51,11 @@ export default function BuyPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
   const [loadingPartners, setLoadingPartners] = useState(true);
+
+  // Resend code state
+  const [resending, setResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   // Auth form state (for inline login/register)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -204,7 +210,11 @@ export default function BuyPage() {
       ...data,
       partnerId: selectedPartnerId,
       partnerSlug: selectedPartner?.slug,
+      purchaseDate: new Date().toISOString(),
     });
+    // Reset resend state for new purchase
+    setResendSuccess(false);
+    setResendError(null);
     setStep('success');
   };
 
@@ -214,6 +224,34 @@ export default function BuyPage() {
       return PARTNER_REDIRECT_URLS[successData.partnerSlug];
     }
     return null;
+  };
+
+  // Handle resend code request
+  const handleResendCode = async () => {
+    if (!successData?.giftCardId) return;
+
+    setResending(true);
+    setResendError(null);
+    setResendSuccess(false);
+
+    try {
+      const response = await fetch(`/api/gift-cards/${successData.giftCardId}/resend`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setResendError(data.error || 'Failed to resend code');
+        return;
+      }
+
+      setResendSuccess(true);
+    } catch (err) {
+      setResendError('An error occurred. Please try again.');
+    } finally {
+      setResending(false);
+    }
   };
 
   const handlePaymentCancel = () => {
@@ -233,6 +271,21 @@ export default function BuyPage() {
   if (step === 'success' && successData) {
     const partnerRedirectUrl = getPartnerRedirectUrl();
     const selectedPartner = partners.find(p => p.id === successData.partnerId);
+    const purchaseDate = successData.purchaseDate
+      ? new Date(successData.purchaseDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
 
     return (
       <div className="min-h-screen bg-neutral-50 py-12">
@@ -250,16 +303,99 @@ export default function BuyPage() {
                 Your credit code has been sent to <strong>{user?.email}</strong>
               </p>
 
-              <div className="bg-neutral-50 rounded-lg p-6 mb-6">
-                <p className="text-sm text-neutral-500 mb-1">Amount</p>
-                <p className="text-3xl font-bold text-primary-600">${successData.amount.toFixed(2)}</p>
-                <p className="text-sm text-neutral-500 mt-4 mb-1">Code ending in</p>
-                <p className="font-mono text-lg">****{successData.codeLast4}</p>
+              {/* Receipt / Order Details */}
+              <div className="bg-neutral-50 rounded-lg p-6 mb-6 text-left">
+                <h3 className="text-sm font-semibold text-neutral-700 mb-4 text-center">Order Receipt</h3>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-neutral-500">Amount</span>
+                    <span className="text-lg font-bold text-primary-600">${successData.amount.toFixed(2)}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-neutral-500">Code Reference</span>
+                    <span className="font-mono text-neutral-900">****{successData.codeLast4}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-neutral-500">Order ID</span>
+                    <span className="font-mono text-xs text-neutral-600">{successData.giftCardId.slice(0, 8)}...</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-neutral-500">Date</span>
+                    <span className="text-sm text-neutral-900">{purchaseDate}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-neutral-500">Email</span>
+                    <span className="text-sm text-neutral-900">{user?.email}</span>
+                  </div>
+
+                  {selectedPartner && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-neutral-500">Partner</span>
+                      <span className="text-sm text-neutral-900">{selectedPartner.name}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <p className="text-sm text-neutral-500 mb-6">
+              <p className="text-sm text-neutral-500 mb-4">
                 Check your email for your full redemption code. You can use it on any partner platform.
               </p>
+
+              {/* Resend Code Section */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-800 mb-3">
+                  Didn&apos;t receive your code? Check your spam folder or request a resend.
+                </p>
+
+                {resendSuccess && (
+                  <div className="bg-green-100 text-green-700 px-3 py-2 rounded text-sm mb-3">
+                    Request submitted! Please check your email and spam folder.
+                  </div>
+                )}
+
+                {resendError && (
+                  <div className="bg-red-100 text-red-700 px-3 py-2 rounded text-sm mb-3">
+                    {resendError}
+                  </div>
+                )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResendCode}
+                  disabled={resending || resendSuccess}
+                  className="w-full"
+                >
+                  {resending ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Sending...
+                    </>
+                  ) : resendSuccess ? (
+                    <>
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Request Sent
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Resend Code to Email
+                    </>
+                  )}
+                </Button>
+              </div>
 
               {/* Partner-specific redirect section */}
               {partnerRedirectUrl && (
