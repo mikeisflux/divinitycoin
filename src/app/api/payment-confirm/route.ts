@@ -145,6 +145,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       giftCardId: giftCard.id,
+      code: code, // Return full code for display on success screen
       codeLast4: codeLast4,
       amount: Number(transaction.amount),
     });

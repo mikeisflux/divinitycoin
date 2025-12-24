@@ -26,6 +26,7 @@ type CheckoutStep = 'select' | 'payment' | 'success';
 
 interface SuccessData {
   giftCardId: string;
+  code: string;
   codeLast4: string;
   amount: number;
   partnerId?: string;
@@ -204,7 +205,7 @@ export default function BuyPage() {
     setStep('payment');
   };
 
-  const handlePaymentSuccess = (data: { giftCardId: string; codeLast4: string; amount: number }) => {
+  const handlePaymentSuccess = (data: { giftCardId: string; code: string; codeLast4: string; amount: number }) => {
     const selectedPartner = partners.find(p => p.id === selectedPartnerId);
     setSuccessData({
       ...data,
@@ -299,8 +300,31 @@ export default function BuyPage() {
               </div>
 
               <h1 className="text-2xl font-bold text-neutral-900 mb-2">Payment Successful!</h1>
-              <p className="text-neutral-600 mb-6">
-                Your credit code has been sent to <strong>{user?.email}</strong>
+              <p className="text-neutral-600 mb-4">
+                Here is your credit code. Save it now!
+              </p>
+
+              {/* Code Display Box */}
+              <div className="bg-primary-50 border-2 border-primary-200 rounded-lg p-6 mb-6">
+                <p className="text-xs text-primary-600 uppercase tracking-wider mb-2 font-semibold">Your Credit Code</p>
+                <p className="font-mono text-2xl sm:text-3xl font-bold text-primary-700 tracking-wider break-all select-all">
+                  {successData.code}
+                </p>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(successData.code);
+                  }}
+                  className="mt-3 inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy to Clipboard
+                </button>
+              </div>
+
+              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+                <strong>Important:</strong> Save this code now. It will also be sent to {user?.email}.
               </p>
 
               {/* Receipt / Order Details */}
@@ -311,11 +335,6 @@ export default function BuyPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-neutral-500">Amount</span>
                     <span className="text-lg font-bold text-primary-600">${successData.amount.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-neutral-500">Code Reference</span>
-                    <span className="font-mono text-neutral-900">****{successData.codeLast4}</span>
                   </div>
 
                   <div className="flex justify-between items-center">
@@ -343,13 +362,13 @@ export default function BuyPage() {
               </div>
 
               <p className="text-sm text-neutral-500 mb-4">
-                Check your email for your full redemption code. You can use it on any partner platform.
+                Use this code on any partner platform to redeem your credits.
               </p>
 
               {/* Resend Code Section */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <p className="text-sm text-blue-800 mb-3">
-                  Didn&apos;t receive your code? Check your spam folder or request a resend.
+                  Need a backup? Request the code to be sent to your email.
                 </p>
 
                 {resendSuccess && (
