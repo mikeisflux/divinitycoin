@@ -117,13 +117,66 @@ export default function TransactionDetailPage() {
     }
   }
 
-  async function handleResendReceipt() {
-    setActionLoading('resend');
+  async function handleSendGiftCardCode() {
+    if (!confirm('This will generate a NEW code for this gift card and send it to the customer. The old code will no longer work. Continue?')) {
+      return;
+    }
+
+    setActionLoading('send_code');
     setMessage(null);
 
-    // For now, just show a message - receipt email would require additional implementation
-    setMessage({ type: 'error', text: 'Receipt email functionality not yet implemented' });
-    setActionLoading(null);
+    try {
+      const response = await fetch(`/api/admin/transactions/${transactionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_gift_card_code' }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to send gift card code' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: data.message || 'Gift card code sent successfully!' });
+      fetchTransaction();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to send gift card code' });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCancel() {
+    if (!confirm('Are you sure you want to cancel this transaction?')) {
+      return;
+    }
+
+    setActionLoading('cancel');
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/transactions/${transactionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: 'error', text: data.error || 'Failed to cancel transaction' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Transaction cancelled successfully!' });
+      fetchTransaction();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to cancel transaction' });
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   if (loading) {
@@ -276,6 +329,30 @@ export default function TransactionDetailPage() {
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
             <h3 className="font-semibold text-neutral-900 mb-4">Actions</h3>
             <div className="space-y-2">
+              {/* Cancel button for pending/processing transactions */}
+              {(transaction.status === 'PENDING' || transaction.status === 'PROCESSING') && (
+                <button
+                  onClick={handleCancel}
+                  disabled={actionLoading === 'cancel'}
+                  className="w-full text-left px-4 py-2 rounded-lg text-sm text-amber-600 hover:bg-amber-50 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {actionLoading === 'cancel' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
+                      Cancelling...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Cancel Transaction
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Refund button for completed purchase transactions */}
               {transaction.status === 'COMPLETED' && transaction.type === 'PURCHASE' && (
                 <button
                   onClick={handleRefund}
@@ -297,25 +374,40 @@ export default function TransactionDetailPage() {
                   )}
                 </button>
               )}
-              <button
-                onClick={handleResendReceipt}
-                disabled={actionLoading === 'resend'}
-                className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition disabled:opacity-50 flex items-center gap-2"
-              >
-                {actionLoading === 'resend' ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-600"></div>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    Resend Receipt
-                  </>
-                )}
-              </button>
+
+              {/* Send Gift Card Code button - only for transactions with active gift cards */}
+              {transaction.giftCard && transaction.giftCard.status !== 'REVOKED' && (
+                <button
+                  onClick={handleSendGiftCardCode}
+                  disabled={actionLoading === 'send_code'}
+                  className="w-full text-left px-4 py-2 rounded-lg text-sm text-primary-600 hover:bg-primary-50 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {actionLoading === 'send_code' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Send Gift Card Code
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* No actions available message */}
+              {transaction.status === 'REFUNDED' && (
+                <p className="text-sm text-neutral-500 italic">This transaction has been refunded.</p>
+              )}
+              {transaction.status === 'CANCELLED' && (
+                <p className="text-sm text-neutral-500 italic">This transaction has been cancelled.</p>
+              )}
+              {transaction.status === 'FAILED' && (
+                <p className="text-sm text-neutral-500 italic">This transaction failed.</p>
+              )}
             </div>
           </div>
         </div>
