@@ -76,7 +76,24 @@ export async function POST(request: NextRequest) {
 
         // Payment succeeded on Stripe - complete the transaction
         const email = transaction.guestEmail || paymentIntent.receipt_email || '';
-        const partnerId = paymentIntent.metadata?.partnerId || null;
+        const rawPartnerId = paymentIntent.metadata?.partnerId || null;
+
+        // Validate partnerId exists in database (empty strings or non-existent IDs cause FK violations)
+        let partnerId: string | null = null;
+        if (rawPartnerId && rawPartnerId.trim() !== '') {
+          const partnerExists = await prisma.partner.findUnique({
+            where: { id: rawPartnerId },
+            select: { id: true },
+          });
+          if (partnerExists) {
+            partnerId = rawPartnerId;
+          } else {
+            logger.warn('Partner ID from sync metadata not found in database', {
+              rawPartnerId,
+              transactionId: transaction.id,
+            });
+          }
+        }
 
         const code = generateGiftCardCode();
         const codeHash = hashCode(code);

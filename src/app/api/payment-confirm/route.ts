@@ -90,10 +90,27 @@ export async function POST(request: NextRequest) {
     const codeLast4 = getCodeLast4(code);
     const email = transaction.guestEmail || paymentIntent.receipt_email || '';
 
-    // Extract partnerId from metadata
-    const partnerId = paymentIntent.metadata.partnerId ||
+    // Extract partnerId from metadata and validate it exists
+    const rawPartnerId = paymentIntent.metadata.partnerId ||
       (transaction.metadata as { partnerId?: string } | null)?.partnerId ||
       null;
+
+    // Validate partnerId exists in database (empty strings or non-existent IDs cause FK violations)
+    let partnerId: string | null = null;
+    if (rawPartnerId && rawPartnerId.trim() !== '') {
+      const partnerExists = await prisma.partner.findUnique({
+        where: { id: rawPartnerId },
+        select: { id: true },
+      });
+      if (partnerExists) {
+        partnerId = rawPartnerId;
+      } else {
+        logger.warn('Partner ID from metadata not found in database', {
+          rawPartnerId,
+          transactionId,
+        });
+      }
+    }
 
     // Use database transaction with isolation to prevent race conditions
     let giftCard;

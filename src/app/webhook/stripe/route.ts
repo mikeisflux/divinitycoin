@@ -125,7 +125,24 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 
   // Get email for the gift card
   const email = transaction.guestEmail || paymentIntent.receipt_email || '';
-  const partnerId = paymentIntent.metadata?.partnerId || null;
+  const rawPartnerId = paymentIntent.metadata?.partnerId || null;
+
+  // Validate partnerId exists in database (empty strings or non-existent IDs cause FK violations)
+  let partnerId: string | null = null;
+  if (rawPartnerId && rawPartnerId.trim() !== '') {
+    const partnerExists = await prisma.partner.findUnique({
+      where: { id: rawPartnerId },
+      select: { id: true },
+    });
+    if (partnerExists) {
+      partnerId = rawPartnerId;
+    } else {
+      logger.warn('Partner ID from webhook metadata not found in database', {
+        rawPartnerId,
+        transactionId,
+      });
+    }
+  }
 
   // Generate gift card and complete transaction atomically
   try {
