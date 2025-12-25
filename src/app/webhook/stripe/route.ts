@@ -6,7 +6,9 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 import { getStripeClient, getWebhookSecret } from '@/lib/stripe';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
+import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 import { logger } from '@/lib/logger';
+import { Prisma } from '@prisma/client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,6 +48,10 @@ export async function POST(request: NextRequest) {
 
     // Handle the event
     switch (event.type) {
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+        break;
+
       case 'checkout.session.completed':
         await handleSuccessfulPayment(event.data.object as Stripe.Checkout.Session);
         break;
@@ -69,6 +75,143 @@ export async function POST(request: NextRequest) {
       { error: 'Webhook handler failed' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Handle PaymentIntent succeeded - fallback for when frontend confirmation fails
+ * This ensures transactions are completed even if the user's browser closes
+ */
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  const transactionId = paymentIntent.metadata?.transactionId;
+
+  if (!transactionId) {
+    logger.debug('PaymentIntent succeeded without transactionId metadata', {
+      paymentIntentId: paymentIntent.id
+    });
+    return;
+  }
+
+  // Find the transaction
+  const transaction = await prisma.transaction.findUnique({
+    where: { id: transactionId },
+    include: { giftCard: true },
+  });
+
+  if (!transaction) {
+    logger.warn('Transaction not found for PaymentIntent', {
+      paymentIntentId: paymentIntent.id,
+      transactionId
+    });
+    return;
+  }
+
+  // If already completed, nothing to do
+  if (transaction.status === 'COMPLETED' && transaction.giftCard) {
+    logger.debug('Transaction already completed via webhook', { transactionId });
+    return;
+  }
+
+  // Validate payment amount matches transaction amount
+  const expectedAmountCents = Math.round(Number(transaction.amount) * 100);
+  if (paymentIntent.amount !== expectedAmountCents) {
+    logger.error('Webhook payment amount mismatch', {
+      expected: expectedAmountCents,
+      received: paymentIntent.amount,
+      transactionId,
+    });
+    return;
+  }
+
+  // Get email for the gift card
+  const email = transaction.guestEmail || paymentIntent.receipt_email || '';
+  const partnerId = paymentIntent.metadata?.partnerId || null;
+
+  // Generate gift card and complete transaction atomically
+  try {
+    const code = generateGiftCardCode();
+    const codeHash = hashCode(code);
+    const codeLast4 = getCodeLast4(code);
+
+    await prisma.$transaction(async (tx) => {
+      // Re-check status inside transaction
+      const freshTransaction = await tx.transaction.findUnique({
+        where: { id: transactionId },
+        include: { giftCard: true },
+      });
+
+      if (freshTransaction?.status === 'COMPLETED' && freshTransaction.giftCard) {
+        // Already processed by frontend or another webhook
+        return;
+      }
+
+      // Create gift card
+      const giftCard = await tx.giftCard.create({
+        data: {
+          codeHash,
+          codeLast4,
+          amount: transaction.amount,
+          currency: 'USD',
+          status: 'ACTIVE',
+          purchasedByEmail: email,
+          activatedAt: new Date(),
+          partnerId: partnerId || undefined,
+        },
+      });
+
+      // Update transaction
+      await tx.transaction.update({
+        where: { id: transactionId },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          giftCardId: giftCard.id,
+        },
+      });
+
+      // Send email with code
+      if (email) {
+        try {
+          await sendGiftCardEmail({
+            to: email,
+            code: code,
+            amount: Number(transaction.amount),
+          });
+          logger.info('Gift card email sent via webhook fallback', {
+            transactionId,
+            giftCardId: giftCard.id
+          });
+        } catch (emailError) {
+          logger.error('Failed to send gift card email from webhook', {
+            error: emailError,
+            giftCardId: giftCard.id
+          });
+        }
+      }
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10000,
+    });
+
+    logger.info('Transaction completed via webhook fallback', {
+      transactionId,
+      paymentIntentId: paymentIntent.id
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // Likely a race condition - check if already completed
+      const existingTransaction = await prisma.transaction.findUnique({
+        where: { id: transactionId },
+        include: { giftCard: true },
+      });
+
+      if (existingTransaction?.status === 'COMPLETED') {
+        logger.debug('Transaction was completed by concurrent request', { transactionId });
+        return;
+      }
+    }
+    logger.error('Webhook failed to complete transaction', { error, transactionId });
+    throw error;
   }
 }
 

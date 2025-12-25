@@ -6,6 +6,7 @@ import { getAdminFromRequest } from '@/lib/admin/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
+import { SyncTransactionsButton } from '@/components/admin/SyncTransactionsButton';
 
 async function getTransactions(page: number = 1, limit: number = 20) {
   const skip = (page - 1) * limit;
@@ -72,11 +73,26 @@ export default async function TransactionsPage() {
 
   const { transactions, total } = await getTransactions();
 
+  // Count pending transactions
+  const pendingCount = transactions.filter(t => t.status === 'PENDING').length;
+
   return (
     <AdminLayout
       title="Transactions"
       description={`${total} total transactions`}
     >
+      {/* Sync Button */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="text-sm text-neutral-600">
+          {pendingCount > 0 && (
+            <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
+              {pendingCount} pending
+            </span>
+          )}
+        </div>
+        <SyncTransactionsButton />
+      </div>
+
       <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
         <table className="min-w-full divide-y divide-neutral-200">
           <thead className="bg-neutral-50">

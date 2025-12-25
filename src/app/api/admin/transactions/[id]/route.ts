@@ -9,6 +9,8 @@ import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
 import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
+import { sendTransactionReceiptEmail } from '@/lib/email/sendTransactionReceipt';
+import { Prisma } from '@prisma/client';
 
 export async function GET(
   request: NextRequest,
@@ -114,6 +116,28 @@ export async function POST(
             completedAt: new Date(),
           },
         });
+
+        // Get email for refund notification
+        const refundEmail = transaction.guestEmail || (transaction.userId ? (await prisma.user.findUnique({ where: { id: transaction.userId } }))?.email : null);
+
+        // Send refund receipt email
+        if (refundEmail) {
+          try {
+            await sendTransactionReceiptEmail({
+              to: refundEmail,
+              transactionId: params.id,
+              amount: Number(transaction.amount),
+              type: 'REFUNDED',
+              originalDate: transaction.createdAt,
+              giftCardLast4: transaction.giftCard?.codeLast4,
+            });
+          } catch (emailError) {
+            logger.error('Failed to send refund receipt email', {
+              error: emailError,
+              transactionId: params.id,
+            });
+          }
+        }
 
         await logAdminAction(
           admin!.id,
@@ -231,6 +255,28 @@ export async function POST(
         },
       });
 
+      // Get email for notification
+      const email = transaction.guestEmail || (transaction.userId ? (await prisma.user.findUnique({ where: { id: transaction.userId } }))?.email : null);
+
+      // Send cancellation receipt email
+      if (email) {
+        try {
+          await sendTransactionReceiptEmail({
+            to: email,
+            transactionId: params.id,
+            amount: Number(transaction.amount),
+            type: 'CANCELLED',
+            originalDate: transaction.createdAt,
+            giftCardLast4: transaction.giftCard?.codeLast4,
+          });
+        } catch (emailError) {
+          logger.error('Failed to send cancellation receipt email', {
+            error: emailError,
+            transactionId: params.id,
+          });
+        }
+      }
+
       await logAdminAction(
         admin!.id,
         'TRANSACTION_CANCELLED',
@@ -242,6 +288,117 @@ export async function POST(
       );
 
       return NextResponse.json({ success: true, message: 'Transaction cancelled' });
+    }
+
+    if (action === 'sync_with_stripe') {
+      if (!transaction.stripePaymentIntentId) {
+        return NextResponse.json({ error: 'No Stripe payment intent associated with this transaction' }, { status: 400 });
+      }
+
+      if (transaction.status === 'COMPLETED') {
+        return NextResponse.json({ error: 'Transaction is already completed' }, { status: 400 });
+      }
+
+      try {
+        const stripe = await getStripeClient();
+        const paymentIntent = await stripe.paymentIntents.retrieve(transaction.stripePaymentIntentId);
+
+        if (paymentIntent.status !== 'succeeded') {
+          return NextResponse.json({
+            success: false,
+            message: `Stripe payment status is: ${paymentIntent.status}`,
+            stripeStatus: paymentIntent.status,
+          });
+        }
+
+        // Payment succeeded on Stripe - complete the transaction
+        const email = transaction.guestEmail || paymentIntent.receipt_email || '';
+        const partnerId = paymentIntent.metadata?.partnerId || null;
+
+        const code = generateGiftCardCode();
+        const codeHash = hashCode(code);
+        const codeLast4 = getCodeLast4(code);
+
+        const giftCard = await prisma.$transaction(async (tx) => {
+          // Check if already completed
+          const fresh = await tx.transaction.findUnique({
+            where: { id: params.id },
+            include: { giftCard: true },
+          });
+
+          if (fresh?.status === 'COMPLETED' && fresh.giftCard) {
+            return fresh.giftCard;
+          }
+
+          // Create gift card
+          const newGiftCard = await tx.giftCard.create({
+            data: {
+              codeHash,
+              codeLast4,
+              amount: transaction.amount,
+              currency: 'USD',
+              status: 'ACTIVE',
+              purchasedByEmail: email,
+              activatedAt: new Date(),
+              partnerId: partnerId || undefined,
+            },
+          });
+
+          // Update transaction
+          await tx.transaction.update({
+            where: { id: params.id },
+            data: {
+              status: 'COMPLETED',
+              completedAt: new Date(),
+              giftCardId: newGiftCard.id,
+            },
+          });
+
+          return newGiftCard;
+        }, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: 10000,
+        });
+
+        // Send gift card email
+        if (email) {
+          try {
+            await sendGiftCardEmail({
+              to: email,
+              code: code,
+              amount: Number(transaction.amount),
+            });
+          } catch (emailError) {
+            logger.error('Failed to send gift card email during sync', {
+              error: emailError,
+              giftCardId: giftCard.id,
+            });
+          }
+        }
+
+        await logAdminAction(
+          admin!.id,
+          'TRANSACTION_SYNCED',
+          'transaction',
+          params.id,
+          { giftCardId: giftCard.id, stripeStatus: paymentIntent.status },
+          getClientIP(request),
+          getUserAgent(request)
+        );
+
+        return NextResponse.json({
+          success: true,
+          message: 'Transaction synced and completed',
+          giftCardId: giftCard.id,
+          codeLast4: giftCard.codeLast4,
+        });
+      } catch (stripeError: unknown) {
+        const errorMessage = stripeError instanceof Error ? stripeError.message : 'Unknown error';
+        logger.error('Failed to sync with Stripe', { error: stripeError, transactionId: params.id });
+        return NextResponse.json({
+          error: `Failed to sync with Stripe: ${errorMessage}`,
+        }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
