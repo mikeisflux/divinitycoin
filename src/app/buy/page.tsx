@@ -26,7 +26,7 @@ type CheckoutStep = 'select' | 'payment' | 'success';
 
 interface SuccessData {
   giftCardId: string;
-  code: string;
+  code: string | null;
   codeLast4: string;
   amount: number;
   partnerId?: string;
@@ -205,7 +205,7 @@ export default function BuyPage() {
     setStep('payment');
   };
 
-  const handlePaymentSuccess = (data: { giftCardId: string; code: string; codeLast4: string; amount: number }) => {
+  const handlePaymentSuccess = (data: { giftCardId: string; code: string | null; codeLast4: string; amount: number }) => {
     const selectedPartner = partners.find(p => p.id === selectedPartnerId);
     setSuccessData({
       ...data,
@@ -301,31 +301,46 @@ export default function BuyPage() {
 
               <h1 className="text-2xl font-bold text-neutral-900 mb-2">Payment Successful!</h1>
               <p className="text-neutral-600 mb-4">
-                Here is your credit code. Save it now!
+                {successData.code
+                  ? 'Here is your credit code. Save it now!'
+                  : 'Your purchase has been confirmed.'}
               </p>
 
               {/* Code Display Box */}
-              <div className="bg-primary-50 border-2 border-primary-200 rounded-lg p-6 mb-6">
-                <p className="text-xs text-primary-600 uppercase tracking-wider mb-2 font-semibold">Your Credit Code</p>
-                <p className="font-mono text-2xl sm:text-3xl font-bold text-primary-700 tracking-wider break-all select-all">
-                  {successData.code}
-                </p>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(successData.code);
-                  }}
-                  className="mt-3 inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  Copy to Clipboard
-                </button>
-              </div>
+              {successData.code ? (
+                <>
+                  <div className="bg-primary-50 border-2 border-primary-200 rounded-lg p-6 mb-6">
+                    <p className="text-xs text-primary-600 uppercase tracking-wider mb-2 font-semibold">Your Credit Code</p>
+                    <p className="font-mono text-2xl sm:text-3xl font-bold text-primary-700 tracking-wider break-all select-all">
+                      {successData.code}
+                    </p>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(successData.code!);
+                      }}
+                      className="mt-3 inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 font-medium"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Copy to Clipboard
+                    </button>
+                  </div>
 
-              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
-                <strong>Important:</strong> Save this code now. It will also be sent to {user?.email}.
-              </p>
+                  <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+                    <strong>Important:</strong> Save this code now. It will also be sent to {user?.email}.
+                  </p>
+                </>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-amber-800 mb-2">
+                    <strong>Code Reference:</strong> ****{successData.codeLast4}
+                  </p>
+                  <p className="text-sm text-amber-700">
+                    Your code has been sent to <strong>{user?.email}</strong>. Please check your email (including spam folder) for the full code.
+                  </p>
+                </div>
+              )}
 
               {/* Receipt / Order Details */}
               <div className="bg-neutral-50 rounded-lg p-6 mb-6 text-left">

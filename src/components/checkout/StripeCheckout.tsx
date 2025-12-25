@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 interface CheckoutFormProps {
   amount: number;
   transactionId: string;
-  onSuccess: (data: { giftCardId: string; code: string; codeLast4: string; amount: number }) => void;
+  onSuccess: (data: { giftCardId: string; code: string | null; codeLast4: string; amount: number }) => void;
   onError: (error: string) => void;
 }
 
@@ -119,7 +119,7 @@ interface StripeCheckoutProps {
   amount: number;
   email: string;
   partnerId?: string;
-  onSuccess: (data: { giftCardId: string; code: string; codeLast4: string; amount: number }) => void;
+  onSuccess: (data: { giftCardId: string; code: string | null; codeLast4: string; amount: number }) => void;
   onCancel: () => void;
 }
 

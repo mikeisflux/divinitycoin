@@ -7,6 +7,7 @@ import { getStripeClient } from '@/lib/stripe';
 import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
 import { logger } from '@/lib/logger';
+import { Prisma } from '@prisma/client';
 
 interface ConfirmRequest {
   paymentIntentId: string;
@@ -67,12 +68,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If already processed, return existing gift card info
+    // If already processed, return existing gift card info (idempotent)
     if (transaction.status === 'COMPLETED' && transaction.giftCard) {
+      logger.info('Transaction already processed, returning existing gift card', {
+        transactionId,
+        giftCardId: transaction.giftCard.id,
+      });
       return NextResponse.json({
         success: true,
         alreadyProcessed: true,
         giftCardId: transaction.giftCard.id,
+        code: null, // Cannot return code for already processed - it's hashed
         codeLast4: transaction.giftCard.codeLast4,
         amount: Number(transaction.amount),
       });
@@ -89,31 +95,94 @@ export async function POST(request: NextRequest) {
       (transaction.metadata as { partnerId?: string } | null)?.partnerId ||
       null;
 
-    // Create gift card with partner reference
-    const giftCard = await prisma.giftCard.create({
-      data: {
-        codeHash,
-        codeLast4,
-        amount: transaction.amount,
-        currency: 'USD',
-        status: 'ACTIVE',
-        purchasedByEmail: email,
-        activatedAt: new Date(),
-        partnerId: partnerId || undefined,
-      },
-    });
+    // Use database transaction with isolation to prevent race conditions
+    let giftCard;
+    let isNewGiftCard = true;
 
-    // Update transaction to completed
-    await prisma.transaction.update({
-      where: { id: transactionId },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
+    try {
+      giftCard = await prisma.$transaction(async (tx) => {
+        // Re-check transaction status inside transaction to prevent race condition
+        const freshTransaction = await tx.transaction.findUnique({
+          where: { id: transactionId },
+          include: { giftCard: true },
+        });
+
+        if (freshTransaction?.status === 'COMPLETED' && freshTransaction.giftCard) {
+          // Another request already processed this - return existing
+          isNewGiftCard = false;
+          return freshTransaction.giftCard;
+        }
+
+        // Create gift card with partner reference
+        const newGiftCard = await tx.giftCard.create({
+          data: {
+            codeHash,
+            codeLast4,
+            amount: transaction.amount,
+            currency: 'USD',
+            status: 'ACTIVE',
+            purchasedByEmail: email,
+            activatedAt: new Date(),
+            partnerId: partnerId || undefined,
+          },
+        });
+
+        // Update transaction to completed
+        await tx.transaction.update({
+          where: { id: transactionId },
+          data: {
+            status: 'COMPLETED',
+            completedAt: new Date(),
+            giftCardId: newGiftCard.id,
+          },
+        });
+
+        return newGiftCard;
+      }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: 10000, // 10 second timeout
+      });
+    } catch (txError) {
+      // Handle race condition - if transaction failed due to concurrent request,
+      // fetch the existing gift card
+      if (txError instanceof Prisma.PrismaClientKnownRequestError) {
+        logger.warn('Transaction conflict, checking for existing gift card', {
+          transactionId,
+          errorCode: txError.code,
+        });
+
+        const existingTransaction = await prisma.transaction.findUnique({
+          where: { id: transactionId },
+          include: { giftCard: true },
+        });
+
+        if (existingTransaction?.giftCard) {
+          return NextResponse.json({
+            success: true,
+            alreadyProcessed: true,
+            giftCardId: existingTransaction.giftCard.id,
+            code: null,
+            codeLast4: existingTransaction.giftCard.codeLast4,
+            amount: Number(transaction.amount),
+          });
+        }
+      }
+      throw txError;
+    }
+
+    // If we got an existing gift card from the transaction, return it
+    if (!isNewGiftCard) {
+      return NextResponse.json({
+        success: true,
+        alreadyProcessed: true,
         giftCardId: giftCard.id,
-      },
-    });
+        code: null,
+        codeLast4: giftCard.codeLast4,
+        amount: Number(transaction.amount),
+      });
+    }
 
-    // Send gift card email
+    // Send gift card email (only for new gift cards)
     if (email) {
       try {
         const emailResult = await sendGiftCardEmail({
