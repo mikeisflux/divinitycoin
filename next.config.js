@@ -7,6 +7,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Allow server actions from these origins (fixes nginx proxy header issue)
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['divinitycoin.com', 'www.divinitycoin.com', 'localhost:3000'],
+    },
+  },
   // Ensure proper cache invalidation on deployments
   generateBuildId: async () => {
     // Use timestamp for unique build IDs
