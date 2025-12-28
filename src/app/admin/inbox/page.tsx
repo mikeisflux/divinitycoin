@@ -8,6 +8,14 @@ import { prisma } from '@/lib/db';
 import { InboxClient } from './InboxClient';
 
 async function getMailboxesAndEmails() {
+  // Check if we need to show migration prompt
+  const [emailLogCount, emailCount] = await Promise.all([
+    prisma.emailLog.count(),
+    prisma.email.count(),
+  ]);
+
+  const needsMigration = emailLogCount > 0 && emailCount === 0;
+
   const [mailboxes, emails, folderCounts] = await Promise.all([
     prisma.mailbox.findMany({
       where: { isActive: true },
@@ -58,6 +66,8 @@ async function getMailboxesAndEmails() {
     })),
     emails,
     folderCounts: counts,
+    needsMigration,
+    oldEmailCount: emailLogCount,
   };
 }
 
@@ -68,18 +78,19 @@ export default async function InboxPage() {
     redirect('/admin/login');
   }
 
-  const { mailboxes, emails, folderCounts } = await getMailboxesAndEmails();
+  const { mailboxes, emails, folderCounts, needsMigration, oldEmailCount } = await getMailboxesAndEmails();
 
   return (
     <AdminLayout
       title="Inbox"
       description="Email management"
-      fullWidth
     >
       <InboxClient
         initialMailboxes={mailboxes}
         initialEmails={emails}
         initialFolderCounts={folderCounts}
+        needsMigration={needsMigration}
+        oldEmailCount={oldEmailCount}
       />
     </AdminLayout>
   );

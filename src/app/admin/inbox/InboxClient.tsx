@@ -34,6 +34,8 @@ interface InboxClientProps {
   initialMailboxes: Mailbox[];
   initialEmails: Email[];
   initialFolderCounts: Record<string, number>;
+  needsMigration?: boolean;
+  oldEmailCount?: number;
 }
 
 const FOLDERS = [
@@ -46,8 +48,11 @@ const FOLDERS = [
   { id: 'ARCHIVE', name: 'Archive', icon: '📦' },
 ];
 
-export function InboxClient({ initialMailboxes, initialEmails, initialFolderCounts }: InboxClientProps) {
-  const [mailboxes] = useState<Mailbox[]>(initialMailboxes);
+export function InboxClient({ initialMailboxes, initialEmails, initialFolderCounts, needsMigration, oldEmailCount }: InboxClientProps) {
+  const [mailboxes, setMailboxes] = useState<Mailbox[]>(initialMailboxes);
+  const [showMigration, setShowMigration] = useState(needsMigration || false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<string | null>(null);
   const [emails, setEmails] = useState<Email[]>(initialEmails);
   const [folderCounts, setFolderCounts] = useState(initialFolderCounts);
   const [selectedMailbox, setSelectedMailbox] = useState<string | null>(null);
@@ -62,6 +67,27 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
   useEffect(() => {
     fetchEmails();
   }, [selectedMailbox, selectedFolder]);
+
+  const handleMigration = async () => {
+    setMigrating(true);
+    setMigrationResult(null);
+    try {
+      const res = await fetch('/api/admin/inbox/migrate', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setMigrationResult(`Successfully migrated ${data.migrated} emails!`);
+        setShowMigration(false);
+        // Refresh the page to load migrated emails
+        window.location.reload();
+      } else {
+        setMigrationResult(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      setMigrationResult('Failed to migrate emails');
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const fetchEmails = async () => {
     setLoading(true);
@@ -173,7 +199,42 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
   };
 
   return (
-    <div className="flex h-[calc(100vh-180px)] bg-white rounded-xl border border-neutral-200 overflow-hidden">
+    <div>
+      {/* Migration Banner */}
+      {showMigration && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-blue-900">Import Existing Emails</h3>
+              <p className="text-sm text-blue-700">
+                Found {oldEmailCount} emails in the old system. Would you like to import them?
+              </p>
+              {migrationResult && (
+                <p className={`text-sm mt-2 ${migrationResult.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                  {migrationResult}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowMigration(false)}
+                className="px-4 py-2 text-sm text-blue-700 hover:bg-blue-100 rounded-lg"
+              >
+                Skip
+              </button>
+              <button
+                onClick={handleMigration}
+                disabled={migrating}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {migrating ? 'Importing...' : 'Import Emails'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex h-[calc(100vh-180px)] bg-white rounded-xl border border-neutral-200 overflow-hidden">
       {/* Sidebar */}
       <div className="w-64 border-r border-neutral-200 flex flex-col">
         {/* Compose Button */}
