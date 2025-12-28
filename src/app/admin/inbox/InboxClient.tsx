@@ -547,6 +547,7 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
           }}
         />
       )}
+      </div>
     </div>
   );
 }
