@@ -766,3 +766,141 @@ model CreditCapture {
   @@index([projectId])
   @@index([capturedAt])
 }
+
+// ============================================
+// EMAIL INBOX SYSTEM
+// ============================================
+
+model Mailbox {
+  id            String    @id @default(cuid())
+
+  // Email address
+  email         String    @unique  // support@divinitycoin.com
+  name          String              // "Support", "Sales", etc.
+
+  // Settings
+  isActive      Boolean   @default(true)
+  isDefault     Boolean   @default(false)
+
+  // Auto-reply settings
+  autoReplyEnabled  Boolean @default(false)
+  autoReplySubject  String?
+  autoReplyMessage  String? @db.Text
+
+  // Signature
+  signature     String?   @db.Text
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  emails        Email[]
+
+  @@index([email])
+  @@index([isActive])
+}
+
+model Email {
+  id            String      @id @default(cuid())
+
+  // Mailbox reference
+  mailboxId     String
+  mailbox       Mailbox     @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+
+  // Direction
+  direction     EmailDirection @default(INBOUND)
+
+  // Sender
+  fromEmail     String
+  fromName      String?
+
+  // Recipients
+  toEmail       String
+  toName        String?
+  ccEmails      String[]    @default([])
+  bccEmails     String[]    @default([])
+
+  // Content
+  subject       String
+  textBody      String?     @db.Text
+  htmlBody      String?     @db.Text
+
+  // Threading
+  threadId      String?     // Group related emails
+  inReplyTo     String?     // Message-ID of parent email
+  messageId     String?     @unique  // Unique message ID
+
+  // Status
+  isRead        Boolean     @default(false)
+  isStarred     Boolean     @default(false)
+  isArchived    Boolean     @default(false)
+  isDeleted     Boolean     @default(false)
+  isSpam        Boolean     @default(false)
+  isDraft       Boolean     @default(false)
+
+  // Labels/folders
+  labels        String[]    @default([])
+  folder        EmailFolder @default(INBOX)
+
+  // SendGrid tracking
+  sendgridMessageId String?
+
+  // Spam info
+  spamScore     Float?
+  senderIp      String?
+
+  // Attachments
+  hasAttachments Boolean    @default(false)
+
+  // Timestamps
+  receivedAt    DateTime    @default(now())
+  sentAt        DateTime?
+  readAt        DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  attachments   EmailAttachment[]
+
+  @@index([mailboxId])
+  @@index([direction])
+  @@index([folder])
+  @@index([isRead])
+  @@index([isDeleted])
+  @@index([threadId])
+  @@index([receivedAt])
+  @@index([fromEmail])
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum EmailFolder {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+  SPAM
+  ARCHIVE
+}
+
+model EmailAttachment {
+  id            String    @id @default(cuid())
+  emailId       String
+  email         Email     @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  filename      String
+  contentType   String
+  size          Int       // Size in bytes
+
+  // Storage
+  storageKey    String?   // S3/storage key
+  url           String?   // Direct URL if available
+
+  createdAt     DateTime  @default(now())
+
+  @@index([emailId])
+}
