@@ -227,10 +227,12 @@ export default function RequestRefundPage() {
                   </svg>
                 </div>
                 <div className="text-sm text-amber-800">
-                  <p className="font-medium">Important:</p>
+                  <p className="font-medium">Important - Full Refunds Only:</p>
                   <ul className="mt-1 list-disc list-inside space-y-1">
+                    <li><strong>We only issue full refunds</strong> - partial refunds are not available</li>
                     <li>Unredeemed codes are eligible for a full refund within 30 days</li>
-                    <li>Redeemed codes require coordination with the partner platform</li>
+                    <li>Redeemed codes require the <strong>full balance to be unused</strong> on the partner platform</li>
+                    <li>If you have spent any of your redeemed balance, a refund cannot be processed</li>
                     <li>Refunds are processed to your original payment method in 5-10 business days</li>
                   </ul>
                   <Link href="/refunds" className="inline-block mt-2 text-amber-900 underline hover:no-underline">

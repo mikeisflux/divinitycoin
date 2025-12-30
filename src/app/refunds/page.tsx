@@ -118,10 +118,13 @@ export default function RefundsPage() {
             been redeemed, a refund cannot be issued.
           </p>
 
-          <h2>Partial Refunds</h2>
+          <h2>No Partial Refunds</h2>
           <p>
-            Partial refunds may be issued in special circumstances at our
-            discretion. Please contact support to discuss your specific situation.
+            <strong>We do not offer partial refunds.</strong> Refunds are only available for the
+            full original purchase amount. If you have redeemed your code on a partner
+            platform and spent any portion of the balance, your purchase is no longer
+            eligible for a refund. This policy ensures fairness and prevents abuse of
+            the refund system.
           </p>
 
           <h2>Disputes and Chargebacks</h2>

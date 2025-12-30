@@ -163,6 +163,13 @@ export async function POST(request: NextRequest) {
 
     const giftCard = transaction.giftCard;
 
+    // IMPORTANT: We only do full refunds - no partial refunds allowed
+    // The refund amount is always the original transaction amount
+    const refundAmount = transaction.amount;
+
+    // For redeemed cards, we require the partner to have the full balance available
+    // If the user has spent any of the redeemed balance, the refund will be rejected
+
     // Determine if code was redeemed on a partner platform
     const wasRedeemed = giftCard?.status === 'REDEEMED' && giftCard.redeemedOnPlatform;
 
