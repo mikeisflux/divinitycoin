@@ -565,6 +565,8 @@ function ComposeModal({
   onSent: () => void;
 }) {
   const [sending, setSending] = useState(false);
+  const [sendToAll, setSendToAll] = useState(false);
+  const [userCount, setUserCount] = useState<number | null>(null);
   const [form, setForm] = useState({
     mailboxId: mailboxes[0]?.id || '',
     to: replyTo ? replyTo.fromEmail : '',
@@ -573,8 +575,19 @@ function ComposeModal({
     body: '',
   });
 
+  // Fetch user count when sendToAll is toggled
+  useEffect(() => {
+    if (sendToAll && userCount === null) {
+      fetch('/api/admin/users?limit=1')
+        .then(res => res.json())
+        .then(data => setUserCount(data.pagination?.total || 0))
+        .catch(() => setUserCount(0));
+    }
+  }, [sendToAll, userCount]);
+
   const handleSend = async () => {
-    if (!form.to || !form.mailboxId) return;
+    if (!sendToAll && !form.to) return;
+    if (!form.mailboxId) return;
 
     setSending(true);
     try {
@@ -583,12 +596,13 @@ function ComposeModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mailboxId: form.mailboxId,
-          to: form.to,
+          to: sendToAll ? undefined : form.to,
           cc: form.cc,
           subject: form.subject,
           htmlBody: form.body.replace(/\n/g, '<br>'),
           textBody: form.body,
           replyToEmailId: replyTo?.id,
+          sendToAllUsers: sendToAll,
         }),
       });
       onSent();
@@ -634,9 +648,28 @@ function ComposeModal({
               value={form.to}
               onChange={(e) => setForm({ ...form, to: e.target.value })}
               placeholder="recipient@example.com"
-              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              disabled={sendToAll}
+              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100 disabled:text-neutral-500"
             />
           </div>
+
+          {!replyTo && (
+            <div className="flex items-center gap-2 px-2 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="sendToAll"
+                checked={sendToAll}
+                onChange={(e) => setSendToAll(e.target.checked)}
+                className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+              />
+              <label htmlFor="sendToAll" className="text-sm text-amber-800 cursor-pointer">
+                Send to all registered users
+                {sendToAll && userCount !== null && (
+                  <span className="ml-1 font-medium">({userCount} users)</span>
+                )}
+              </label>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-neutral-500 w-16">Cc:</span>

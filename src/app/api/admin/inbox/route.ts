@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { mailboxId, to, cc, bcc, subject, htmlBody, textBody, isDraft, replyToEmailId } = body;
+    const { mailboxId, to, cc, bcc, subject, htmlBody, textBody, isDraft, replyToEmailId, sendToAllUsers } = body;
 
     if (!mailboxId) {
       return NextResponse.json({ error: 'Mailbox ID is required' }, { status: 400 });
@@ -130,8 +130,97 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mailbox not found' }, { status: 404 });
     }
 
-    if (!isDraft && !to) {
+    if (!isDraft && !to && !sendToAllUsers) {
       return NextResponse.json({ error: 'Recipient is required' }, { status: 400 });
+    }
+
+    // Handle sending to all registered users
+    if (sendToAllUsers) {
+      const users = await prisma.user.findMany({
+        where: {
+          email: { not: '' },
+        },
+        select: { email: true, name: true },
+      });
+
+      if (users.length === 0) {
+        return NextResponse.json({ error: 'No users found to send to' }, { status: 400 });
+      }
+
+      // Add signature if available
+      let finalHtml = htmlBody || '';
+      if (mailbox.signature) {
+        finalHtml += `<br><br>--<br>${mailbox.signature}`;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      // Send to each user with rate limiting (1 email per second)
+      for (let i = 0; i < users.length; i++) {
+        const user = users[i];
+        try {
+          const result = await sendEmail({
+            to: user.email,
+            toName: user.name || undefined,
+            subject: subject || '(no subject)',
+            html: finalHtml,
+            text: textBody,
+            fromEmail: mailbox.email,
+            fromName: mailbox.name,
+          });
+
+          if (result.success) {
+            successCount++;
+          } else {
+            failCount++;
+            logger.error('Failed to send bulk email', { email: user.email, error: result.error });
+          }
+        } catch (sendError) {
+          failCount++;
+          logger.error('Error sending bulk email', { email: user.email, error: sendError });
+        }
+
+        // Rate limit: wait 1 second between emails (except for last one)
+        if (i < users.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Create a single record for the bulk send
+      const messageId = `<${crypto.randomUUID()}@divinitycoin.com>`;
+      await prisma.email.create({
+        data: {
+          mailboxId,
+          direction: 'OUTBOUND',
+          fromEmail: mailbox.email,
+          fromName: mailbox.name,
+          toEmail: `All Users (${users.length})`,
+          subject: subject || '(no subject)',
+          htmlBody: htmlBody || '',
+          textBody: textBody || '',
+          messageId,
+          threadId: crypto.randomUUID(),
+          folder: 'SENT',
+          isRead: true,
+          sentAt: new Date(),
+        },
+      });
+
+      logger.info('Bulk email sent to all users', {
+        totalUsers: users.length,
+        successCount,
+        failCount,
+        subject,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Email sent to ${successCount} users${failCount > 0 ? ` (${failCount} failed)` : ''}`,
+        totalUsers: users.length,
+        successCount,
+        failCount,
+      });
     }
 
     // Generate message ID
