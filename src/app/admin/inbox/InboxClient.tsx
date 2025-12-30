@@ -718,7 +718,7 @@ function ComposeModal({
           </button>
           <button
             onClick={handleSend}
-            disabled={sending || !form.to}
+            disabled={sending || (!sendToAll && !form.to)}
             className="px-6 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition"
           >
             {sending ? 'Sending...' : 'Send'}
