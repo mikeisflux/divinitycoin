@@ -54,7 +54,11 @@ const faqs = [
     questions: [
       {
         q: 'Can I get a refund?',
-        a: 'Unredeemed credits can be refunded within 30 days of purchase. Contact our support team with your order details.',
+        a: 'Yes! Unredeemed credits can be refunded within 30 days of purchase. Sign in to your account and go to "Request Refund" to submit your request instantly. We only offer full refunds - partial refunds are not available.',
+      },
+      {
+        q: 'What if my code was already redeemed?',
+        a: 'If you redeemed your code on a partner platform, a refund is only possible if you have not spent any of the balance. We will coordinate with the partner to verify the full balance is available before processing your refund.',
       },
       {
         q: 'What if I never received my code?',
