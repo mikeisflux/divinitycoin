@@ -114,7 +114,7 @@ export default function HowItWorksPage() {
               },
               {
                 q: 'Can I get a refund?',
-                a: 'Unused credits can be refunded within 30 days of purchase. Contact our support team.',
+                a: 'Yes! Unused credits can be refunded within 30 days of purchase. Sign in to your account and visit the Request Refund page to submit a refund request instantly.',
               },
               {
                 q: 'What platforms accept DivinityCoin?',
