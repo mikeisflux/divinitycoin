@@ -904,3 +904,61 @@ model EmailAttachment {
 
   @@index([emailId])
 }
+
+// ============================================
+// REFUND REQUESTS
+// ============================================
+
+model RefundRequest {
+  id                String              @id @default(cuid())
+
+  // Request info
+  transactionId     String
+  giftCardId        String?
+  userId            String?
+  email             String
+  amount            Decimal             @db.Decimal(10, 2)
+  reason            String?             @db.Text
+
+  // Status
+  status            RefundRequestStatus @default(PENDING)
+
+  // Partner webhook (if code was redeemed)
+  partnerId         String?
+  partnerName       String?
+  webhookSent       Boolean             @default(false)
+  webhookSentAt     DateTime?
+  webhookResponse   Json?
+  partnerRefundId   String?             // ID returned by partner
+
+  // Original redemption info (for partner webhook)
+  originalCardCode  String?             // Last 4 chars only
+  redeemedAmount    Decimal?            @db.Decimal(10, 2)
+
+  // Stripe refund
+  stripeRefundId    String?
+
+  // Timestamps
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  processedAt       DateTime?
+  failedAt          DateTime?
+  failureReason     String?             @db.Text
+
+  @@index([transactionId])
+  @@index([giftCardId])
+  @@index([userId])
+  @@index([status])
+  @@index([partnerId])
+  @@index([createdAt])
+}
+
+enum RefundRequestStatus {
+  PENDING           // Awaiting processing
+  AWAITING_PARTNER  // Webhook sent to partner, awaiting response
+  APPROVED          // Approved, ready for Stripe refund
+  PROCESSING        // Stripe refund in progress
+  COMPLETED         // Refund completed
+  FAILED            // Refund failed (partner rejected or Stripe error)
+  REJECTED          // Admin rejected
+}

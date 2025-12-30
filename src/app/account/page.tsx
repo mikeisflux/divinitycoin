@@ -213,6 +213,9 @@ export default function AccountPage() {
                 <Link href="/balance">
                   <Button variant="outline">Check Balance</Button>
                 </Link>
+                <Link href="/request-refund">
+                  <Button variant="outline">Request Refund</Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
