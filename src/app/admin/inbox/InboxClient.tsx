@@ -310,6 +310,12 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
           >
             <span>⚙️</span> Manage Mailboxes
           </Link>
+          <Link
+            href="/admin/emails/queue"
+            className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-500 hover:text-neutral-700"
+          >
+            <span>📬</span> Email Queue
+          </Link>
         </nav>
       </div>
 
