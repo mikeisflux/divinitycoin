@@ -962,3 +962,67 @@ enum RefundRequestStatus {
   FAILED            // Refund failed (partner rejected or Stripe error)
   REJECTED          // Admin rejected
 }
+
+// ============================================
+// EMAIL QUEUE SYSTEM
+// ============================================
+
+model EmailQueue {
+  id            String           @id @default(cuid())
+
+  // Recipient
+  toEmail       String
+  toName        String?
+
+  // Sender (override defaults if provided)
+  fromEmail     String?
+  fromName      String?
+
+  // Content
+  subject       String
+  htmlBody      String           @db.Text
+  textBody      String?          @db.Text
+
+  // Mailbox reference (optional, for inbox tracking)
+  mailboxId     String?
+
+  // Status
+  status        EmailQueueStatus @default(PENDING)
+
+  // Priority (lower = higher priority)
+  priority      Int              @default(10)
+
+  // Retry tracking
+  attempts      Int              @default(0)
+  maxAttempts   Int              @default(3)
+  lastError     String?          @db.Text
+  nextRetryAt   DateTime?
+
+  // Bulk send tracking
+  bulkSendId    String?          // Group emails from same bulk send
+  bulkSendIndex Int?             // Position in bulk send
+
+  // Result
+  sendgridMessageId String?
+  sentAt        DateTime?
+
+  // Timestamps
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  scheduledAt   DateTime?        // Schedule for future sending
+  processedAt   DateTime?
+
+  @@index([status])
+  @@index([priority])
+  @@index([scheduledAt])
+  @@index([bulkSendId])
+  @@index([createdAt])
+}
+
+enum EmailQueueStatus {
+  PENDING       // Waiting to be sent
+  PROCESSING    // Currently being sent
+  SENT          // Successfully sent
+  FAILED        // All retries exhausted
+  CANCELLED     // Manually cancelled
+}

@@ -591,7 +591,7 @@ function ComposeModal({
 
     setSending(true);
     try {
-      await fetch('/api/admin/inbox', {
+      const res = await fetch('/api/admin/inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -605,6 +605,13 @@ function ComposeModal({
           sendToAllUsers: sendToAll,
         }),
       });
+      const data = await res.json();
+
+      if (sendToAll && data.bulkSendId) {
+        // Show queue info for bulk sends
+        alert(`${data.totalUsers} emails queued for delivery.\nEstimated time: ${data.estimatedMinutes} minutes.\n\nView progress at: /admin/emails/queue`);
+      }
+
       onSent();
     } catch (error) {
       console.error('Failed to send:', error);
