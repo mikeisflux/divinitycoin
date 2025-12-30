@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { sendEmail } from '@/lib/email/sendgrid';
 import crypto from 'crypto';
 
 // Parse email address from "Name <email@domain.com>" format
@@ -179,6 +180,41 @@ export async function POST(request: NextRequest) {
         subject,
         isSpam,
       });
+
+      // Send auto-reply if enabled and not spam
+      if (mailbox.autoReplyEnabled && !isSpam && sender.email) {
+        try {
+          const autoReplySubject = mailbox.autoReplySubject || `Re: ${subject}`;
+          const autoReplyMessage = mailbox.autoReplyMessage ||
+            'Thank you for your email. We have received your message and will respond as soon as possible.';
+
+          await sendEmail({
+            to: sender.email,
+            toName: sender.name || undefined,
+            subject: autoReplySubject,
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                ${autoReplyMessage.replace(/\n/g, '<br>')}
+                ${mailbox.signature ? `<br><br>--<br>${mailbox.signature}` : ''}
+              </div>
+            `,
+            text: `${autoReplyMessage}\n\n${mailbox.signature ? `--\n${mailbox.signature}` : ''}`,
+            fromEmail: mailbox.email,
+            fromName: mailbox.name,
+            replyTo: mailbox.email,
+          });
+
+          logger.info('Auto-reply sent', {
+            mailboxId: mailbox.id,
+            to: sender.email,
+          });
+        } catch (autoReplyError) {
+          logger.error('Failed to send auto-reply', {
+            mailboxId: mailbox.id,
+            error: autoReplyError,
+          });
+        }
+      }
     }
 
     return NextResponse.json({ success: true });

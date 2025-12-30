@@ -29,6 +29,8 @@ export interface SendEmailParams {
   html: string;
   text?: string;
   replyTo?: string;
+  fromEmail?: string;  // Override default from email
+  fromName?: string;   // Override default from name
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{
@@ -52,13 +54,17 @@ export async function sendEmail(params: SendEmailParams): Promise<{
     // Set API key
     sgMail.setApiKey(config.apiKey);
 
+    // Use custom from address if provided, otherwise use config defaults
+    const fromEmail = params.fromEmail || config.fromEmail;
+    const fromName = params.fromName || config.fromName;
+
     // Log email attempt
     const emailLog = await prisma.emailLog.create({
       data: {
         toEmail: params.to,
         toName: params.toName,
-        fromEmail: config.fromEmail,
-        fromName: config.fromName,
+        fromEmail: fromEmail,
+        fromName: fromName,
         subject: params.subject,
         htmlContent: params.html,
         textContent: params.text || '',
@@ -68,8 +74,8 @@ export async function sendEmail(params: SendEmailParams): Promise<{
 
     const msg = {
       to: params.toName ? { email: params.to, name: params.toName } : params.to,
-      from: { email: config.fromEmail, name: config.fromName },
-      replyTo: params.replyTo || config.replyTo || config.fromEmail,
+      from: { email: fromEmail, name: fromName },
+      replyTo: params.replyTo || config.replyTo || fromEmail,
       subject: params.subject,
       html: params.html,
       text: params.text,
@@ -94,13 +100,16 @@ export async function sendEmail(params: SendEmailParams): Promise<{
 
     const errorMessage = error instanceof Error ? error.message : 'Failed to send email';
 
-    // Log failure
+    // Log failure - use custom from if provided
+    const fromEmail = params.fromEmail || config.fromEmail;
+    const fromName = params.fromName || config.fromName;
+
     await prisma.emailLog.create({
       data: {
         toEmail: params.to,
         toName: params.toName,
-        fromEmail: config.fromEmail,
-        fromName: config.fromName,
+        fromEmail: fromEmail,
+        fromName: fromName,
         subject: params.subject,
         htmlContent: params.html,
         textContent: params.text || '',
