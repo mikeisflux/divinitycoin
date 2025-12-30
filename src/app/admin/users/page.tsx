@@ -16,6 +16,7 @@ interface User {
   createdAt: string;
   creditBalances: Array<{ availableBalance: string; heldBalance: string }>;
   _count: { transactions: number; purchasedCards: number };
+  allTimePurchaseTotal: number;
 }
 
 interface Pagination {
@@ -185,6 +186,9 @@ export default function UsersPage() {
                 User
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                All-Time Purchases
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                 Balance
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
@@ -204,7 +208,7 @@ export default function UsersPage() {
           <tbody className="bg-white divide-y divide-neutral-200">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center">
+                <td colSpan={7} className="px-6 py-12 text-center">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                   </div>
@@ -212,7 +216,7 @@ export default function UsersPage() {
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-neutral-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-neutral-500">
                   {search ? 'No users found matching your search.' : 'No users yet.'}
                 </td>
               </tr>
@@ -226,6 +230,11 @@ export default function UsersPage() {
                       </div>
                       <div className="text-sm text-neutral-500">{user.email}</div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-neutral-900">
+                      {formatCurrency(user.allTimePurchaseTotal)}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-medium text-green-600">

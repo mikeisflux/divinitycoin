@@ -45,13 +45,34 @@ export async function GET(request: NextRequest) {
           _count: {
             select: { transactions: true, purchasedCards: true },
           },
+          transactions: {
+            where: {
+              type: 'PURCHASE',
+              status: 'COMPLETED',
+            },
+            select: { amount: true },
+          },
         },
       }),
       prisma.user.count({ where }),
     ]);
 
+    // Calculate all-time purchase total for each user
+    const usersWithTotals = users.map((user) => {
+      const allTimePurchaseTotal = user.transactions.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0
+      );
+      // Remove transactions array from response to keep it clean
+      const { transactions, ...userWithoutTransactions } = user;
+      return {
+        ...userWithoutTransactions,
+        allTimePurchaseTotal,
+      };
+    });
+
     return NextResponse.json({
-      users,
+      users: usersWithTotals,
       pagination: {
         page,
         limit,
