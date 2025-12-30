@@ -6,8 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 
@@ -170,44 +168,34 @@ export default function RequestRefundPage() {
 
   if (loading) {
     return (
-      <>
-        <Header />
-        <div className="min-h-screen bg-neutral-50 py-24 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-        </div>
-        <Footer />
-      </>
+      <div className="min-h-screen bg-neutral-50 py-24 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <>
-        <Header />
-        <div className="min-h-screen bg-neutral-50 py-24">
-          <div className="max-w-md mx-auto px-4 text-center">
-            <Card>
-              <CardContent className="py-12">
-                <h1 className="text-2xl font-bold text-neutral-900 mb-4">Sign In Required</h1>
-                <p className="text-neutral-600 mb-6">
-                  Please sign in to your account to request a refund.
-                </p>
-                <Link href="/account">
-                  <Button>Sign In</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
+      <div className="min-h-screen bg-neutral-50 py-24">
+        <div className="max-w-md mx-auto px-4 text-center">
+          <Card>
+            <CardContent className="py-12">
+              <h1 className="text-2xl font-bold text-neutral-900 mb-4">Sign In Required</h1>
+              <p className="text-neutral-600 mb-6">
+                Please sign in to your account to request a refund.
+              </p>
+              <Link href="/account">
+                <Button>Sign In</Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
-        <Footer />
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <Header />
-      <div className="min-h-screen bg-neutral-50 py-12">
+    <div className="min-h-screen bg-neutral-50 py-12">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8">
@@ -429,8 +417,6 @@ export default function RequestRefundPage() {
             </Link>
           </div>
         </div>
-      </div>
-      <Footer />
-    </>
+    </div>
   );
 }
