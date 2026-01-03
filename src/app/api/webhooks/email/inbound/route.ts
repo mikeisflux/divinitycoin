@@ -130,6 +130,21 @@ export async function POST(request: NextRequest) {
       // Generate thread ID (use In-Reply-To or create new)
       const threadId = inReplyTo || messageId || crypto.randomUUID();
 
+      // Check for duplicate message (same messageId already exists)
+      if (messageId) {
+        const existingEmail = await prisma.email.findFirst({
+          where: { messageId, mailboxId: mailbox.id },
+        });
+        if (existingEmail) {
+          logger.info('Duplicate inbound email skipped', {
+            messageId,
+            mailboxId: mailbox.id,
+            existingEmailId: existingEmail.id,
+          });
+          continue; // Skip this recipient, already processed
+        }
+      }
+
       // Create the email record
       const email = await prisma.email.create({
         data: {

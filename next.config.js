@@ -8,8 +8,10 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Allow server actions from these origins (fixes nginx proxy header issue)
-  serverActions: {
-    allowedOrigins: ['divinitycoin.com', 'www.divinitycoin.com', 'localhost:3000'],
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['divinitycoin.com', 'www.divinitycoin.com', 'localhost:3000'],
+    },
   },
   // Ensure proper cache invalidation on deployments
   generateBuildId: async () => {
