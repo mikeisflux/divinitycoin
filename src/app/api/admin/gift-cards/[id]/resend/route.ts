@@ -1,13 +1,13 @@
 // app/api/admin/gift-cards/[id]/resend/route.ts
-// Resend gift card code email
+// Resend gift card code email - generates a NEW code for security
 
 import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
-import { getStripeClient } from '@/lib/stripe';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
+import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 
 export async function POST(
   request: NextRequest,
@@ -38,53 +38,52 @@ export async function POST(
       return NextResponse.json({ error: 'No email address on file for this gift card' }, { status: 400 });
     }
 
-    // Try to get the original code from Stripe checkout session metadata
-    if (!giftCard.stripeCheckoutSessionId) {
-      return NextResponse.json({
-        error: 'Cannot resend email - original code not available. The code was only sent during initial purchase.'
-      }, { status: 400 });
+    // Generate a NEW code (more secure than trying to recover old one)
+    const newCode = generateGiftCardCode();
+    const newCodeHash = hashCode(newCode);
+    const newCodeLast4 = getCodeLast4(newCode);
+
+    // Update the gift card with the new code hash
+    await prisma.giftCard.update({
+      where: { id: params.id },
+      data: {
+        codeHash: newCodeHash,
+        codeLast4: newCodeLast4,
+      },
+    });
+
+    // Send the email with the new code
+    const result = await sendGiftCardEmail({
+      to: recipientEmail,
+      code: newCode,
+      amount: Number(giftCard.amount),
+    });
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
     }
 
-    try {
-      const stripe = await getStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(giftCard.stripeCheckoutSessionId);
+    await logAdminAction(
+      admin!.id,
+      'GIFTCARD_RESEND_EMAIL',
+      'giftCard',
+      params.id,
+      { recipientEmail, codeRegenerated: true, newCodeLast4 },
+      getClientIP(request),
+      getUserAgent(request)
+    );
 
-      if (!session.metadata?.giftCardCode) {
-        return NextResponse.json({
-          error: 'Cannot resend email - original code not available in payment records.'
-        }, { status: 400 });
-      }
+    logger.info('Gift card code regenerated and resent', {
+      giftCardId: params.id,
+      recipientEmail,
+      newCodeLast4,
+    });
 
-      const code = session.metadata.giftCardCode;
-
-      // Send the email
-      const result = await sendGiftCardEmail({
-        to: recipientEmail,
-        code,
-        amount: Number(giftCard.amount),
-      });
-
-      if (!result.success) {
-        return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
-      }
-
-      await logAdminAction(
-        admin!.id,
-        'GIFTCARD_RESEND_EMAIL',
-        'giftCard',
-        params.id,
-        { recipientEmail },
-        getClientIP(request),
-        getUserAgent(request)
-      );
-
-      return NextResponse.json({ success: true });
-    } catch (stripeError) {
-      logger.apiError('Stripe error retrieving session:', error);
-      return NextResponse.json({
-        error: 'Cannot resend email - payment records not accessible.'
-      }, { status: 400 });
-    }
+    return NextResponse.json({
+      success: true,
+      message: 'New code generated and sent to customer',
+      newCodeLast4,
+    });
   } catch (error) {
     logger.apiError('Failed to resend gift card email:', error);
     return NextResponse.json({ error: 'Failed to resend email' }, { status: 500 });

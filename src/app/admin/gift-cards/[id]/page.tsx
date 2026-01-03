@@ -130,6 +130,10 @@ export default function GiftCardDetailPage() {
   }
 
   async function handleResendEmail() {
+    if (!confirm('This will generate a NEW code and send it to the customer. The old code will no longer work. Continue?')) {
+      return;
+    }
+
     setActionLoading('resend');
     setMessage(null);
 
@@ -145,7 +149,9 @@ export default function GiftCardDetailPage() {
         return;
       }
 
-      setMessage({ type: 'success', text: 'Email sent successfully!' });
+      setMessage({ type: 'success', text: `New code generated (****${data.newCodeLast4}) and sent to customer!` });
+      // Refresh the card to show new code last 4
+      fetchGiftCard();
     } catch (err) {
       setMessage({ type: 'error', text: 'Failed to resend email' });
     } finally {
