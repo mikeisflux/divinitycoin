@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
-import { encrypt } from '@/lib/encryption';
+import { encrypt, decrypt } from '@/lib/encryption';
 import { clearConfigCache } from '@/lib/config';
 
 const SENDGRID_CONFIG_KEYS = [
@@ -24,6 +24,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Check if reveal=true is requested
+    const url = new URL(request.url);
+    const reveal = url.searchParams.get('reveal') === 'true';
+
     const configs = await prisma.systemConfig.findMany({
       where: {
         key: {
@@ -32,16 +36,33 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const configMap = new Map(configs.map((c: { key: string; value: string }) => [c.key, c.value]));
+    const configMap = new Map(configs.map((c: { key: string; value: string; isEncrypted?: boolean }) => [c.key, c]));
 
-    const hasApiKey = configs.some((c: { key: string; value: string }) => c.key === 'SENDGRID_API_KEY' && c.value);
-    const fromEmail = configMap.get('SENDGRID_FROM_EMAIL') || '';
+    const apiKeyConfig = configMap.get('SENDGRID_API_KEY') as { value: string; isEncrypted?: boolean } | undefined;
+    const hasApiKey = !!(apiKeyConfig?.value);
+    const fromEmail = (configMap.get('SENDGRID_FROM_EMAIL') as { value: string } | undefined)?.value || '';
+
+    // Decrypt API key if reveal is requested
+    let apiKeyValue = '';
+    if (hasApiKey) {
+      if (reveal && apiKeyConfig) {
+        try {
+          apiKeyValue = apiKeyConfig.isEncrypted
+            ? decrypt(apiKeyConfig.value)
+            : apiKeyConfig.value;
+        } catch {
+          apiKeyValue = '••••••••'; // Fallback if decryption fails
+        }
+      } else {
+        apiKeyValue = '••••••••';
+      }
+    }
 
     const settings = {
-      apiKey: hasApiKey ? '••••••••' : '',
+      apiKey: apiKeyValue,
       fromEmail,
-      fromName: configMap.get('SENDGRID_FROM_NAME') || 'DivinityCoin',
-      replyTo: configMap.get('SENDGRID_REPLY_TO') || '',
+      fromName: (configMap.get('SENDGRID_FROM_NAME') as { value: string } | undefined)?.value || 'DivinityCoin',
+      replyTo: (configMap.get('SENDGRID_REPLY_TO') as { value: string } | undefined)?.value || '',
       testEmailRecipient: '',
       isConfigured: !!(hasApiKey && fromEmail),
     };
