@@ -4,9 +4,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   // Ensure proper cache invalidation on deployments
   generateBuildId: async () => {
     // Use timestamp for unique build IDs
