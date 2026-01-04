@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -129,6 +129,7 @@ export function StripeCheckout({ amount, email, partnerId, onSuccess, onCancel }
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const paymentIntentCreated = useRef(false);
 
   useEffect(() => {
     // Load Stripe publishable key
@@ -149,11 +150,18 @@ export function StripeCheckout({ amount, email, partnerId, onSuccess, onCancel }
   useEffect(() => {
     if (!stripePromise) return;
 
+    // Prevent duplicate PaymentIntent creation (React StrictMode, remounts, etc.)
+    if (paymentIntentCreated.current) return;
+    paymentIntentCreated.current = true;
+
+    const controller = new AbortController();
+
     // Create PaymentIntent
     fetch('/api/payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount, email, partnerId }),
+      signal: controller.signal,
     })
       .then((res) => res.json())
       .then((data) => {
@@ -162,14 +170,22 @@ export function StripeCheckout({ amount, email, partnerId, onSuccess, onCancel }
           setTransactionId(data.transactionId);
         } else {
           setError(data.error || 'Failed to initialize payment');
+          paymentIntentCreated.current = false; // Allow retry on error
         }
       })
-      .catch(() => {
-        setError('Failed to initialize payment');
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setError('Failed to initialize payment');
+          paymentIntentCreated.current = false; // Allow retry on error
+        }
       })
       .finally(() => {
         setLoading(false);
       });
+
+    return () => {
+      controller.abort();
+    };
   }, [stripePromise, amount, email, partnerId]);
 
   if (loading) {
