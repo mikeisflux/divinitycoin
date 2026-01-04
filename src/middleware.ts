@@ -15,6 +15,32 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin') || '';
 
+  // Block bot attacks on server actions
+  // These are malformed requests from scanners/bots that cause Next.js errors
+  const nextAction = request.headers.get('next-action');
+  if (nextAction) {
+    // Valid Next.js server action IDs are long hashes, not single characters like "x"
+    // Block obviously invalid action IDs (less than 10 chars or containing only simple chars)
+    if (nextAction.length < 10 || /^[a-z0-9]{1,5}$/i.test(nextAction)) {
+      return new NextResponse(JSON.stringify({ error: 'Invalid request' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  // Block POST requests to root paths without proper headers (bot attacks)
+  if (request.method === 'POST' && !origin && !pathname.startsWith('/api/webhooks')) {
+    const contentType = request.headers.get('content-type') || '';
+    // If it's a POST with next-action header but no origin, it's likely a bot
+    if (nextAction && !contentType.includes('multipart/form-data')) {
+      return new NextResponse(JSON.stringify({ error: 'Invalid request' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   // Create response with pathname header for layout detection
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', pathname);
