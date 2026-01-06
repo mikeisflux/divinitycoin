@@ -80,18 +80,7 @@ export default function BuyPage() {
       const response = await fetch('/api/partners/public');
       if (response.ok) {
         const data = await response.json();
-        // Add "Divinity Comics" as a static option if not already in the list
         const partnerList: Partner[] = data.partners || [];
-
-        // Check if Divinity Comics exists, if not add it
-        const hasDivinityComics = partnerList.some(p => p.slug === 'divinitycomics');
-        if (!hasDivinityComics) {
-          partnerList.push({
-            id: 'divinitycomics',
-            name: 'Divinity Comics',
-            slug: 'divinitycomics',
-          });
-        }
 
         setPartners(partnerList);
 
@@ -107,7 +96,7 @@ export default function BuyPage() {
           }
         }
 
-        // If no referer match, default to Indiecrowdfund
+        // If no referer match, default to Indiecrowdfund (if available)
         if (!defaultPartnerId) {
           const indiecrowdfund = partnerList.find(p => p.slug === 'indiecrowdfund');
           if (indiecrowdfund) {

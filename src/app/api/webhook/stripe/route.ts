@@ -92,7 +92,11 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     return;
   }
 
-  // Find the transaction
+  // Small delay to let frontend payment-confirm handle it first
+  // This reduces race conditions without breaking the fallback mechanism
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  // Find the transaction (after delay, to see if frontend already completed it)
   const transaction = await prisma.transaction.findUnique({
     where: { id: transactionId },
     include: { giftCard: true },
@@ -106,9 +110,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     return;
   }
 
-  // If already completed, nothing to do
+  // If already completed, nothing to do (frontend likely handled it)
   if (transaction.status === 'COMPLETED' && transaction.giftCard) {
-    logger.debug('Transaction already completed via webhook', { transactionId });
+    logger.debug('Transaction already completed (frontend handled it)', { transactionId });
     return;
   }
 
@@ -216,15 +220,25 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // Likely a race condition - check if already completed
+      // Check if this is a write conflict (P2034) - expected race condition
+      const isWriteConflict = error.code === 'P2034';
+
+      // Check if already completed
       const existingTransaction = await prisma.transaction.findUnique({
         where: { id: transactionId },
         include: { giftCard: true },
       });
 
       if (existingTransaction?.status === 'COMPLETED') {
-        logger.debug('Transaction was completed by concurrent request', { transactionId });
+        // This is the expected outcome - frontend completed it first
+        logger.debug('Transaction was completed by frontend (race condition resolved)', { transactionId });
         return;
+      }
+
+      // If it was a write conflict but not completed, something else went wrong
+      if (isWriteConflict) {
+        logger.warn('Webhook write conflict, transaction not yet completed', { transactionId, errorCode: error.code });
+        return; // Let Stripe retry if needed
       }
     }
     logger.error('Webhook failed to complete transaction', { error, transactionId });

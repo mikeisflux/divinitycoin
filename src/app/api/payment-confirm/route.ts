@@ -163,10 +163,7 @@ export async function POST(request: NextRequest) {
       // Handle race condition - if transaction failed due to concurrent request,
       // fetch the existing gift card
       if (txError instanceof Prisma.PrismaClientKnownRequestError) {
-        logger.warn('Transaction conflict, checking for existing gift card', {
-          transactionId,
-          errorCode: txError.code,
-        });
+        const isWriteConflict = txError.code === 'P2034';
 
         const existingTransaction = await prisma.transaction.findUnique({
           where: { id: transactionId },
@@ -174,6 +171,12 @@ export async function POST(request: NextRequest) {
         });
 
         if (existingTransaction?.giftCard) {
+          // This is a normal race condition - webhook completed it first
+          // Log at debug level since this is expected behavior
+          logger.debug('Transaction completed by webhook, returning existing gift card', {
+            transactionId,
+            giftCardId: existingTransaction.giftCard.id,
+          });
           return NextResponse.json({
             success: true,
             alreadyProcessed: true,
@@ -181,6 +184,14 @@ export async function POST(request: NextRequest) {
             code: null,
             codeLast4: existingTransaction.giftCard.codeLast4,
             amount: Number(transaction.amount),
+          });
+        }
+
+        // Write conflict but not completed - log for investigation
+        if (isWriteConflict) {
+          logger.warn('Payment confirm write conflict, transaction not completed', {
+            transactionId,
+            errorCode: txError.code,
           });
         }
       }
