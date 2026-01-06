@@ -182,6 +182,115 @@ export async function POST(
         });
       }
 
+      case 'transaction.refund': {
+        // Partner is notifying us that they refunded a transaction
+        // This happens when a customer gets a refund on the partner's platform
+        const { transactionId, cardCode, amount, reason, partnerTransactionId } = payload.data || {};
+
+        if (!transactionId && !cardCode) {
+          return NextResponse.json(
+            { error: 'Either transactionId or cardCode is required' },
+            { status: 400 }
+          );
+        }
+
+        logger.info('Partner refund webhook received', {
+          partnerId: partner.id,
+          partnerName: partner.name,
+          transactionId,
+          cardCode: cardCode ? `****${cardCode.slice(-4)}` : undefined,
+          amount,
+          reason,
+          partnerTransactionId,
+        });
+
+        // Find the gift card and associated transaction
+        let giftCard;
+        if (cardCode) {
+          // Find by card code (hashed)
+          const crypto = await import('crypto');
+          const codeHash = crypto.createHash('sha256').update(cardCode.toUpperCase()).digest('hex');
+          giftCard = await prisma.giftCard.findFirst({
+            where: { codeHash },
+            include: { transaction: true },
+          });
+        } else if (transactionId) {
+          // Find by transaction ID
+          const transaction = await prisma.transaction.findUnique({
+            where: { id: transactionId },
+            include: { giftCard: { include: { transaction: true } } },
+          });
+          giftCard = transaction?.giftCard;
+        }
+
+        if (!giftCard) {
+          logger.warn('Gift card not found for partner refund', { transactionId, cardCode });
+          return NextResponse.json(
+            { error: 'Gift card not found' },
+            { status: 404 }
+          );
+        }
+
+        // Check if already refunded
+        if (giftCard.status === 'REFUNDED') {
+          return NextResponse.json({
+            success: true,
+            message: 'Card already marked as refunded',
+            cardId: giftCard.id,
+          });
+        }
+
+        // Update gift card status to REFUNDED
+        await prisma.giftCard.update({
+          where: { id: giftCard.id },
+          data: {
+            status: 'REFUNDED',
+            metadata: {
+              ...(typeof giftCard.metadata === 'object' ? giftCard.metadata : {}),
+              partnerRefund: {
+                partnerId: partner.id,
+                partnerName: partner.name,
+                partnerTransactionId,
+                reason: reason || 'Refunded by partner',
+                refundedAt: new Date().toISOString(),
+              },
+            },
+          },
+        });
+
+        // Update associated transaction status if exists
+        if (giftCard.transaction) {
+          await prisma.transaction.update({
+            where: { id: giftCard.transaction.id },
+            data: {
+              status: 'REFUNDED',
+              metadata: {
+                ...(typeof giftCard.transaction.metadata === 'object' ? giftCard.transaction.metadata : {}),
+                partnerRefund: {
+                  partnerId: partner.id,
+                  partnerName: partner.name,
+                  partnerTransactionId,
+                  reason: reason || 'Refunded by partner',
+                  refundedAt: new Date().toISOString(),
+                },
+              },
+            },
+          });
+        }
+
+        logger.info('Gift card marked as refunded by partner', {
+          giftCardId: giftCard.id,
+          partnerId: partner.id,
+          partnerTransactionId,
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Card marked as refunded',
+          cardId: giftCard.id,
+        });
+      }
+
       default:
         // Unknown event type - log and acknowledge
         logger.info(`Unknown webhook event: ${event}`);
@@ -229,6 +338,7 @@ export async function GET(
         'test.ping',
         'card.validate',
         'card.redeem',
+        'transaction.refund',
       ],
     });
   } catch (error) {

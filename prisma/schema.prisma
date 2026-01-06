@@ -25,6 +25,10 @@ model User {
   // Stripe
   stripeCustomerId String? @unique
 
+  // Account status
+  bannedAt      DateTime?
+  banReason     String?
+
   // Timestamps
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
