@@ -35,6 +35,7 @@ interface User {
     amount: string;
     status: string;
     stripePaymentIntentId: string | null;
+    giftCardId: string | null;
     createdAt: string;
   }>;
 }
@@ -79,6 +80,7 @@ export default function UserDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [banning, setBanning] = useState(false);
   const [refunding, setRefunding] = useState(false);
+  const [resendingGiftCard, setResendingGiftCard] = useState<string | null>(null);
   const [banReason, setBanReason] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -266,6 +268,36 @@ export default function UserDetailPage() {
     setError('');
   }
 
+  async function handleResendGiftCard(giftCardId: string) {
+    if (!confirm('This will generate a NEW code and email it to the customer. The old code will no longer work. Continue?')) {
+      return;
+    }
+
+    setResendingGiftCard(giftCardId);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/admin/gift-cards/${giftCardId}/resend`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to resend gift card');
+        return;
+      }
+
+      setMessage('New gift card code sent to customer');
+      fetchUser();
+      setTimeout(() => setMessage(''), 3000);
+    } catch {
+      setError('Failed to resend gift card');
+    } finally {
+      setResendingGiftCard(null);
+    }
+  }
+
   if (loading) {
     return (
       <AdminLayout title="Loading..." description="Please wait">
@@ -403,7 +435,16 @@ export default function UserDetailPage() {
                       <td className="py-3 text-sm text-neutral-500">
                         {new Date(tx.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="py-3">
+                      <td className="py-3 space-x-2">
+                        {tx.type === 'PURCHASE' && tx.status === 'COMPLETED' && tx.giftCardId && (
+                          <button
+                            onClick={() => handleResendGiftCard(tx.giftCardId!)}
+                            disabled={resendingGiftCard === tx.giftCardId}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                          >
+                            {resendingGiftCard === tx.giftCardId ? 'Sending...' : 'Resend'}
+                          </button>
+                        )}
                         {tx.type === 'PURCHASE' && tx.status === 'COMPLETED' && tx.stripePaymentIntentId && (
                           <button
                             onClick={() => openRefundModal(tx.id)}
