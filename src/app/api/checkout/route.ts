@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
 import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
+import { getCurrentUser } from '@/lib/auth/user';
 
 // Constants
 const PRESET_AMOUNTS = [10, 25, 50, 100, 250];
@@ -47,6 +48,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get logged-in user or find user by email
+    let userId: string | null = null;
+    const currentUser = await getCurrentUser();
+    if (currentUser) {
+      userId = currentUser.id;
+    } else {
+      // Check if email belongs to an existing user
+      const existingUser = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        select: { id: true },
+      });
+      if (existingUser) {
+        userId = existingUser.id;
+      }
+    }
+
     // Generate gift card code (not yet activated)
     const code = generateGiftCardCode();
     const codeHash = hashCode(code);
@@ -60,6 +77,7 @@ export async function POST(request: NextRequest) {
         amount,
         currency: 'USD',
         status: 'PENDING',
+        purchaserId: userId,
         purchasedByEmail: email,
       },
     });
@@ -104,7 +122,8 @@ export async function POST(request: NextRequest) {
     // Create transaction record
     await prisma.transaction.create({
       data: {
-        guestEmail: email,
+        userId,
+        guestEmail: userId ? null : email,
         type: 'PURCHASE',
         amount,
         currency: 'USD',
