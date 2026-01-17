@@ -78,6 +78,18 @@ export async function POST(request: NextRequest) {
         const email = transaction.guestEmail || paymentIntent.receipt_email || '';
         const rawPartnerId = paymentIntent.metadata?.partnerId || null;
 
+        // Find user by email to link the purchase
+        let userId: string | null = transaction.userId;
+        if (!userId && email) {
+          const existingUser = await prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+            select: { id: true },
+          });
+          if (existingUser) {
+            userId = existingUser.id;
+          }
+        }
+
         // Validate partnerId exists in database (empty strings or non-existent IDs cause FK violations)
         let partnerId: string | null = null;
         if (rawPartnerId && rawPartnerId.trim() !== '') {
@@ -122,6 +134,7 @@ export async function POST(request: NextRequest) {
                 amount: transaction.amount,
                 currency: 'USD',
                 status: 'ACTIVE',
+                purchaserId: userId,
                 purchasedByEmail: email,
                 activatedAt: new Date(),
                 partnerId: partnerId || undefined,
@@ -135,6 +148,7 @@ export async function POST(request: NextRequest) {
                 status: 'COMPLETED',
                 completedAt: new Date(),
                 giftCardId: newGiftCard.id,
+                userId: userId,
               },
             });
 
