@@ -6,13 +6,12 @@ import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getStripeClient } from '@/lib/stripe';
 import { sendWebhook } from '@/lib/partner/webhook';
-import { cookies } from 'next/headers';
+import { getSessionToken, getCurrentUser } from '@/lib/auth/user';
 
 // GET - List user's refund requests
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('session')?.value;
+    const sessionToken = await getSessionToken();
 
     if (!sessionToken) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -88,8 +87,7 @@ export async function GET(request: NextRequest) {
 // POST - Submit a refund request
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('session')?.value;
+    const sessionToken = await getSessionToken();
 
     if (!sessionToken) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
