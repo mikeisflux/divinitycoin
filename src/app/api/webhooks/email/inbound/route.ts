@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { sendEmail } from '@/lib/email/sendgrid';
+import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
 
 // Parse email address from "Name <email@domain.com>" format
@@ -145,29 +146,39 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create the email record
-      const email = await prisma.email.create({
-        data: {
-          mailboxId: mailbox.id,
-          direction: 'INBOUND',
-          fromEmail: sender.email,
-          fromName: sender.name,
-          toEmail: recipientEmail.toLowerCase(),
-          ccEmails: ccAddresses,
-          subject,
-          textBody: text,
-          htmlBody: html,
-          messageId,
-          inReplyTo,
-          threadId,
-          folder: isSpam ? 'SPAM' : 'INBOX',
-          isSpam,
-          spamScore: parseFloat(spamScore) || null,
-          senderIp,
-          hasAttachments: attachmentCount > 0,
-          receivedAt: new Date(),
-        },
-      });
+      // Create the email record (with race condition handling)
+      let email;
+      try {
+        email = await prisma.email.create({
+          data: {
+            mailboxId: mailbox.id,
+            direction: 'INBOUND',
+            fromEmail: sender.email,
+            fromName: sender.name,
+            toEmail: recipientEmail.toLowerCase(),
+            ccEmails: ccAddresses,
+            subject,
+            textBody: text,
+            htmlBody: html,
+            messageId,
+            inReplyTo,
+            threadId,
+            folder: isSpam ? 'SPAM' : 'INBOX',
+            isSpam,
+            spamScore: parseFloat(spamScore) || null,
+            senderIp,
+            hasAttachments: attachmentCount > 0,
+            receivedAt: new Date(),
+          },
+        });
+      } catch (createError) {
+        // Handle unique constraint violation (P2002) - duplicate messageId
+        if (createError instanceof Prisma.PrismaClientKnownRequestError && createError.code === 'P2002') {
+          logger.debug('Duplicate email skipped (race condition)', { messageId, mailboxId: mailbox.id });
+          continue; // Skip to next recipient
+        }
+        throw createError;
+      }
 
       // Handle attachments if any
       if (attachmentCount > 0) {

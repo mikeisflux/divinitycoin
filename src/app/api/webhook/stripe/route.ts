@@ -219,27 +219,23 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       paymentIntentId: paymentIntent.id
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // Check if this is a write conflict (P2034) - expected race condition
-      const isWriteConflict = error.code === 'P2034';
-
-      // Check if already completed
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      // Write conflict (P2034) - expected race condition with frontend payment-confirm
+      // Check if transaction was completed by the other request
       const existingTransaction = await prisma.transaction.findUnique({
         where: { id: transactionId },
         include: { giftCard: true },
       });
 
-      if (existingTransaction?.status === 'COMPLETED') {
-        // This is the expected outcome - frontend completed it first
-        logger.debug('Transaction was completed by frontend (race condition resolved)', { transactionId });
+      if (existingTransaction?.status === 'COMPLETED' && existingTransaction.giftCard) {
+        // Frontend completed it first - this is normal and expected
+        logger.debug('Transaction completed by frontend during webhook (race resolved)', { transactionId });
         return;
       }
 
-      // If it was a write conflict but not completed, something else went wrong
-      if (isWriteConflict) {
-        logger.warn('Webhook write conflict, transaction not yet completed', { transactionId, errorCode: error.code });
-        return; // Let Stripe retry if needed
-      }
+      // Not yet completed - Stripe will retry the webhook
+      logger.debug('Transaction conflict, awaiting retry', { transactionId });
+      return;
     }
     logger.error('Webhook failed to complete transaction', { error, transactionId });
     throw error;
