@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { SyncTransactionsButton } from '@/components/admin/SyncTransactionsButton';
 import { RemindUsersButton } from '@/components/admin/RemindUsersButton';
+import { LinkPurchasesButton } from '@/components/admin/LinkPurchasesButton';
 
 async function getTransactions(page: number = 1, limit: number = 20) {
   const skip = (page - 1) * limit;
@@ -92,6 +93,7 @@ export default async function TransactionsPage() {
           )}
         </div>
         <div className="flex items-center gap-4">
+          <LinkPurchasesButton />
           <RemindUsersButton />
           <SyncTransactionsButton />
         </div>
