@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { SyncTransactionsButton } from '@/components/admin/SyncTransactionsButton';
+import { RemindUsersButton } from '@/components/admin/RemindUsersButton';
 
 async function getTransactions(page: number = 1, limit: number = 20) {
   const skip = (page - 1) * limit;
@@ -81,7 +82,7 @@ export default async function TransactionsPage() {
       title="Transactions"
       description={`${total} total transactions`}
     >
-      {/* Sync Button */}
+      {/* Action Buttons */}
       <div className="mb-6 flex items-center justify-between">
         <div className="text-sm text-neutral-600">
           {pendingCount > 0 && (
@@ -90,7 +91,10 @@ export default async function TransactionsPage() {
             </span>
           )}
         </div>
-        <SyncTransactionsButton />
+        <div className="flex items-center gap-4">
+          <RemindUsersButton />
+          <SyncTransactionsButton />
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
