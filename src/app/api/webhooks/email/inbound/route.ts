@@ -7,6 +7,8 @@ import { logger } from '@/lib/logger';
 import { sendEmail } from '@/lib/email/sendgrid';
 import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
 
 // Parse email address from "Name <email@domain.com>" format
 function parseEmailAddress(raw: string): { email: string; name: string | null } {
@@ -182,16 +184,27 @@ export async function POST(request: NextRequest) {
 
       // Handle attachments if any
       if (attachmentCount > 0) {
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'attachments');
+        await mkdir(uploadsDir, { recursive: true });
+
         for (let i = 1; i <= attachmentCount; i++) {
           const attachment = formData.get(`attachment${i}`) as File | null;
           if (attachment) {
+            // Generate unique storage key
+            const storageKey = `${email.id}-${i}-${Date.now()}-${attachment.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+            const filePath = path.join(uploadsDir, storageKey);
+
+            // Save file content
+            const buffer = Buffer.from(await attachment.arrayBuffer());
+            await writeFile(filePath, buffer);
+
             await prisma.emailAttachment.create({
               data: {
                 emailId: email.id,
                 filename: attachment.name,
                 contentType: attachment.type,
                 size: attachment.size,
-                // Note: For production, you'd upload to S3/storage and store the key
+                storageKey,
               },
             });
           }

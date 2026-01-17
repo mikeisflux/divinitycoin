@@ -509,12 +509,15 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
                 <div className="text-sm font-medium mb-2">Attachments</div>
                 <div className="flex flex-wrap gap-2">
                   {selectedEmail.attachments.map((att) => (
-                    <span
+                    <a
                       key={att.id}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-neutral-200 rounded text-sm"
+                      href={`/api/admin/inbox/attachments/${att.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-neutral-200 rounded text-sm hover:bg-primary-50 hover:border-primary-300 transition cursor-pointer"
                     >
                       📎 {att.filename}
-                    </span>
+                    </a>
                   ))}
                 </div>
               </div>
