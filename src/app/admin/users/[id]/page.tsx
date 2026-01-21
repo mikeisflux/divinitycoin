@@ -81,6 +81,7 @@ export default function UserDetailPage() {
   const [banning, setBanning] = useState(false);
   const [refunding, setRefunding] = useState(false);
   const [resendingGiftCard, setResendingGiftCard] = useState<string | null>(null);
+  const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
   const [banReason, setBanReason] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -295,6 +296,35 @@ export default function UserDetailPage() {
       setError('Failed to resend gift card');
     } finally {
       setResendingGiftCard(null);
+    }
+  }
+
+  async function handleSendPasswordReset() {
+    if (!user) return;
+
+    setSendingPasswordReset(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to send password reset email');
+        return;
+      }
+
+      setMessage('Password reset email sent to user');
+      setTimeout(() => setMessage(''), 3000);
+    } catch {
+      setError('Failed to send password reset email');
+    } finally {
+      setSendingPasswordReset(false);
     }
   }
 
@@ -526,6 +556,16 @@ export default function UserDetailPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 Edit Profile
+              </button>
+              <button
+                onClick={handleSendPasswordReset}
+                disabled={sendingPasswordReset}
+                className="w-full text-left px-4 py-2 rounded-lg text-sm hover:bg-neutral-50 transition flex items-center gap-2 disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                {sendingPasswordReset ? 'Sending...' : 'Send Password Reset'}
               </button>
               {user.stripeCustomerId && (
                 <a

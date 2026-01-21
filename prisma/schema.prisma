@@ -34,11 +34,12 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  purchasedCards  GiftCard[]      @relation("PurchasedCards")
-  redeemedCards   GiftCard[]      @relation("RedeemedCards")
-  creditBalances  CreditBalance[]
-  transactions    Transaction[]
-  sessions        Session[]
+  purchasedCards       GiftCard[]            @relation("PurchasedCards")
+  redeemedCards        GiftCard[]            @relation("RedeemedCards")
+  creditBalances       CreditBalance[]
+  transactions         Transaction[]
+  sessions             Session[]
+  passwordResetTokens  PasswordResetToken[]
 
   @@index([email])
   @@index([stripeCustomerId])
@@ -55,6 +56,19 @@ model Session {
   // Session metadata
   ipAddress    String?
   userAgent    String?
+
+  @@index([token])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
 
   @@index([token])
   @@index([userId])
