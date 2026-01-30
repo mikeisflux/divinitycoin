@@ -253,36 +253,87 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
     return;
   }
 
-  // Update gift card status to ACTIVE
-  const giftCard = await prisma.giftCard.update({
-    where: { id: giftCardId },
-    data: {
-      status: 'ACTIVE',
-      stripePaymentIntentId: session.payment_intent as string,
-    },
-  });
-
-  // Update transaction status
-  await prisma.transaction.updateMany({
-    where: { stripeCheckoutSessionId: session.id },
-    data: {
-      status: 'COMPLETED',
-      stripePaymentIntentId: session.payment_intent as string,
-      completedAt: new Date(),
-    },
-  });
-
-  // Send gift card email
-  if (session.customer_email) {
-    try {
-      await sendGiftCardEmail({
-        to: session.customer_email,
-        code: giftCardCode,
-        amount: Number(giftCard.amount),
+  try {
+    // Use a transaction to ensure atomicity and handle race conditions
+    const result = await prisma.$transaction(async (tx) => {
+      // Check if gift card is already active (idempotency check)
+      const existingGiftCard = await tx.giftCard.findUnique({
+        where: { id: giftCardId },
       });
-    } catch (error) {
-      logger.error('Failed to send gift card email', { error, giftCardId });
+
+      if (!existingGiftCard) {
+        logger.warn('Gift card not found for checkout session', { giftCardId, sessionId: session.id });
+        return null;
+      }
+
+      // If already active, this webhook was already processed
+      if (existingGiftCard.status === 'ACTIVE') {
+        logger.info('Gift card already active, skipping duplicate webhook', { giftCardId });
+        return { giftCard: existingGiftCard, alreadyProcessed: true };
+      }
+
+      // Update gift card status to ACTIVE
+      const giftCard = await tx.giftCard.update({
+        where: { id: giftCardId },
+        data: {
+          status: 'ACTIVE',
+          stripePaymentIntentId: session.payment_intent as string,
+        },
+      });
+
+      // Update transaction status
+      await tx.transaction.updateMany({
+        where: { stripeCheckoutSessionId: session.id },
+        data: {
+          status: 'COMPLETED',
+          stripePaymentIntentId: session.payment_intent as string,
+          completedAt: new Date(),
+        },
+      });
+
+      return { giftCard, alreadyProcessed: false };
+    }, {
+      timeout: 10000,
+    });
+
+    if (!result) return;
+
+    // Send gift card email only if this is the first processing
+    if (!result.alreadyProcessed && session.customer_email) {
+      try {
+        await sendGiftCardEmail({
+          to: session.customer_email,
+          code: giftCardCode,
+          amount: Number(result.giftCard.amount),
+        });
+      } catch (error) {
+        logger.error('Failed to send gift card email', { error, giftCardId });
+      }
     }
+  } catch (error) {
+    // Handle write conflicts gracefully - Stripe will retry
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      logger.warn('Transaction conflict in handleSuccessfulPayment, checking for existing gift card', {
+        giftCardId,
+        errorCode: error.code,
+      });
+
+      // Check if already processed
+      const existingGiftCard = await prisma.giftCard.findUnique({
+        where: { id: giftCardId },
+      });
+
+      if (existingGiftCard?.status === 'ACTIVE') {
+        logger.info('Transaction already processed, returning existing gift card', {
+          giftCardId,
+        });
+        return;
+      }
+
+      // Not yet completed - will be retried by Stripe
+      throw error;
+    }
+    throw error;
   }
 }
 
@@ -296,21 +347,46 @@ async function handleExpiredSession(session: Stripe.Checkout.Session) {
     return;
   }
 
-  // Delete the pending gift card
-  await prisma.giftCard.delete({
-    where: { id: giftCardId },
-  }).catch(() => {
-    // Gift card may already be deleted or in different state
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Check if gift card exists and is still pending
+      const existingGiftCard = await tx.giftCard.findUnique({
+        where: { id: giftCardId },
+      });
 
-  // Update transaction status
-  await prisma.transaction.updateMany({
-    where: { stripeCheckoutSessionId: session.id },
-    data: {
-      status: 'FAILED',
-      failureReason: 'Checkout session expired',
-    },
-  });
+      // Only delete if still in PENDING status - if ACTIVE, payment succeeded
+      if (existingGiftCard && existingGiftCard.status === 'PENDING') {
+        await tx.giftCard.delete({
+          where: { id: giftCardId },
+        });
+      }
+
+      // Update transaction status
+      await tx.transaction.updateMany({
+        where: {
+          stripeCheckoutSessionId: session.id,
+          status: 'PENDING', // Only update pending transactions
+        },
+        data: {
+          status: 'FAILED',
+          failureReason: 'Checkout session expired',
+        },
+      });
+    }, {
+      timeout: 10000,
+    });
+  } catch (error) {
+    // Handle gracefully - expired session cleanup is not critical
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      logger.debug('Error cleaning up expired session (non-critical)', {
+        sessionId: session.id,
+        giftCardId,
+        errorCode: error.code,
+      });
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
