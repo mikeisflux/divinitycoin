@@ -1,15 +1,17 @@
 #!/bin/bash
 # deploy.sh
-# Production deployment script
+# Zero-downtime deployment script for DivinityCoin
+# Usage: ./scripts/deploy.sh [branch]
 
 set -e
 
 echo "Starting deployment..."
 
-# Variables
+# Variables - detect current directory or use default
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(dirname "$SCRIPT_DIR")"
 APP_NAME="divinitycoin"
-DEPLOY_DIR="/opt/${APP_NAME}"
-BACKUP_DIR="/opt/${APP_NAME}/backups"
+BRANCH="${1:-main}"
 
 # Colors
 RED='\033[0;31m'
@@ -29,87 +31,110 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    log_error "Please run as root"
-    exit 1
+# Change to app directory
+cd "$APP_DIR"
+log_info "Working directory: $APP_DIR"
+log_info "Target branch: $BRANCH"
+
+# Step 1: Pull latest changes
+log_info "Fetching latest changes..."
+git fetch origin "$BRANCH"
+
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse "origin/$BRANCH")
+
+if [ "$LOCAL" = "$REMOTE" ]; then
+    log_warn "Already up to date with origin/$BRANCH"
+    read -p "Rebuild anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Deployment cancelled."
+        exit 0
+    fi
+else
+    log_info "Pulling changes..."
+    git pull origin "$BRANCH"
 fi
 
-# Create backup
-log_info "Creating backup..."
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-mkdir -p "${BACKUP_DIR}"
-if [ -d "${DEPLOY_DIR}/current" ]; then
-    tar -czf "${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz" -C "${DEPLOY_DIR}" current
-    log_info "Backup created: backup_${TIMESTAMP}.tar.gz"
-fi
-
-# Pull latest changes
-log_info "Pulling latest changes..."
-cd "${DEPLOY_DIR}/repo"
-git fetch origin
-git checkout main
-git pull origin main
-
-# Install dependencies
+# Step 2: Install dependencies
 log_info "Installing dependencies..."
-npm ci --production=false
+npm ci --prefer-offline 2>/dev/null || npm install
 
-# Generate Prisma client
+# Step 3: Generate Prisma client
 log_info "Generating Prisma client..."
 npx prisma generate
 
-# Run database migrations
+# Step 4: Run database migrations
 log_info "Running database migrations..."
-npx prisma migrate deploy
+npx prisma migrate deploy || log_warn "No pending migrations"
 
-# Build application
-log_info "Building application..."
+# Step 5: Build application (while current version stays live)
+log_info "Building Next.js application..."
+BUILD_START=$(date +%s)
 npm run build
+BUILD_END=$(date +%s)
+log_info "Build completed in $((BUILD_END - BUILD_START)) seconds"
 
-# Create new release directory
-RELEASE_DIR="${DEPLOY_DIR}/releases/${TIMESTAMP}"
-mkdir -p "${RELEASE_DIR}"
+# Step 6: Hot reload with PM2 (zero-downtime)
+log_info "Performing zero-downtime reload..."
 
-# Copy built files
-log_info "Copying built files..."
-cp -r .next "${RELEASE_DIR}/"
-cp -r public "${RELEASE_DIR}/"
-cp -r node_modules "${RELEASE_DIR}/"
-cp -r prisma "${RELEASE_DIR}/"
-cp package.json "${RELEASE_DIR}/"
-cp next.config.js "${RELEASE_DIR}/" 2>/dev/null || true
-
-# Update symlink
-log_info "Updating symlink..."
-rm -f "${DEPLOY_DIR}/current"
-ln -sf "${RELEASE_DIR}" "${DEPLOY_DIR}/current"
-
-# Restart application
-log_info "Restarting application..."
-if command -v pm2 &> /dev/null; then
-    pm2 reload ecosystem.config.js --env production
+if pm2 list 2>/dev/null | grep -q "$APP_NAME"; then
+    # Use reload for graceful zero-downtime restart
+    # PM2 will start new instances before killing old ones
+    pm2 reload "$APP_NAME" --update-env
+    log_info "Application reloaded (zero downtime)"
 else
-    systemctl restart ${APP_NAME}
+    log_warn "Application not found in PM2. Starting fresh..."
+    if [ -f "ecosystem.config.js" ]; then
+        pm2 start ecosystem.config.js --env production
+    else
+        pm2 start npm --name "$APP_NAME" -- start
+    fi
 fi
 
-# Cleanup old releases (keep last 5)
-log_info "Cleaning up old releases..."
-cd "${DEPLOY_DIR}/releases"
-ls -t | tail -n +6 | xargs -r rm -rf
+# Step 7: Reload nginx (if accessible)
+if command -v nginx &> /dev/null; then
+    log_info "Testing nginx configuration..."
+    if sudo nginx -t 2>/dev/null; then
+        sudo nginx -s reload
+        log_info "Nginx reloaded"
+    elif nginx -t 2>/dev/null; then
+        nginx -s reload
+        log_info "Nginx reloaded"
+    else
+        log_warn "Nginx config test failed, skipping reload"
+    fi
+fi
 
-# Health check
+# Step 8: Save PM2 state
+pm2 save 2>/dev/null || true
+
+# Step 9: Health check
 log_info "Running health check..."
-sleep 5
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health)
-if [ "$HTTP_STATUS" -eq 200 ]; then
-    log_info "Deployment successful! Application is healthy."
-else
-    log_error "Health check failed! HTTP status: ${HTTP_STATUS}"
-    log_warn "Rolling back to previous version..."
-    # Rollback logic here
+sleep 3
+
+MAX_RETRIES=5
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health 2>/dev/null || echo "000")
+    if [ "$HTTP_STATUS" = "200" ]; then
+        log_info "Health check passed!"
+        break
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    log_warn "Health check attempt $RETRY_COUNT/$MAX_RETRIES (status: $HTTP_STATUS)"
+    sleep 2
+done
+
+if [ "$HTTP_STATUS" != "200" ]; then
+    log_error "Health check failed after $MAX_RETRIES attempts"
+    log_warn "Check logs with: pm2 logs $APP_NAME"
     exit 1
 fi
 
+# Step 10: Show status
+echo ""
+pm2 status "$APP_NAME"
 echo ""
 log_info "Deployment completed successfully!"
+log_info "Monitor logs: pm2 logs $APP_NAME"
