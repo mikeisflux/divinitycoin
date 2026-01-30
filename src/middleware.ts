@@ -14,12 +14,13 @@ const allowedOrigins = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin') || '';
+  const host = request.headers.get('host') || '';
 
   // Block bot attacks on server actions
   // These are malformed requests from scanners/bots that cause Next.js errors
   const nextAction = request.headers.get('next-action');
   if (nextAction) {
-    // Valid Next.js server action IDs are long hashes, not single characters like "x"
+    // Valid Next.js server action IDs are long hashes (40 chars), not single characters like "x"
     // Block obviously invalid action IDs (less than 10 chars or containing only simple chars)
     if (nextAction.length < 10 || /^[a-z0-9]{1,5}$/i.test(nextAction)) {
       return new NextResponse(JSON.stringify({ error: 'Invalid request' }), {
@@ -27,17 +28,42 @@ export function middleware(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    // For server actions, ensure we have a valid origin
+    // This prevents "Missing origin header" errors in logs
+    if (!origin) {
+      // If no origin but we have a host, this might be from our nginx proxy
+      // Check if request is coming from allowed sources
+      const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+      const constructedOrigin = `${forwardedProto}://${host}`;
+
+      // Verify host is one of our known hosts
+      const knownHosts = ['divinitycoin.com', 'www.divinitycoin.com', 'localhost:3000'];
+      const isKnownHost = knownHosts.some(h => host.includes(h));
+
+      if (!isKnownHost) {
+        // Unknown host with server action and no origin - likely a bot
+        return new NextResponse(JSON.stringify({ error: 'Invalid request' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
   }
 
-  // Block POST requests to root paths without proper headers (bot attacks)
-  if (request.method === 'POST' && !origin && !pathname.startsWith('/api/webhooks')) {
-    const contentType = request.headers.get('content-type') || '';
-    // If it's a POST with next-action header but no origin, it's likely a bot
-    if (nextAction && !contentType.includes('multipart/form-data')) {
-      return new NextResponse(JSON.stringify({ error: 'Invalid request' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+  // Block POST requests to non-API paths without origin (bot attacks on server actions)
+  if (request.method === 'POST' && !origin && !pathname.startsWith('/api/')) {
+    // Webhooks are exempt - they legitimately don't have origin headers
+    if (!pathname.startsWith('/webhook/')) {
+      const contentType = request.headers.get('content-type') || '';
+      // If it's a POST without origin, it's likely a bot
+      // Only allow multipart form data for file uploads
+      if (!contentType.includes('multipart/form-data')) {
+        return new NextResponse(JSON.stringify({ error: 'Invalid request' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
   }
 
