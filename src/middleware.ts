@@ -53,8 +53,9 @@ export function middleware(request: NextRequest) {
 
   // Block POST requests to non-API paths without origin (bot attacks on server actions)
   if (request.method === 'POST' && !origin && !pathname.startsWith('/api/')) {
-    // Webhooks are exempt - they legitimately don't have origin headers
-    if (!pathname.startsWith('/webhook/')) {
+    // Webhooks and internal partner API are exempt - they legitimately don't have origin headers
+    // (server-to-server calls don't include Origin)
+    if (!pathname.startsWith('/webhook/') && !pathname.startsWith('/internal')) {
       const contentType = request.headers.get('content-type') || '';
       // If it's a POST without origin, it's likely a bot
       // Only allow multipart form data for file uploads
