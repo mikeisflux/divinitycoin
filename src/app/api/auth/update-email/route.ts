@@ -5,11 +5,12 @@ import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser, verifyPassword, getUserByEmail } from '@/lib/auth/user';
 import { prisma } from '@/lib/db';
+import { z } from 'zod';
 
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
+const updateEmailSchema = z.object({
+  newEmail: z.string().email('Invalid email address'),
+  currentPassword: z.string().min(1, 'Current password is required'),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,30 +24,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { newEmail, currentPassword } = body;
+    const validation = updateEmailSchema.safeParse(body);
 
-    // Validate inputs
-    if (!newEmail || typeof newEmail !== 'string') {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'New email is required' },
+        { error: validation.error.errors[0].message },
         { status: 400 }
       );
     }
 
-    if (!isValidEmail(newEmail)) {
-      return NextResponse.json(
-        { error: 'Invalid email address' },
-        { status: 400 }
-      );
-    }
-
-    if (!currentPassword || typeof currentPassword !== 'string') {
-      return NextResponse.json(
-        { error: 'Current password is required' },
-        { status: 400 }
-      );
-    }
-
+    const { newEmail, currentPassword } = validation.data;
     const normalizedEmail = newEmail.toLowerCase().trim();
 
     // Check if email is the same
