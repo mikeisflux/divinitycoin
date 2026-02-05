@@ -46,6 +46,13 @@ export default function AccountPage() {
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailForm, setEmailForm] = useState({
+    newEmail: '',
+    currentPassword: '',
+  });
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState('');
 
   useEffect(() => {
     checkAuth();
@@ -121,6 +128,38 @@ export default function AccountPage() {
       setCreditBalance(null);
     } catch (err) {
       console.error('Logout failed:', err);
+    }
+  }
+
+  async function handleEmailUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    setEmailError('');
+    setEmailSuccess('');
+    setSubmitting(true);
+
+    try {
+      const response = await fetch('/api/auth/update-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailForm),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setEmailError(data.error || 'Failed to update email');
+        return;
+      }
+
+      // Update local user state
+      setUser(prev => prev ? { ...prev, email: data.user.email } : null);
+      setEmailSuccess('Email updated successfully!');
+      setEditingEmail(false);
+      setEmailForm({ newEmail: '', currentPassword: '' });
+    } catch (err) {
+      setEmailError('An error occurred. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -276,16 +315,92 @@ export default function AccountPage() {
               <CardTitle>Account Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-sm text-neutral-500">Email</dt>
-                  <dd className="text-neutral-900">{user.email}</dd>
+              {emailSuccess && (
+                <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm mb-4">
+                  {emailSuccess}
                 </div>
-                <div>
-                  <dt className="text-sm text-neutral-500">Member Since</dt>
-                  <dd className="text-neutral-900">{formatDate(user.createdAt)}</dd>
-                </div>
-              </dl>
+              )}
+
+              {!editingEmail ? (
+                <dl className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <dt className="text-sm text-neutral-500">Email</dt>
+                    <dd className="text-neutral-900 flex items-center gap-2">
+                      {user.email}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingEmail(true);
+                          setEmailForm({ newEmail: '', currentPassword: '' });
+                          setEmailError('');
+                          setEmailSuccess('');
+                        }}
+                        className="text-sm text-primary-600 hover:underline"
+                      >
+                        Edit
+                      </button>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm text-neutral-500">Member Since</dt>
+                    <dd className="text-neutral-900">{formatDate(user.createdAt)}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <form onSubmit={handleEmailUpdate} className="space-y-4 max-w-md">
+                  <div>
+                    <label htmlFor="newEmail" className="block text-sm font-medium text-neutral-700 mb-1">
+                      New Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="newEmail"
+                      required
+                      value={emailForm.newEmail}
+                      onChange={(e) => setEmailForm({ ...emailForm, newEmail: e.target.value })}
+                      className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      placeholder="newemail@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="currentPassword" className="block text-sm font-medium text-neutral-700 mb-1">
+                      Current Password
+                    </label>
+                    <input
+                      type="password"
+                      id="currentPassword"
+                      required
+                      value={emailForm.currentPassword}
+                      onChange={(e) => setEmailForm({ ...emailForm, currentPassword: e.target.value })}
+                      className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      placeholder="Enter your current password"
+                    />
+                  </div>
+
+                  {emailError && (
+                    <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">
+                      {emailError}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? 'Updating...' : 'Update Email'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingEmail(false);
+                        setEmailError('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>
