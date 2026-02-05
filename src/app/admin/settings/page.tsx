@@ -6,6 +6,7 @@ import { getAdminFromRequest } from '@/lib/admin/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
+import { BackupSection } from '@/components/admin/BackupSection';
 
 async function getSystemHealth() {
   const [
@@ -116,6 +117,12 @@ export default async function GeneralSettingsPage() {
             </div>
           </Link>
         ))}
+      </div>
+
+      {/* Server Backup */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-neutral-900 mb-4">Maintenance</h2>
+        <BackupSection />
       </div>
 
       {/* Quick Info */}
