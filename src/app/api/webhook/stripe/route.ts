@@ -9,6 +9,8 @@ import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
 import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 import { logger } from '@/lib/logger';
 import { Prisma } from '@prisma/client';
+import { placeHold } from '@/lib/credits/holds';
+import { sendWebhook } from '@/lib/partner/webhook';
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,8 +83,15 @@ export async function POST(request: NextRequest) {
 /**
  * Handle PaymentIntent succeeded - fallback for when frontend confirmation fails
  * This ensures transactions are completed even if the user's browser closes
+ * Also handles partner-initiated payments with auto gift card + redeem + hold
  */
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  // Check if this is a partner-initiated payment (seamless payment flow)
+  if (paymentIntent.metadata?.type === 'partner_payment') {
+    await handlePartnerPaymentSucceeded(paymentIntent);
+    return;
+  }
+
   const transactionId = paymentIntent.metadata?.transactionId;
 
   if (!transactionId) {
@@ -430,4 +439,237 @@ async function handleRefund(charge: Stripe.Charge) {
       completedAt: new Date(),
     },
   });
+}
+
+/**
+ * Handle partner-initiated payment (seamless payment flow)
+ * Auto-creates gift card, redeems to balance, places hold, and sends webhook
+ */
+async function handlePartnerPaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  const { partnerId, platformUserId, pledgeId, projectId, email } = paymentIntent.metadata;
+
+  if (!partnerId || !platformUserId || !pledgeId || !projectId) {
+    logger.error('Partner payment missing required metadata', {
+      paymentIntentId: paymentIntent.id,
+      metadata: paymentIntent.metadata,
+    });
+    return;
+  }
+
+  // Check if already processed
+  const existingPayment = await prisma.pendingPartnerPayment.findUnique({
+    where: { paymentIntentId: paymentIntent.id },
+  });
+
+  if (existingPayment?.status === 'COMPLETED') {
+    logger.debug('Partner payment already processed', { paymentIntentId: paymentIntent.id });
+    return;
+  }
+
+  const amountDollars = paymentIntent.amount / 100;
+
+  try {
+    // Generate gift card code
+    const code = generateGiftCardCode();
+    const codeHash = hashCode(code);
+    const codeLast4 = getCodeLast4(code);
+
+    let giftCardId: string;
+    let holdId: string | undefined;
+
+    // Use a transaction for atomicity
+    await prisma.$transaction(async (tx) => {
+      // 1. Create gift card
+      const giftCard = await tx.giftCard.create({
+        data: {
+          codeHash,
+          codeLast4,
+          amount: amountDollars,
+          currency: 'USD',
+          status: 'REDEEMED', // Immediately redeemed
+          purchasedByEmail: email,
+          activatedAt: new Date(),
+          redeemedAt: new Date(),
+          redeemedByPlatformUserId: platformUserId,
+          redeemedOnPlatform: partnerId,
+          partnerId,
+          stripePaymentIntentId: paymentIntent.id,
+        },
+      });
+      giftCardId = giftCard.id;
+
+      // 2. Upsert credit balance (auto-redeem)
+      const creditBalance = await tx.creditBalance.upsert({
+        where: { platformUserId },
+        create: {
+          platformUserId,
+          email,
+          availableBalance: amountDollars,
+          heldBalance: 0,
+        },
+        update: {
+          availableBalance: { increment: amountDollars },
+        },
+      });
+
+      // 3. Create ledger entry for redemption
+      await tx.creditLedger.create({
+        data: {
+          creditBalanceId: creditBalance.id,
+          type: 'REDEMPTION',
+          amount: amountDollars,
+          balanceAfter: creditBalance.availableBalance,
+          giftCardId: giftCard.id,
+          description: `Auto-redeemed gift card ****${codeLast4} from partner payment`,
+          metadata: {
+            paymentIntentId: paymentIntent.id,
+            partnerId,
+            pledgeId,
+            projectId,
+            autoRedeemed: true,
+          },
+        },
+      });
+
+      // 4. Update pending payment record
+      await tx.pendingPartnerPayment.update({
+        where: { paymentIntentId: paymentIntent.id },
+        data: {
+          giftCardId: giftCard.id,
+          status: 'PROCESSING',
+        },
+      });
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 15000,
+    });
+
+    // 5. Place hold (after transaction to avoid nested transactions)
+    const holdResult = await placeHold({
+      platformUserId,
+      amount: amountDollars,
+      pledgeId,
+      projectId,
+      ipAddress: '0.0.0.0', // Webhook has no client IP
+    });
+
+    if (holdResult.success) {
+      holdId = holdResult.holdId;
+    } else {
+      logger.error('Failed to place hold after partner payment', {
+        paymentIntentId: paymentIntent.id,
+        error: holdResult.error,
+      });
+    }
+
+    // 6. Update pending payment with final status
+    await prisma.pendingPartnerPayment.update({
+      where: { paymentIntentId: paymentIntent.id },
+      data: {
+        status: 'COMPLETED',
+        holdId,
+        completedAt: new Date(),
+      },
+    });
+
+    // 7. Send webhook to partner
+    const partner = await prisma.partner.findUnique({
+      where: { id: partnerId },
+      select: { webhookUrl: true, webhookSecret: true },
+    });
+
+    if (partner?.webhookUrl && partner?.webhookSecret) {
+      // Get payment method details from Stripe
+      let paymentMethodDetails = { type: 'card', brand: 'unknown', last4: '****' };
+      if (paymentIntent.payment_method && typeof paymentIntent.payment_method === 'string') {
+        try {
+          const stripe = await getStripeClient();
+          const pm = await stripe.paymentMethods.retrieve(paymentIntent.payment_method);
+          if (pm.card) {
+            paymentMethodDetails = {
+              type: 'card',
+              brand: pm.card.brand || 'unknown',
+              last4: pm.card.last4 || '****',
+            };
+          }
+        } catch {
+          // Use defaults if retrieval fails
+        }
+      }
+
+      const webhookResult = await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'payment.succeeded', {
+        paymentIntentId: paymentIntent.id,
+        amount: paymentIntent.amount,
+        platformUserId,
+        pledgeId,
+        projectId,
+        giftCard: {
+          last4: codeLast4,
+          amount: paymentIntent.amount,
+          autoRedeemed: true,
+        },
+        hold: holdId ? {
+          holdId,
+          amount: paymentIntent.amount,
+          status: 'ACTIVE',
+        } : null,
+        paymentMethod: paymentMethodDetails,
+      });
+
+      // Update webhook sent status
+      await prisma.pendingPartnerPayment.update({
+        where: { paymentIntentId: paymentIntent.id },
+        data: {
+          webhookSent: webhookResult.success,
+          webhookSentAt: new Date(),
+        },
+      });
+
+      if (!webhookResult.success) {
+        logger.warn('Failed to send webhook to partner', {
+          paymentIntentId: paymentIntent.id,
+          partnerId,
+          error: webhookResult.error,
+        });
+      }
+    }
+
+    logger.info('Partner payment processed successfully', {
+      paymentIntentId: paymentIntent.id,
+      partnerId,
+      platformUserId,
+      amount: amountDollars,
+      holdId,
+    });
+  } catch (error) {
+    logger.error('Failed to process partner payment', {
+      error,
+      paymentIntentId: paymentIntent.id,
+    });
+
+    // Update status to failed
+    await prisma.pendingPartnerPayment.update({
+      where: { paymentIntentId: paymentIntent.id },
+      data: { status: 'FAILED' },
+    }).catch(() => {});
+
+    // Send failure webhook to partner
+    const partner = await prisma.partner.findUnique({
+      where: { id: partnerId },
+      select: { webhookUrl: true, webhookSecret: true },
+    });
+
+    if (partner?.webhookUrl && partner?.webhookSecret) {
+      await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'payment.failed', {
+        paymentIntentId: paymentIntent.id,
+        amount: paymentIntent.amount,
+        platformUserId,
+        pledgeId,
+        projectId,
+        error: 'Payment processing failed',
+      });
+    }
+
+    throw error;
+  }
 }

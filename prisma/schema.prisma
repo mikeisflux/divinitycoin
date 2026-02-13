@@ -1044,3 +1044,90 @@ enum EmailQueueStatus {
   FAILED        // All retries exhausted
   CANCELLED     // Manually cancelled
 }
+
+// ============================================
+// PARTNER PAYMENT SYSTEM (Seamless Payments)
+// ============================================
+
+model PlatformUser {
+  id                String    @id @default(cuid())
+
+  // Partner reference
+  partnerId         String
+
+  // Platform identity
+  platformUserId    String    @unique  // User ID from partner platform
+  email             String
+
+  // Stripe customer on DC's account
+  stripeCustomerId  String?   @unique
+
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  pendingPayments   PendingPartnerPayment[]
+
+  @@index([partnerId])
+  @@index([platformUserId])
+  @@index([email])
+}
+
+model PendingPartnerPayment {
+  id                String    @id @default(cuid())
+
+  // Stripe payment intent
+  paymentIntentId   String    @unique
+
+  // Partner reference
+  partnerId         String
+
+  // Platform user reference
+  platformUserId    String
+  platformUser      PlatformUser? @relation(fields: [platformUserId], references: [platformUserId])
+
+  // Pledge/project reference (from partner)
+  pledgeId          String
+  projectId         String
+
+  // Payment details
+  amount            Int       // Amount in cents
+  currency          String    @default("usd")
+  email             String
+
+  // Status tracking
+  status            PartnerPaymentStatus @default(PENDING)
+
+  // Gift card created after payment succeeds
+  giftCardId        String?
+
+  // Hold created after auto-redemption
+  holdId            String?
+
+  // Refund info
+  refundId          String?
+  refundedAt        DateTime?
+
+  // Webhook delivery tracking
+  webhookSent       Boolean   @default(false)
+  webhookSentAt     DateTime?
+
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+
+  @@index([partnerId])
+  @@index([platformUserId])
+  @@index([pledgeId])
+  @@index([status])
+}
+
+enum PartnerPaymentStatus {
+  PENDING       // PaymentIntent created, awaiting payment
+  PROCESSING    // Payment in progress
+  COMPLETED     // Payment succeeded, gift card created, redeemed, held
+  FAILED        // Payment failed
+  REFUNDED      // Payment refunded
+}

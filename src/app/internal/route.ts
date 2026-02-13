@@ -10,6 +10,8 @@ import { SettlementStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { hashApiKey } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
+import { getStripeClient } from '@/lib/stripe';
+import { getStripeConfig } from '@/lib/config';
 import crypto from 'crypto';
 
 // Fallback to legacy INTERNAL_API_KEY for backwards compatibility
@@ -137,6 +139,12 @@ export async function POST(request: NextRequest) {
 
       case 'record_capture':
         return handleRecordCapture(body);
+
+      case 'create-payment-intent':
+        return handleCreatePaymentIntent(body, partnerId!);
+
+      case 'refund':
+        return handleRefund(body, partnerId!, ipAddress);
 
       default:
         return NextResponse.json(
@@ -631,4 +639,309 @@ async function handleCapture(body: { pledgeId: string }, ipAddress: string) {
   }
 
   return NextResponse.json(result);
+}
+
+/**
+ * Create a Stripe PaymentIntent for seamless payment
+ * Returns client_secret for Stripe Elements and publishable key
+ */
+async function handleCreatePaymentIntent(
+  body: {
+    amount: number;
+    currency?: string;
+    platformUserId: string;
+    email: string;
+    pledgeId: string;
+    projectId: string;
+    statement_descriptor?: string;
+  },
+  partnerId: string
+) {
+  const { amount, currency = 'usd', platformUserId, email, pledgeId, projectId, statement_descriptor } = body;
+
+  // Validate required fields
+  if (!amount || !platformUserId || !email || !pledgeId || !projectId) {
+    return NextResponse.json(
+      { error: 'Missing required fields: amount, platformUserId, email, pledgeId, projectId' },
+      { status: 400 }
+    );
+  }
+
+  if (amount <= 0) {
+    return NextResponse.json(
+      { error: 'Amount must be positive' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const stripe = await getStripeClient();
+    const stripeConfig = await getStripeConfig();
+
+    // Find or create DC user for this platformUserId
+    let dcUser = await prisma.platformUser.findUnique({
+      where: { platformUserId },
+    });
+
+    if (!dcUser) {
+      dcUser = await prisma.platformUser.create({
+        data: {
+          platformUserId,
+          email,
+          partnerId,
+        },
+      });
+    }
+
+    // Find or create Stripe customer
+    let stripeCustomerId = dcUser.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email,
+        metadata: {
+          platformUserId,
+          partnerId,
+        },
+      });
+      stripeCustomerId = customer.id;
+
+      // Save the Stripe customer ID
+      await prisma.platformUser.update({
+        where: { id: dcUser.id },
+        data: { stripeCustomerId },
+      });
+    }
+
+    // Create Stripe PaymentIntent with metadata for webhook processing
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency,
+      customer: stripeCustomerId,
+      metadata: {
+        type: 'partner_payment',
+        partnerId,
+        platformUserId,
+        pledgeId,
+        projectId,
+        email,
+      },
+      statement_descriptor: statement_descriptor?.substring(0, 22), // Max 22 chars
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    // Store pending payment mapping
+    await prisma.pendingPartnerPayment.create({
+      data: {
+        paymentIntentId: paymentIntent.id,
+        partnerId,
+        platformUserId,
+        pledgeId,
+        projectId,
+        amount,
+        currency,
+        email,
+        status: 'PENDING',
+      },
+    });
+
+    logger.info('Partner payment intent created', {
+      paymentIntentId: paymentIntent.id,
+      partnerId,
+      platformUserId,
+      amount,
+      pledgeId,
+    });
+
+    return NextResponse.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      publishableKey: stripeConfig.publishableKey,
+      amount,
+    });
+  } catch (error) {
+    logger.error('Failed to create payment intent', { error, partnerId, platformUserId, amount });
+    return NextResponse.json(
+      { error: 'Failed to create payment intent' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Process a refund for a partner payment
+ * Refunds the Stripe charge, voids the gift card, releases the hold, and deducts from balance
+ */
+async function handleRefund(
+  body: {
+    paymentIntentId: string;
+    amount?: number;
+    reason?: string;
+    pledgeId?: string;
+  },
+  partnerId: string,
+  ipAddress: string
+) {
+  const { paymentIntentId, amount, reason, pledgeId } = body;
+
+  if (!paymentIntentId) {
+    return NextResponse.json(
+      { error: 'paymentIntentId is required' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const stripe = await getStripeClient();
+
+    // Find the pending/completed payment record
+    const paymentRecord = await prisma.pendingPartnerPayment.findUnique({
+      where: { paymentIntentId },
+    });
+
+    if (!paymentRecord) {
+      return NextResponse.json(
+        { error: 'Payment not found' },
+        { status: 404 }
+      );
+    }
+
+    // Verify the partner owns this payment
+    if (paymentRecord.partnerId !== partnerId && partnerId !== 'internal') {
+      return NextResponse.json(
+        { error: 'Payment not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get the original payment intent to verify status
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      return NextResponse.json(
+        { error: `Cannot refund payment with status: ${paymentIntent.status}` },
+        { status: 400 }
+      );
+    }
+
+    // Process Stripe refund
+    const refundAmount = amount || paymentRecord.amount;
+    const refund = await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      amount: refundAmount,
+      reason: reason === 'campaign_failed' ? 'requested_by_customer' : 'requested_by_customer',
+      metadata: {
+        partnerId,
+        pledgeId: pledgeId || paymentRecord.pledgeId,
+        reason: reason || 'partner_refund',
+      },
+    });
+
+    // Find and void the associated gift card
+    if (paymentRecord.giftCardId) {
+      await prisma.giftCard.update({
+        where: { id: paymentRecord.giftCardId },
+        data: { status: 'REVOKED' },
+      });
+    }
+
+    // Release the hold if one exists
+    const holdPledgeId = pledgeId || paymentRecord.pledgeId;
+    if (holdPledgeId) {
+      try {
+        await releaseHold(holdPledgeId, ipAddress);
+      } catch {
+        // Hold may not exist or already released - that's ok
+      }
+    }
+
+    // Deduct from user's credit balance if already redeemed
+    if (paymentRecord.status === 'COMPLETED') {
+      const creditBalance = await prisma.creditBalance.findUnique({
+        where: { platformUserId: paymentRecord.platformUserId },
+      });
+
+      if (creditBalance) {
+        const refundAmountDollars = refundAmount / 100;
+        const currentAvailable = Number(creditBalance.availableBalance);
+
+        if (currentAvailable >= refundAmountDollars) {
+          await prisma.creditBalance.update({
+            where: { id: creditBalance.id },
+            data: {
+              availableBalance: { decrement: refundAmountDollars },
+            },
+          });
+
+          // Create ledger entry
+          await prisma.creditLedger.create({
+            data: {
+              creditBalanceId: creditBalance.id,
+              type: 'REFUND',
+              amount: -refundAmountDollars,
+              balanceAfter: currentAvailable - refundAmountDollars,
+              description: `Refund for payment ${paymentIntentId}`,
+              metadata: {
+                paymentIntentId,
+                refundId: refund.id,
+                reason,
+                ipAddress,
+              },
+            },
+          });
+        }
+      }
+    }
+
+    // Update payment record status
+    await prisma.pendingPartnerPayment.update({
+      where: { paymentIntentId },
+      data: {
+        status: 'REFUNDED',
+        refundId: refund.id,
+        refundedAt: new Date(),
+      },
+    });
+
+    // Send webhook to partner
+    const partner = await prisma.partner.findUnique({
+      where: { id: paymentRecord.partnerId },
+      select: { webhookUrl: true, webhookSecret: true },
+    });
+
+    if (partner?.webhookUrl && partner?.webhookSecret) {
+      const { sendWebhook } = await import('@/lib/partner/webhook');
+      await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'refund.completed', {
+        paymentIntentId,
+        refundId: refund.id,
+        amount: refundAmount,
+        pledgeId: holdPledgeId,
+        platformUserId: paymentRecord.platformUserId,
+        status: 'succeeded',
+      });
+    }
+
+    logger.info('Partner refund processed', {
+      paymentIntentId,
+      refundId: refund.id,
+      amount: refundAmount,
+      partnerId,
+    });
+
+    return NextResponse.json({
+      success: true,
+      refundId: refund.id,
+      amount: refundAmount,
+      status: 'succeeded',
+    });
+  } catch (error) {
+    logger.error('Failed to process refund', { error, paymentIntentId, partnerId });
+    return NextResponse.json(
+      { error: 'Failed to process refund' },
+      { status: 500 }
+    );
+  }
 }

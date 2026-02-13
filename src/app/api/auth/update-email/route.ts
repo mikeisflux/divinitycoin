@@ -27,8 +27,9 @@ export async function POST(request: NextRequest) {
     const validation = updateEmailSchema.safeParse(body);
 
     if (!validation.success) {
+      const firstError = validation.error.issues[0];
       return NextResponse.json(
-        { error: validation.error.errors[0].message },
+        { error: firstError?.message || 'Invalid input' },
         { status: 400 }
       );
     }
