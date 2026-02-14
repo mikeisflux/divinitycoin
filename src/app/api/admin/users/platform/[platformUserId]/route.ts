@@ -52,10 +52,30 @@ export async function GET(
       }),
     ]);
 
-    // Fill in email from PlatformUser if CreditBalance.email is null
+    // Resolve email from multiple sources if CreditBalance.email is null
+    let resolvedEmail = creditBalance.email || platformUser?.email || null;
+
+    if (!resolvedEmail) {
+      // Check gift card redemptions and partner payments for email
+      const [giftCard, payment] = await Promise.all([
+        prisma.giftCard.findFirst({
+          where: {
+            redeemedByPlatformUserId: platformUserId,
+            redeemedByEmail: { not: null },
+          },
+          select: { redeemedByEmail: true },
+        }),
+        prisma.pendingPartnerPayment.findFirst({
+          where: { platformUserId },
+          select: { email: true },
+        }),
+      ]);
+      resolvedEmail = giftCard?.redeemedByEmail || payment?.email || null;
+    }
+
     const resolvedCreditBalance = {
       ...creditBalance,
-      email: creditBalance.email || platformUser?.email || null,
+      email: resolvedEmail,
     };
 
     return NextResponse.json({

@@ -93,20 +93,39 @@ export async function GET(request: NextRequest) {
     // Also search PlatformUser emails for users where CreditBalance.email is null
     let cbWhere: Record<string, unknown> = {};
     if (search) {
-      // Find platformUserIds where the email matches in PlatformUser table
-      // (for older records where CreditBalance.email is null)
-      const matchingPlatformUsers = await prisma.platformUser.findMany({
-        where: { email: { contains: search, mode: 'insensitive' } },
-        select: { platformUserId: true },
-      });
-      const matchingPuIds = matchingPlatformUsers.map(pu => pu.platformUserId);
+      // Find platformUserIds where the email matches across all sources
+      const [matchingPlatformUsers, matchingGiftCards, matchingPayments] = await Promise.all([
+        prisma.platformUser.findMany({
+          where: { email: { contains: search, mode: 'insensitive' } },
+          select: { platformUserId: true },
+        }),
+        prisma.giftCard.findMany({
+          where: {
+            redeemedByEmail: { contains: search, mode: 'insensitive' },
+            redeemedByPlatformUserId: { not: null },
+          },
+          select: { redeemedByPlatformUserId: true },
+          distinct: ['redeemedByPlatformUserId'],
+        }),
+        prisma.pendingPartnerPayment.findMany({
+          where: { email: { contains: search, mode: 'insensitive' } },
+          select: { platformUserId: true },
+          distinct: ['platformUserId'],
+        }),
+      ]);
+
+      const matchingPuIds = new Set([
+        ...matchingPlatformUsers.map(pu => pu.platformUserId),
+        ...matchingGiftCards.map(gc => gc.redeemedByPlatformUserId).filter(Boolean) as string[],
+        ...matchingPayments.map(pp => pp.platformUserId),
+      ]);
 
       const orConditions: Record<string, unknown>[] = [
         { email: { contains: search, mode: 'insensitive' } },
         { platformUserId: { contains: search, mode: 'insensitive' } },
       ];
-      if (matchingPuIds.length > 0) {
-        orConditions.push({ platformUserId: { in: matchingPuIds } });
+      if (matchingPuIds.size > 0) {
+        orConditions.push({ platformUserId: { in: Array.from(matchingPuIds) } });
       }
       cbWhere = { OR: orConditions };
     }
@@ -134,28 +153,65 @@ export async function GET(request: NextRequest) {
 
     const platformUserIds = creditBalances.map(cb => cb.platformUserId);
 
-    // Look up emails from PlatformUser table for records where CreditBalance.email is null
-    let platformUserEmails: Record<string, string> = {};
+    // Look up emails from multiple sources for records where CreditBalance.email is null
+    let resolvedEmails: Record<string, string> = {};
     // Get partner payment aggregates for these platform users
     let paymentAggregates: Record<string, { total: number; count: number; completedCount: number; failedCount: number }> = {};
 
+    // Identify which platformUserIds need email resolution
+    const needsEmail = creditBalances.filter(cb => !cb.email).map(cb => cb.platformUserId);
+
     if (platformUserIds.length > 0) {
-      const [platformUserRecords, payments] = await Promise.all([
+      const queries: Promise<unknown>[] = [
+        // Source 1: PlatformUser table
         prisma.platformUser.findMany({
           where: { platformUserId: { in: platformUserIds } },
           select: { platformUserId: true, email: true },
         }),
+        // Partner payment aggregates
         prisma.pendingPartnerPayment.findMany({
           where: { platformUserId: { in: platformUserIds } },
-          select: { platformUserId: true, amount: true, status: true },
+          select: { platformUserId: true, amount: true, status: true, email: true },
         }),
-      ]);
+      ];
 
-      for (const pu of platformUserRecords) {
-        platformUserEmails[pu.platformUserId] = pu.email;
+      // Source 2: GiftCard redemptions (for legacy users)
+      if (needsEmail.length > 0) {
+        queries.push(
+          prisma.giftCard.findMany({
+            where: {
+              redeemedByPlatformUserId: { in: needsEmail },
+              redeemedByEmail: { not: null },
+            },
+            select: { redeemedByPlatformUserId: true, redeemedByEmail: true },
+            distinct: ['redeemedByPlatformUserId'],
+          })
+        );
       }
 
+      const results = await Promise.all(queries);
+      const platformUserRecords = results[0] as Array<{ platformUserId: string; email: string }>;
+      const payments = results[1] as Array<{ platformUserId: string; amount: number; status: string; email: string }>;
+      const giftCardRedemptions = (results[2] || []) as Array<{ redeemedByPlatformUserId: string | null; redeemedByEmail: string | null }>;
+
+      // Priority 1: PlatformUser email
+      for (const pu of platformUserRecords) {
+        resolvedEmails[pu.platformUserId] = pu.email;
+      }
+
+      // Priority 2: GiftCard redemption email (only if not already resolved)
+      for (const gc of giftCardRedemptions) {
+        if (gc.redeemedByPlatformUserId && gc.redeemedByEmail && !resolvedEmails[gc.redeemedByPlatformUserId]) {
+          resolvedEmails[gc.redeemedByPlatformUserId] = gc.redeemedByEmail;
+        }
+      }
+
+      // Priority 3: PendingPartnerPayment email (only if not already resolved)
       for (const pp of payments) {
+        if (pp.email && !resolvedEmails[pp.platformUserId]) {
+          resolvedEmails[pp.platformUserId] = pp.email;
+        }
+
         if (!paymentAggregates[pp.platformUserId]) {
           paymentAggregates[pp.platformUserId] = { total: 0, count: 0, completedCount: 0, failedCount: 0 };
         }
@@ -181,7 +237,7 @@ export async function GET(request: NextRequest) {
       return {
         id: cbWithoutLedger.id,
         platformUserId: cbWithoutLedger.platformUserId,
-        email: cbWithoutLedger.email || platformUserEmails[cbWithoutLedger.platformUserId] || 'Unknown',
+        email: cbWithoutLedger.email || resolvedEmails[cbWithoutLedger.platformUserId] || 'Unknown',
         linkedUserId: cbWithoutLedger.userId,
         availableBalance: cbWithoutLedger.availableBalance,
         heldBalance: cbWithoutLedger.heldBalance,
