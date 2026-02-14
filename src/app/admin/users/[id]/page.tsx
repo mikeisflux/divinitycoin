@@ -20,6 +20,7 @@ interface User {
   creditBalances: Array<{
     availableBalance: string;
     heldBalance: string;
+    platformUserId: string;
     holds: Array<{ id: string; amount: string; status: string }>;
   }>;
   purchasedCards: Array<{
@@ -38,6 +39,24 @@ interface User {
     giftCardId: string | null;
     createdAt: string;
   }>;
+}
+
+interface PartnerPayment {
+  id: string;
+  paymentIntentId: string;
+  partnerId: string;
+  platformUserId: string;
+  pledgeId: string;
+  projectId: string;
+  amount: number; // cents
+  currency: string;
+  status: string;
+  giftCardId: string | null;
+  holdId: string | null;
+  refundId: string | null;
+  refundedAt: string | null;
+  createdAt: string;
+  completedAt: string | null;
 }
 
 function formatCurrency(amount: number): string {
@@ -70,6 +89,7 @@ export default function UserDetailPage() {
   const userId = params.id as string;
 
   const [user, setUser] = useState<User | null>(null);
+  const [partnerPayments, setPartnerPayments] = useState<PartnerPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -102,6 +122,7 @@ export default function UserDetailPage() {
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
+        setPartnerPayments(data.partnerPayments || []);
         setEditForm({
           name: data.user.name || '',
           email: data.user.email,
@@ -440,12 +461,10 @@ export default function UserDetailPage() {
             </dl>
           </div>
 
-          {/* Recent Transactions */}
+          {/* Recent Transactions (Legacy) */}
+          {user.transactions.length > 0 && (
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
-            <h2 className="text-lg font-semibold text-neutral-900 mb-4">Recent Transactions</h2>
-            {user.transactions.length === 0 ? (
-              <p className="text-neutral-500 text-sm">No transactions yet.</p>
-            ) : (
+            <h2 className="text-lg font-semibold text-neutral-900 mb-4">Legacy Transactions</h2>
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead>
                   <tr>
@@ -483,6 +502,46 @@ export default function UserDetailPage() {
                             Refund
                           </button>
                         )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          </div>
+          )}
+
+          {/* Partner Payments */}
+          <div className="bg-white rounded-xl border border-neutral-200 p-6">
+            <h2 className="text-lg font-semibold text-neutral-900 mb-4">Partner Payments</h2>
+            {partnerPayments.length === 0 ? (
+              <p className="text-neutral-500 text-sm">No partner payments yet.</p>
+            ) : (
+              <table className="min-w-full divide-y divide-neutral-200">
+                <thead>
+                  <tr>
+                    <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Pledge</th>
+                    <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Amount</th>
+                    <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Status</th>
+                    <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Hold</th>
+                    <th className="text-left text-xs font-medium text-neutral-500 uppercase py-2">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {partnerPayments.map((pp) => (
+                    <tr key={pp.id}>
+                      <td className="py-3">
+                        <div className="text-sm text-neutral-900 font-mono">{pp.pledgeId.slice(0, 12)}...</div>
+                        <div className="text-xs text-neutral-500">{pp.paymentIntentId.slice(0, 15)}...</div>
+                      </td>
+                      <td className="py-3 text-sm font-medium">{formatCurrency(pp.amount / 100)}</td>
+                      <td className="py-3"><StatusBadge status={pp.status} /></td>
+                      <td className="py-3 text-sm text-neutral-500">
+                        {pp.holdId ? (
+                          <span className="text-green-600 font-mono text-xs">{pp.holdId.slice(0, 8)}...</span>
+                        ) : '-'}
+                      </td>
+                      <td className="py-3 text-sm text-neutral-500">
+                        {new Date(pp.createdAt).toLocaleDateString()}
                       </td>
                     </tr>
                   ))}

@@ -40,7 +40,11 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         include: {
           creditBalances: {
-            select: { availableBalance: true, heldBalance: true },
+            select: {
+              availableBalance: true,
+              heldBalance: true,
+              platformUserId: true,
+            },
           },
           _count: {
             select: { transactions: true, purchasedCards: true },
@@ -57,17 +61,57 @@ export async function GET(request: NextRequest) {
       prisma.user.count({ where }),
     ]);
 
-    // Calculate all-time purchase total for each user
+    // Get partner payment totals for users that have credit balances with platformUserIds
+    const platformUserIds = users
+      .flatMap((u) => u.creditBalances.map((cb) => cb.platformUserId))
+      .filter(Boolean) as string[];
+
+    let partnerPaymentTotals: Record<string, number> = {};
+    let partnerPaymentCounts: Record<string, number> = {};
+    if (platformUserIds.length > 0) {
+      const partnerPayments = await prisma.pendingPartnerPayment.findMany({
+        where: {
+          platformUserId: { in: platformUserIds },
+          status: 'COMPLETED',
+        },
+        select: { platformUserId: true, amount: true },
+      });
+
+      for (const pp of partnerPayments) {
+        partnerPaymentTotals[pp.platformUserId] = (partnerPaymentTotals[pp.platformUserId] || 0) + (pp.amount / 100);
+        partnerPaymentCounts[pp.platformUserId] = (partnerPaymentCounts[pp.platformUserId] || 0) + 1;
+      }
+    }
+
+    // Calculate all-time purchase total for each user (legacy + partner payments)
     const usersWithTotals = users.map((user) => {
-      const allTimePurchaseTotal = user.transactions.reduce(
+      const legacyTotal = user.transactions.reduce(
         (sum, t) => sum + Number(t.amount),
         0
       );
+
+      // Sum partner payment totals for this user's credit balances
+      let partnerTotal = 0;
+      let partnerCount = 0;
+      for (const cb of user.creditBalances) {
+        if (cb.platformUserId && partnerPaymentTotals[cb.platformUserId]) {
+          partnerTotal += partnerPaymentTotals[cb.platformUserId];
+          partnerCount += partnerPaymentCounts[cb.platformUserId] || 0;
+        }
+      }
+
+      const allTimePurchaseTotal = legacyTotal + partnerTotal;
+      const totalTransactionCount = (user._count.transactions || 0) + partnerCount;
+
       // Remove transactions array from response to keep it clean
       const { transactions, ...userWithoutTransactions } = user;
       return {
         ...userWithoutTransactions,
         allTimePurchaseTotal,
+        _count: {
+          ...userWithoutTransactions._count,
+          transactions: totalTransactionCount,
+        },
       };
     });
 

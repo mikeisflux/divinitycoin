@@ -19,18 +19,47 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const status = searchParams.get('status');
     const type = searchParams.get('type');
+    const source = searchParams.get('source'); // 'legacy', 'partner', or null for all
 
     const skip = (page - 1) * limit;
+
+    // Legacy transactions
+    if (source === 'partner') {
+      // Only show partner payments
+      const ppWhere: any = {};
+      if (status) ppWhere.status = status;
+
+      const [partnerPayments, ppTotal] = await Promise.all([
+        prisma.pendingPartnerPayment.findMany({
+          where: ppWhere,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.pendingPartnerPayment.count({ where: ppWhere }),
+      ]);
+
+      return NextResponse.json({
+        transactions: [],
+        partnerPayments,
+        pagination: {
+          page,
+          limit,
+          total: ppTotal,
+          pages: Math.ceil(ppTotal / limit),
+        },
+      });
+    }
 
     const where: any = {};
     if (status) where.status = status;
     if (type) where.type = type;
 
-    const [transactions, total] = await Promise.all([
+    const [transactions, total, partnerPayments, ppTotal] = await Promise.all([
       prisma.transaction.findMany({
         where,
         skip,
-        take: limit,
+        take: source === 'legacy' ? limit : Math.ceil(limit / 2),
         orderBy: { createdAt: 'desc' },
         include: {
           user: { select: { email: true, name: true } },
@@ -38,15 +67,32 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.transaction.count({ where }),
+      // Also fetch partner payments unless filtering to legacy only
+      source === 'legacy'
+        ? Promise.resolve([])
+        : prisma.pendingPartnerPayment.findMany({
+            where: status ? { status } : {},
+            skip,
+            take: Math.ceil(limit / 2),
+            orderBy: { createdAt: 'desc' },
+          }),
+      source === 'legacy'
+        ? Promise.resolve(0)
+        : prisma.pendingPartnerPayment.count({ where: status ? { status } : {} }),
     ]);
+
+    const combinedTotal = total + (typeof ppTotal === 'number' ? ppTotal : 0);
 
     return NextResponse.json({
       transactions,
+      partnerPayments: partnerPayments || [],
       pagination: {
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit),
+        total: combinedTotal,
+        legacyTotal: total,
+        partnerTotal: typeof ppTotal === 'number' ? ppTotal : 0,
+        pages: Math.ceil(combinedTotal / limit),
       },
     });
   } catch (error) {

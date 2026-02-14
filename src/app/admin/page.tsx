@@ -25,23 +25,30 @@ async function getDashboardStats() {
     failedTransactions,
     recentTransactions,
     recentRedemptions,
+    // Partner payment revenue
+    ppTotalRevenue,
+    ppTodayRevenue,
+    ppWeekRevenue,
+    ppMonthRevenue,
+    ppFailedCount,
+    recentPartnerPayments,
   ] = await Promise.all([
-    // Total revenue
+    // Total revenue (legacy)
     prisma.transaction.aggregate({
       where: { type: 'PURCHASE', status: 'COMPLETED' },
       _sum: { amount: true },
     }),
-    // Today's revenue
+    // Today's revenue (legacy)
     prisma.transaction.aggregate({
       where: { type: 'PURCHASE', status: 'COMPLETED', createdAt: { gte: startOfToday } },
       _sum: { amount: true },
     }),
-    // This week's revenue
+    // This week's revenue (legacy)
     prisma.transaction.aggregate({
       where: { type: 'PURCHASE', status: 'COMPLETED', createdAt: { gte: startOfWeek } },
       _sum: { amount: true },
     }),
-    // This month's revenue
+    // This month's revenue (legacy)
     prisma.transaction.aggregate({
       where: { type: 'PURCHASE', status: 'COMPLETED', createdAt: { gte: startOfMonth } },
       _sum: { amount: true },
@@ -56,11 +63,11 @@ async function getDashboardStats() {
     prisma.user.count(),
     // Active partners
     prisma.partner.count({ where: { status: 'ACTIVE' } }),
-    // Failed transactions (last 24 hours)
+    // Failed transactions (last 24 hours) - legacy
     prisma.transaction.count({
       where: { status: 'FAILED', createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
     }),
-    // Recent transactions
+    // Recent transactions (legacy)
     prisma.transaction.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
@@ -72,24 +79,60 @@ async function getDashboardStats() {
       take: 5,
       orderBy: { redeemedAt: 'desc' },
     }),
+    // Partner payment revenue - total
+    prisma.pendingPartnerPayment.aggregate({
+      where: { status: 'COMPLETED' },
+      _sum: { amount: true },
+    }),
+    // Partner payment revenue - today
+    prisma.pendingPartnerPayment.aggregate({
+      where: { status: 'COMPLETED', createdAt: { gte: startOfToday } },
+      _sum: { amount: true },
+    }),
+    // Partner payment revenue - week
+    prisma.pendingPartnerPayment.aggregate({
+      where: { status: 'COMPLETED', createdAt: { gte: startOfWeek } },
+      _sum: { amount: true },
+    }),
+    // Partner payment revenue - month
+    prisma.pendingPartnerPayment.aggregate({
+      where: { status: 'COMPLETED', createdAt: { gte: startOfMonth } },
+      _sum: { amount: true },
+    }),
+    // Failed partner payments (last 24 hours)
+    prisma.pendingPartnerPayment.count({
+      where: { status: 'FAILED', createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+    }),
+    // Recent partner payments
+    prisma.pendingPartnerPayment.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+    }),
   ]);
 
   const redemptionRate = totalCards > 0 ? (redeemedCards / totalCards) * 100 : 0;
 
+  // Partner payment amounts are in cents, convert to dollars
+  const ppTotalDollars = (Number(ppTotalRevenue._sum.amount) || 0) / 100;
+  const ppTodayDollars = (Number(ppTodayRevenue._sum.amount) || 0) / 100;
+  const ppWeekDollars = (Number(ppWeekRevenue._sum.amount) || 0) / 100;
+  const ppMonthDollars = (Number(ppMonthRevenue._sum.amount) || 0) / 100;
+
   return {
-    totalRevenue: Number(totalRevenue._sum.amount) || 0,
-    todayRevenue: Number(todayRevenue._sum.amount) || 0,
-    weekRevenue: Number(weekRevenue._sum.amount) || 0,
-    monthRevenue: Number(monthRevenue._sum.amount) || 0,
+    totalRevenue: (Number(totalRevenue._sum.amount) || 0) + ppTotalDollars,
+    todayRevenue: (Number(todayRevenue._sum.amount) || 0) + ppTodayDollars,
+    weekRevenue: (Number(weekRevenue._sum.amount) || 0) + ppWeekDollars,
+    monthRevenue: (Number(monthRevenue._sum.amount) || 0) + ppMonthDollars,
     activeCards,
     totalCards,
     redeemedCards,
     redemptionRate,
     totalUsers,
     activePartners,
-    failedTransactions,
+    failedTransactions: failedTransactions + ppFailedCount,
     recentTransactions,
     recentRedemptions,
+    recentPartnerPayments,
   };
 }
 
@@ -206,9 +249,38 @@ export default async function AdminDashboard() {
                 </div>
               ))
             ) : (
-              <p className="text-neutral-500 text-sm">No transactions yet</p>
+              <p className="text-neutral-500 text-sm">No legacy transactions yet</p>
             )}
           </div>
+
+          {/* Recent Partner Payments */}
+          {stats.recentPartnerPayments && stats.recentPartnerPayments.length > 0 && (
+            <>
+              <h4 className="text-sm font-semibold text-neutral-700 mt-6 mb-3 border-t pt-4">Recent Partner Payments</h4>
+              <div className="space-y-4">
+                {stats.recentPartnerPayments.map((pp: any) => (
+                  <div key={pp.id} className="flex items-center justify-between py-2 border-b border-neutral-100 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">
+                        Partner Payment
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        {new Date(pp.createdAt).toLocaleDateString()} &middot; {pp.email}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-green-600">
+                        +{formatCurrency(pp.amount / 100)}
+                      </p>
+                      <p className={`text-xs ${pp.status === 'COMPLETED' ? 'text-green-600' : pp.status === 'FAILED' ? 'text-red-600' : 'text-neutral-500'}`}>
+                        {pp.status}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Recent Redemptions */}

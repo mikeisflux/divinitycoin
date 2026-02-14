@@ -56,7 +56,23 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    // Fetch partner payments linked to this user's credit balances
+    const platformUserIds = user.creditBalances
+      .map((cb) => cb.platformUserId)
+      .filter(Boolean) as string[];
+
+    let partnerPayments: any[] = [];
+    if (platformUserIds.length > 0) {
+      partnerPayments = await prisma.pendingPartnerPayment.findMany({
+        where: {
+          platformUserId: { in: platformUserIds },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+    }
+
+    return NextResponse.json({ user, partnerPayments });
   } catch (error) {
     logger.apiError('Failed to fetch user:', error);
     return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
