@@ -90,14 +90,26 @@ export async function GET(request: NextRequest) {
     }
 
     // Platform users view (default) - query CreditBalance directly
-    const cbWhere = search
-      ? {
-          OR: [
-            { email: { contains: search, mode: 'insensitive' as const } },
-            { platformUserId: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    // Also search PlatformUser emails for users where CreditBalance.email is null
+    let cbWhere: Record<string, unknown> = {};
+    if (search) {
+      // Find platformUserIds where the email matches in PlatformUser table
+      // (for older records where CreditBalance.email is null)
+      const matchingPlatformUsers = await prisma.platformUser.findMany({
+        where: { email: { contains: search, mode: 'insensitive' } },
+        select: { platformUserId: true },
+      });
+      const matchingPuIds = matchingPlatformUsers.map(pu => pu.platformUserId);
+
+      const orConditions: Record<string, unknown>[] = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { platformUserId: { contains: search, mode: 'insensitive' } },
+      ];
+      if (matchingPuIds.length > 0) {
+        orConditions.push({ platformUserId: { in: matchingPuIds } });
+      }
+      cbWhere = { OR: orConditions };
+    }
 
     const [creditBalances, cbTotal] = await Promise.all([
       prisma.creditBalance.findMany({
@@ -110,22 +122,38 @@ export async function GET(request: NextRequest) {
             where: { status: 'ACTIVE' },
             select: { id: true, amount: true, pledgeId: true },
           },
+          // Include ledger entries to calculate all-time totals from gift card redemptions
+          ledgerEntries: {
+            where: { type: 'REDEMPTION' },
+            select: { amount: true },
+          },
         },
       }),
       prisma.creditBalance.count({ where: cbWhere }),
     ]);
 
-    // Get partner payment aggregates for these platform users
     const platformUserIds = creditBalances.map(cb => cb.platformUserId);
 
+    // Look up emails from PlatformUser table for records where CreditBalance.email is null
+    let platformUserEmails: Record<string, string> = {};
+    // Get partner payment aggregates for these platform users
     let paymentAggregates: Record<string, { total: number; count: number; completedCount: number; failedCount: number }> = {};
+
     if (platformUserIds.length > 0) {
-      const payments = await prisma.pendingPartnerPayment.findMany({
-        where: {
-          platformUserId: { in: platformUserIds },
-        },
-        select: { platformUserId: true, amount: true, status: true },
-      });
+      const [platformUserRecords, payments] = await Promise.all([
+        prisma.platformUser.findMany({
+          where: { platformUserId: { in: platformUserIds } },
+          select: { platformUserId: true, email: true },
+        }),
+        prisma.pendingPartnerPayment.findMany({
+          where: { platformUserId: { in: platformUserIds } },
+          select: { platformUserId: true, amount: true, status: true },
+        }),
+      ]);
+
+      for (const pu of platformUserRecords) {
+        platformUserEmails[pu.platformUserId] = pu.email;
+      }
 
       for (const pp of payments) {
         if (!paymentAggregates[pp.platformUserId]) {
@@ -141,21 +169,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const platformUsers = creditBalances.map(cb => ({
-      id: cb.id,
-      platformUserId: cb.platformUserId,
-      email: cb.email || 'Unknown',
-      linkedUserId: cb.userId,
-      availableBalance: cb.availableBalance,
-      heldBalance: cb.heldBalance,
-      activeHolds: cb.holds.length,
-      allTimePurchaseTotal: paymentAggregates[cb.platformUserId]?.total || 0,
-      totalPayments: paymentAggregates[cb.platformUserId]?.count || 0,
-      completedPayments: paymentAggregates[cb.platformUserId]?.completedCount || 0,
-      failedPayments: paymentAggregates[cb.platformUserId]?.failedCount || 0,
-      createdAt: cb.createdAt,
-      userType: 'platform' as const,
-    }));
+    const platformUsers = creditBalances.map(cb => {
+      // All-time total = partner payment completed amounts + legacy gift card redemption amounts
+      const partnerTotal = paymentAggregates[cb.platformUserId]?.total || 0;
+      const redemptionTotal = cb.ledgerEntries.reduce(
+        (sum, entry) => sum + Number(entry.amount),
+        0
+      );
+      const { ledgerEntries, ...cbWithoutLedger } = cb;
+
+      return {
+        id: cbWithoutLedger.id,
+        platformUserId: cbWithoutLedger.platformUserId,
+        email: cbWithoutLedger.email || platformUserEmails[cbWithoutLedger.platformUserId] || 'Unknown',
+        linkedUserId: cbWithoutLedger.userId,
+        availableBalance: cbWithoutLedger.availableBalance,
+        heldBalance: cbWithoutLedger.heldBalance,
+        activeHolds: cbWithoutLedger.holds.length,
+        allTimePurchaseTotal: partnerTotal + redemptionTotal,
+        totalPayments: paymentAggregates[cbWithoutLedger.platformUserId]?.count || 0,
+        completedPayments: paymentAggregates[cbWithoutLedger.platformUserId]?.completedCount || 0,
+        failedPayments: paymentAggregates[cbWithoutLedger.platformUserId]?.failedCount || 0,
+        createdAt: cbWithoutLedger.createdAt,
+        userType: 'platform' as const,
+      };
+    });
 
     return NextResponse.json({
       users: platformUsers,

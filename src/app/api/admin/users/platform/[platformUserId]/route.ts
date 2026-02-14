@@ -40,20 +40,26 @@ export async function GET(
       return NextResponse.json({ error: 'Platform user not found' }, { status: 404 });
     }
 
-    // Get platform user record (has stripe customer ID)
-    const platformUser = await prisma.platformUser.findUnique({
-      where: { platformUserId },
-    });
+    // Get platform user record (has stripe customer ID and email)
+    const [platformUser, partnerPayments] = await Promise.all([
+      prisma.platformUser.findUnique({
+        where: { platformUserId },
+      }),
+      prisma.pendingPartnerPayment.findMany({
+        where: { platformUserId },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+    ]);
 
-    // Get all partner payments for this platform user
-    const partnerPayments = await prisma.pendingPartnerPayment.findMany({
-      where: { platformUserId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
+    // Fill in email from PlatformUser if CreditBalance.email is null
+    const resolvedCreditBalance = {
+      ...creditBalance,
+      email: creditBalance.email || platformUser?.email || null,
+    };
 
     return NextResponse.json({
-      creditBalance,
+      creditBalance: resolvedCreditBalance,
       platformUser,
       partnerPayments,
     });
