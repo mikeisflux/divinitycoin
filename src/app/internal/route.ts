@@ -146,6 +146,9 @@ export async function POST(request: NextRequest) {
       case 'refund':
         return handleRefund(body, partnerId!, ipAddress);
 
+      case 'verify-payment':
+        return handleVerifyPayment(body, partnerId!);
+
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -644,6 +647,7 @@ async function handleCapture(body: { pledgeId: string }, ipAddress: string) {
 /**
  * Create a Stripe PaymentIntent for seamless payment
  * Returns client_secret for Stripe Elements and publishable key
+ * Supports type: "upcharge" for pledge modification additional charges
  */
 async function handleCreatePaymentIntent(
   body: {
@@ -651,13 +655,19 @@ async function handleCreatePaymentIntent(
     currency?: string;
     platformUserId: string;
     email: string;
+    name?: string;
     pledgeId: string;
     projectId: string;
     statement_descriptor?: string;
+    type?: string;
+    originalPaymentId?: string;
   },
   partnerId: string
 ) {
-  const { amount, currency = 'usd', platformUserId, email, pledgeId, projectId, statement_descriptor } = body;
+  const {
+    amount, currency = 'usd', platformUserId, email, pledgeId, projectId,
+    statement_descriptor, type, originalPaymentId,
+  } = body;
 
   // Validate required fields
   if (!amount || !platformUserId || !email || !pledgeId || !projectId) {
@@ -673,6 +683,8 @@ async function handleCreatePaymentIntent(
       { status: 400 }
     );
   }
+
+  const isUpcharge = type === 'upcharge';
 
   try {
     const stripe = await getStripeClient();
@@ -713,19 +725,26 @@ async function handleCreatePaymentIntent(
       });
     }
 
+    // Build metadata for webhook processing
+    const intentMetadata: Record<string, string> = {
+      type: isUpcharge ? 'partner_upcharge' : 'partner_payment',
+      partnerId,
+      platformUserId,
+      pledgeId,
+      projectId,
+      email,
+    };
+
+    if (isUpcharge && originalPaymentId) {
+      intentMetadata.originalPaymentId = originalPaymentId;
+    }
+
     // Create Stripe PaymentIntent with metadata for webhook processing
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
       customer: stripeCustomerId,
-      metadata: {
-        type: 'partner_payment',
-        partnerId,
-        platformUserId,
-        pledgeId,
-        projectId,
-        email,
-      },
+      metadata: intentMetadata,
       statement_descriptor: statement_descriptor?.substring(0, 22), // Max 22 chars
       automatic_payment_methods: {
         enabled: true,
@@ -753,6 +772,7 @@ async function handleCreatePaymentIntent(
       platformUserId,
       amount,
       pledgeId,
+      type: isUpcharge ? 'upcharge' : 'initial',
     });
 
     return NextResponse.json({
@@ -773,23 +793,30 @@ async function handleCreatePaymentIntent(
 
 /**
  * Process a refund for a partner payment
- * Refunds the Stripe charge, voids the gift card, releases the hold, and deducts from balance
+ * Supports full refunds (cancellations) and partial refunds (pledge modifications)
+ * Full: Stripe refund + void gift card + release hold + deduct balance + webhook
+ * Partial: Stripe refund + deduct balance only (hold/gift card stay active, no webhook or partial webhook)
  */
 async function handleRefund(
   body: {
-    paymentIntentId: string;
+    paymentIntentId?: string;
+    paymentId?: string;
     amount?: number;
     reason?: string;
     pledgeId?: string;
+    partial?: boolean;
+    requestedBy?: string;
   },
   partnerId: string,
   ipAddress: string
 ) {
-  const { paymentIntentId, amount, reason, pledgeId } = body;
+  // Support both paymentIntentId and paymentId (alias)
+  const paymentIntentId = body.paymentIntentId || body.paymentId;
+  const { amount, reason, pledgeId, partial = false } = body;
 
   if (!paymentIntentId) {
     return NextResponse.json(
-      { error: 'paymentIntentId is required' },
+      { error: 'paymentIntentId or paymentId is required' },
       { status: 400 }
     );
   }
@@ -827,38 +854,42 @@ async function handleRefund(
       );
     }
 
-    // Process Stripe refund
+    // Process Stripe refund (partial or full)
     const refundAmount = amount || paymentRecord.amount;
     const refund = await stripe.refunds.create({
       payment_intent: paymentIntentId,
       amount: refundAmount,
-      reason: reason === 'campaign_failed' ? 'requested_by_customer' : 'requested_by_customer',
+      reason: 'requested_by_customer',
       metadata: {
         partnerId,
         pledgeId: pledgeId || paymentRecord.pledgeId,
         reason: reason || 'partner_refund',
+        partial: partial ? 'true' : 'false',
       },
     });
 
-    // Find and void the associated gift card
-    if (paymentRecord.giftCardId) {
-      await prisma.giftCard.update({
-        where: { id: paymentRecord.giftCardId },
-        data: { status: 'REVOKED' },
-      });
-    }
+    // For full refunds: void gift card and release hold
+    if (!partial) {
+      // Void the associated gift card
+      if (paymentRecord.giftCardId) {
+        await prisma.giftCard.update({
+          where: { id: paymentRecord.giftCardId },
+          data: { status: 'REVOKED' },
+        });
+      }
 
-    // Release the hold if one exists
-    const holdPledgeId = pledgeId || paymentRecord.pledgeId;
-    if (holdPledgeId) {
-      try {
-        await releaseHold(holdPledgeId, ipAddress);
-      } catch {
-        // Hold may not exist or already released - that's ok
+      // Release the hold
+      const holdPledgeId = pledgeId || paymentRecord.pledgeId;
+      if (holdPledgeId) {
+        try {
+          await releaseHold(holdPledgeId, ipAddress);
+        } catch {
+          // Hold may not exist or already released - that's ok
+        }
       }
     }
 
-    // Deduct from user's credit balance if already redeemed
+    // Deduct from user's credit balance for both partial and full refunds
     if (paymentRecord.status === 'COMPLETED') {
       const creditBalance = await prisma.creditBalance.findUnique({
         where: { platformUserId: paymentRecord.platformUserId },
@@ -868,6 +899,8 @@ async function handleRefund(
         const refundAmountDollars = refundAmount / 100;
         const currentAvailable = Number(creditBalance.availableBalance);
 
+        // For partial refunds, deduct from available balance
+        // For full refunds, deduct from available balance
         if (currentAvailable >= refundAmountDollars) {
           await prisma.creditBalance.update({
             where: { id: creditBalance.id },
@@ -883,11 +916,14 @@ async function handleRefund(
               type: 'REFUND',
               amount: -refundAmountDollars,
               balanceAfter: currentAvailable - refundAmountDollars,
-              description: `Refund for payment ${paymentIntentId}`,
+              description: partial
+                ? `Partial refund for payment ${paymentIntentId}`
+                : `Refund for payment ${paymentIntentId}`,
               metadata: {
                 paymentIntentId,
                 refundId: refund.id,
                 reason,
+                partial,
                 ipAddress,
               },
             },
@@ -897,37 +933,44 @@ async function handleRefund(
     }
 
     // Update payment record status
-    await prisma.pendingPartnerPayment.update({
-      where: { paymentIntentId },
-      data: {
-        status: 'REFUNDED',
-        refundId: refund.id,
-        refundedAt: new Date(),
-      },
-    });
-
-    // Send webhook to partner
-    const partner = await prisma.partner.findUnique({
-      where: { id: paymentRecord.partnerId },
-      select: { webhookUrl: true, webhookSecret: true },
-    });
-
-    if (partner?.webhookUrl && partner?.webhookSecret) {
-      const { sendWebhook } = await import('@/lib/partner/webhook');
-      await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'refund.completed', {
-        paymentIntentId,
-        refundId: refund.id,
-        amount: refundAmount,
-        pledgeId: holdPledgeId,
-        platformUserId: paymentRecord.platformUserId,
-        status: 'succeeded',
+    // For partial refunds, keep the payment as COMPLETED (pledge stays active)
+    if (!partial) {
+      await prisma.pendingPartnerPayment.update({
+        where: { paymentIntentId },
+        data: {
+          status: 'REFUNDED',
+          refundId: refund.id,
+          refundedAt: new Date(),
+        },
       });
+    }
+
+    // Send webhook to partner - skip for partial refunds, or include partial flag
+    if (!partial) {
+      const partner = await prisma.partner.findUnique({
+        where: { id: paymentRecord.partnerId },
+        select: { webhookUrl: true, webhookSecret: true },
+      });
+
+      if (partner?.webhookUrl && partner?.webhookSecret) {
+        const { sendWebhook } = await import('@/lib/partner/webhook');
+        await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'refund.completed', {
+          paymentIntentId,
+          refundId: refund.id,
+          amount: refundAmount,
+          pledgeId: pledgeId || paymentRecord.pledgeId,
+          platformUserId: paymentRecord.platformUserId,
+          status: 'succeeded',
+          partial: false,
+        });
+      }
     }
 
     logger.info('Partner refund processed', {
       paymentIntentId,
       refundId: refund.id,
       amount: refundAmount,
+      partial,
       partnerId,
     });
 
@@ -935,12 +978,95 @@ async function handleRefund(
       success: true,
       refundId: refund.id,
       amount: refundAmount,
+      partial,
       status: 'succeeded',
     });
   } catch (error) {
     logger.error('Failed to process refund', { error, paymentIntentId, partnerId });
     return NextResponse.json(
       { error: 'Failed to process refund' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Verify payment status server-side
+ * Lets partners confirm a payment succeeded after frontend reports success
+ */
+async function handleVerifyPayment(
+  body: { paymentIntentId?: string; paymentId?: string },
+  partnerId: string
+) {
+  const paymentIntentId = body.paymentIntentId || body.paymentId;
+
+  if (!paymentIntentId) {
+    return NextResponse.json(
+      { error: 'paymentIntentId is required' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Look up our payment record first
+    const paymentRecord = await prisma.pendingPartnerPayment.findUnique({
+      where: { paymentIntentId },
+    });
+
+    if (!paymentRecord) {
+      return NextResponse.json(
+        { error: 'Payment not found' },
+        { status: 404 }
+      );
+    }
+
+    // Verify the partner owns this payment
+    if (paymentRecord.partnerId !== partnerId && partnerId !== 'internal') {
+      return NextResponse.json(
+        { error: 'Payment not found' },
+        { status: 404 }
+      );
+    }
+
+    // Verify against Stripe
+    const stripe = await getStripeClient();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    // Map Stripe status to simpler statuses
+    let status: string;
+    switch (paymentIntent.status) {
+      case 'succeeded':
+        status = 'succeeded';
+        break;
+      case 'processing':
+        status = 'pending';
+        break;
+      case 'requires_payment_method':
+      case 'requires_confirmation':
+      case 'requires_action':
+        status = 'pending';
+        break;
+      case 'canceled':
+        status = 'failed';
+        break;
+      default:
+        status = paymentIntent.status;
+    }
+
+    return NextResponse.json({
+      success: true,
+      status,
+      amount: paymentIntent.amount,
+      pledgeId: paymentRecord.pledgeId,
+      projectId: paymentRecord.projectId,
+      platformUserId: paymentRecord.platformUserId,
+      holdId: paymentRecord.holdId,
+      dcStatus: paymentRecord.status,
+    });
+  } catch (error) {
+    logger.error('Failed to verify payment', { error, paymentIntentId, partnerId });
+    return NextResponse.json(
+      { error: 'Failed to verify payment' },
       { status: 500 }
     );
   }

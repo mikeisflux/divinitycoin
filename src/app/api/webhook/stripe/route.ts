@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
  */
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   // Check if this is a partner-initiated payment (seamless payment flow)
-  if (paymentIntent.metadata?.type === 'partner_payment') {
+  // Handles both initial payments and upcharges
+  if (paymentIntent.metadata?.type === 'partner_payment' || paymentIntent.metadata?.type === 'partner_upcharge') {
     await handlePartnerPaymentSucceeded(paymentIntent);
     return;
   }
@@ -597,12 +598,18 @@ async function handlePartnerPaymentSucceeded(paymentIntent: Stripe.PaymentIntent
         }
       }
 
+      const isUpcharge = paymentIntent.metadata?.type === 'partner_upcharge';
+
       const webhookResult = await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'payment.succeeded', {
         paymentIntentId: paymentIntent.id,
         amount: paymentIntent.amount,
         platformUserId,
         pledgeId,
         projectId,
+        type: isUpcharge ? 'upcharge' : 'initial',
+        ...(isUpcharge && paymentIntent.metadata?.originalPaymentId
+          ? { originalPaymentId: paymentIntent.metadata.originalPaymentId }
+          : {}),
         giftCard: {
           last4: codeLast4,
           amount: paymentIntent.amount,
