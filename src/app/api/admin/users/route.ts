@@ -20,109 +20,152 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const search = searchParams.get('search') || '';
+    const view = searchParams.get('view') || 'platform'; // 'platform' | 'dc'
 
     const skip = (page - 1) * limit;
 
-    const where = search
+    if (view === 'dc') {
+      // Legacy DC website users
+      const where = search
+        ? {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' as const } },
+              { name: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {};
+
+      const [users, total] = await Promise.all([
+        prisma.user.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            creditBalances: {
+              select: {
+                availableBalance: true,
+                heldBalance: true,
+                platformUserId: true,
+              },
+            },
+            _count: {
+              select: { transactions: true, purchasedCards: true },
+            },
+            transactions: {
+              where: {
+                type: 'PURCHASE',
+                status: 'COMPLETED',
+              },
+              select: { amount: true },
+            },
+          },
+        }),
+        prisma.user.count({ where }),
+      ]);
+
+      const usersWithTotals = users.map((user) => {
+        const legacyTotal = user.transactions.reduce(
+          (sum, t) => sum + Number(t.amount),
+          0
+        );
+        const { transactions, ...userWithoutTransactions } = user;
+        return {
+          ...userWithoutTransactions,
+          allTimePurchaseTotal: legacyTotal,
+          userType: 'dc' as const,
+        };
+      });
+
+      return NextResponse.json({
+        users: usersWithTotals,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+        view: 'dc',
+      });
+    }
+
+    // Platform users view (default) - query CreditBalance directly
+    const cbWhere = search
       ? {
           OR: [
             { email: { contains: search, mode: 'insensitive' as const } },
-            { name: { contains: search, mode: 'insensitive' as const } },
+            { platformUserId: { contains: search, mode: 'insensitive' as const } },
           ],
         }
       : {};
 
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
+    const [creditBalances, cbTotal] = await Promise.all([
+      prisma.creditBalance.findMany({
+        where: cbWhere,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          creditBalances: {
-            select: {
-              availableBalance: true,
-              heldBalance: true,
-              platformUserId: true,
-            },
-          },
-          _count: {
-            select: { transactions: true, purchasedCards: true },
-          },
-          transactions: {
-            where: {
-              type: 'PURCHASE',
-              status: 'COMPLETED',
-            },
-            select: { amount: true },
+          holds: {
+            where: { status: 'ACTIVE' },
+            select: { id: true, amount: true, pledgeId: true },
           },
         },
       }),
-      prisma.user.count({ where }),
+      prisma.creditBalance.count({ where: cbWhere }),
     ]);
 
-    // Get partner payment totals for users that have credit balances with platformUserIds
-    const platformUserIds = users
-      .flatMap((u) => u.creditBalances.map((cb) => cb.platformUserId))
-      .filter(Boolean) as string[];
+    // Get partner payment aggregates for these platform users
+    const platformUserIds = creditBalances.map(cb => cb.platformUserId);
 
-    let partnerPaymentTotals: Record<string, number> = {};
-    let partnerPaymentCounts: Record<string, number> = {};
+    let paymentAggregates: Record<string, { total: number; count: number; completedCount: number; failedCount: number }> = {};
     if (platformUserIds.length > 0) {
-      const partnerPayments = await prisma.pendingPartnerPayment.findMany({
+      const payments = await prisma.pendingPartnerPayment.findMany({
         where: {
           platformUserId: { in: platformUserIds },
-          status: 'COMPLETED',
         },
-        select: { platformUserId: true, amount: true },
+        select: { platformUserId: true, amount: true, status: true },
       });
 
-      for (const pp of partnerPayments) {
-        partnerPaymentTotals[pp.platformUserId] = (partnerPaymentTotals[pp.platformUserId] || 0) + (pp.amount / 100);
-        partnerPaymentCounts[pp.platformUserId] = (partnerPaymentCounts[pp.platformUserId] || 0) + 1;
+      for (const pp of payments) {
+        if (!paymentAggregates[pp.platformUserId]) {
+          paymentAggregates[pp.platformUserId] = { total: 0, count: 0, completedCount: 0, failedCount: 0 };
+        }
+        paymentAggregates[pp.platformUserId].count++;
+        if (pp.status === 'COMPLETED') {
+          paymentAggregates[pp.platformUserId].total += pp.amount / 100;
+          paymentAggregates[pp.platformUserId].completedCount++;
+        } else if (pp.status === 'FAILED') {
+          paymentAggregates[pp.platformUserId].failedCount++;
+        }
       }
     }
 
-    // Calculate all-time purchase total for each user (legacy + partner payments)
-    const usersWithTotals = users.map((user) => {
-      const legacyTotal = user.transactions.reduce(
-        (sum, t) => sum + Number(t.amount),
-        0
-      );
-
-      // Sum partner payment totals for this user's credit balances
-      let partnerTotal = 0;
-      let partnerCount = 0;
-      for (const cb of user.creditBalances) {
-        if (cb.platformUserId && partnerPaymentTotals[cb.platformUserId]) {
-          partnerTotal += partnerPaymentTotals[cb.platformUserId];
-          partnerCount += partnerPaymentCounts[cb.platformUserId] || 0;
-        }
-      }
-
-      const allTimePurchaseTotal = legacyTotal + partnerTotal;
-      const totalTransactionCount = (user._count.transactions || 0) + partnerCount;
-
-      // Remove transactions array from response to keep it clean
-      const { transactions, ...userWithoutTransactions } = user;
-      return {
-        ...userWithoutTransactions,
-        allTimePurchaseTotal,
-        _count: {
-          ...userWithoutTransactions._count,
-          transactions: totalTransactionCount,
-        },
-      };
-    });
+    const platformUsers = creditBalances.map(cb => ({
+      id: cb.id,
+      platformUserId: cb.platformUserId,
+      email: cb.email || 'Unknown',
+      linkedUserId: cb.userId,
+      availableBalance: cb.availableBalance,
+      heldBalance: cb.heldBalance,
+      activeHolds: cb.holds.length,
+      allTimePurchaseTotal: paymentAggregates[cb.platformUserId]?.total || 0,
+      totalPayments: paymentAggregates[cb.platformUserId]?.count || 0,
+      completedPayments: paymentAggregates[cb.platformUserId]?.completedCount || 0,
+      failedPayments: paymentAggregates[cb.platformUserId]?.failedCount || 0,
+      createdAt: cb.createdAt,
+      userType: 'platform' as const,
+    }));
 
     return NextResponse.json({
-      users: usersWithTotals,
+      users: platformUsers,
       pagination: {
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit),
+        total: cbTotal,
+        pages: Math.ceil(cbTotal / limit),
       },
+      view: 'platform',
     });
   } catch (error) {
     logger.apiError('/api/admin/users', error);
