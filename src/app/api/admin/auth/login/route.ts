@@ -7,6 +7,9 @@ import { loginAdmin } from '@/lib/admin/auth';
 import { getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { cookies } from 'next/headers';
 
+// Uses cookies(); never pre-render during build.
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();

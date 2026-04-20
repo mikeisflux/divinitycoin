@@ -12,6 +12,9 @@ import { Prisma } from '@prisma/client';
 import { placeHold } from '@/lib/credits/holds';
 import { sendWebhook } from '@/lib/partner/webhook';
 
+// Uses headers() / raw body; never pre-render during build.
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();

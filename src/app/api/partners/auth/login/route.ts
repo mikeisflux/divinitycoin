@@ -6,6 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { loginPartner } from '@/lib/partner/auth';
 import { cookies } from 'next/headers';
 
+// Uses cookies(); never pre-render during build.
+export const dynamic = 'force-dynamic';
+
 function getClientIP(request: NextRequest): string {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

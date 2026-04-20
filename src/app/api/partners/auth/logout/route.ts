@@ -6,6 +6,9 @@ import { getPartnerFromRequest, logoutPartner } from '@/lib/partner/auth';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 
+// Uses cookies(); never pre-render during build.
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const partner = await getPartnerFromRequest();

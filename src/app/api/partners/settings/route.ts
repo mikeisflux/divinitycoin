@@ -6,6 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPartnerFromRequest } from '@/lib/partner/auth';
 import { prisma } from '@/lib/db';
 
+// Uses cookies(); never pre-render during build.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const partner = await getPartnerFromRequest();
