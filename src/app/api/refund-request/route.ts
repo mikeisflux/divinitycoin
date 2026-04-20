@@ -2,6 +2,7 @@
 // User refund request API
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getStripeClient } from '@/lib/stripe';
@@ -143,22 +144,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check for existing pending refund request
-    const existingRequest = await prisma.refundRequest.findFirst({
-      where: {
-        transactionId,
-        status: { notIn: ['FAILED', 'REJECTED'] },
-      },
-    });
-
-    if (existingRequest) {
-      return NextResponse.json({
-        error: 'A refund request already exists for this transaction',
-        existingRequestId: existingRequest.id,
-        status: existingRequest.status,
-      }, { status: 400 });
-    }
-
     const giftCard = transaction.giftCard;
 
     // IMPORTANT: We only do full refunds - no partial refunds allowed
@@ -187,22 +172,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create refund request
-    const refundRequest = await prisma.refundRequest.create({
-      data: {
-        transactionId,
-        giftCardId: giftCard?.id,
-        userId: session.userId,
-        email: session.user.email,
-        amount: transaction.amount,
-        reason,
-        status: wasRedeemed ? 'AWAITING_PARTNER' : 'APPROVED',
-        partnerId,
-        partnerName,
-        originalCardCode: giftCard?.codeLast4,
-        redeemedAmount: giftCard ? giftCard.amount : null,
-      },
-    });
+    // Atomically check "no active refund request exists yet" and create
+    // one. Running check+create in a Serializable transaction ensures two
+    // concurrent POSTs for the same transactionId can't both succeed —
+    // one will be rolled back with a serialization conflict and fall
+    // through to the 400 response below.
+    let refundRequest: Awaited<ReturnType<typeof prisma.refundRequest.create>>;
+    try {
+      refundRequest = await prisma.$transaction(async (tx) => {
+        const existing = await tx.refundRequest.findFirst({
+          where: {
+            transactionId,
+            status: { notIn: ['FAILED', 'REJECTED'] },
+          },
+        });
+        if (existing) {
+          throw new Error(`REFUND_REQUEST_EXISTS:${existing.id}:${existing.status}`);
+        }
+        return tx.refundRequest.create({
+          data: {
+            transactionId,
+            giftCardId: giftCard?.id,
+            userId: session.userId,
+            email: session.user.email,
+            amount: transaction.amount,
+            reason,
+            status: wasRedeemed ? 'AWAITING_PARTNER' : 'APPROVED',
+            partnerId,
+            partnerName,
+            originalCardCode: giftCard?.codeLast4,
+            redeemedAmount: giftCard ? giftCard.amount : null,
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.startsWith('REFUND_REQUEST_EXISTS:')) {
+        const [, existingId, existingStatus] = msg.split(':');
+        return NextResponse.json({
+          error: 'A refund request already exists for this transaction',
+          existingRequestId: existingId,
+          status: existingStatus,
+        }, { status: 400 });
+      }
+      throw err;
+    }
 
     // If code was NOT redeemed, process refund directly
     if (!wasRedeemed) {
@@ -372,10 +386,15 @@ async function processStripeRefund(
   try {
     const stripe = await getStripeClient();
 
-    // Create refund in Stripe
-    const refund = await stripe.refunds.create({
-      payment_intent: transaction.stripePaymentIntentId,
-    });
+    // Create refund in Stripe. Use a deterministic idempotency key tied to
+    // the refund-request row so retries and double-clicks produce the same
+    // refund instead of charging the user twice-back.
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: transaction.stripePaymentIntentId,
+      },
+      { idempotencyKey: `user-refund-${refundRequestId}` },
+    );
 
     // Update transaction
     await prisma.transaction.update({

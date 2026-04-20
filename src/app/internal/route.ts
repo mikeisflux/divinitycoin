@@ -690,39 +690,50 @@ async function handleCreatePaymentIntent(
     const stripe = await getStripeClient();
     const stripeConfig = await getStripeConfig();
 
-    // Find or create DC user for this platformUserId
-    let dcUser = await prisma.platformUser.findUnique({
+    // Find or create DC user for this platformUserId.
+    // Use upsert so two concurrent requests can't both pass a "not found"
+    // check and both try to create the same platformUserId.
+    let dcUser = await prisma.platformUser.upsert({
       where: { platformUserId },
+      create: {
+        platformUserId,
+        email,
+        partnerId,
+      },
+      update: {},
     });
 
-    if (!dcUser) {
-      dcUser = await prisma.platformUser.create({
-        data: {
-          platformUserId,
-          email,
-          partnerId,
-        },
-      });
-    }
-
-    // Find or create Stripe customer
+    // Find or create Stripe customer.
+    // Use idempotencyKey so concurrent requests for a user without a
+    // customer don't create two orphan Stripe customers.
     let stripeCustomerId = dcUser.stripeCustomerId;
 
     if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email,
-        metadata: {
-          platformUserId,
-          partnerId,
+      const customer = await stripe.customers.create(
+        {
+          email,
+          metadata: {
+            platformUserId,
+            partnerId,
+          },
         },
-      });
+        { idempotencyKey: `customer-${platformUserId}` },
+      );
       stripeCustomerId = customer.id;
 
-      // Save the Stripe customer ID
-      await prisma.platformUser.update({
-        where: { id: dcUser.id },
+      // Only write the id if it's still missing (avoid clobbering a
+      // customer id a concurrent request may have just written).
+      await prisma.platformUser.updateMany({
+        where: { id: dcUser.id, stripeCustomerId: null },
         data: { stripeCustomerId },
       });
+
+      // Re-read to pick up whichever customer id won the race.
+      const refreshed = await prisma.platformUser.findUnique({
+        where: { id: dcUser.id },
+        select: { stripeCustomerId: true },
+      });
+      if (refreshed?.stripeCustomerId) stripeCustomerId = refreshed.stripeCustomerId;
     }
 
     // Build metadata for webhook processing
@@ -854,19 +865,29 @@ async function handleRefund(
       );
     }
 
-    // Process Stripe refund (partial or full)
+    // Process Stripe refund (partial or full).
+    // Idempotency key: for full refunds, a deterministic key per payment
+    // ensures duplicate calls return the same refund instead of issuing a
+    // second one. For partial refunds, include the amount so distinct
+    // partials succeed but accidental duplicates are coalesced.
     const refundAmount = amount || paymentRecord.amount;
-    const refund = await stripe.refunds.create({
-      payment_intent: paymentIntentId,
-      amount: refundAmount,
-      reason: 'requested_by_customer',
-      metadata: {
-        partnerId,
-        pledgeId: pledgeId || paymentRecord.pledgeId,
-        reason: reason || 'partner_refund',
-        partial: partial ? 'true' : 'false',
+    const refundIdempotencyKey = partial
+      ? `refund-partial-${paymentIntentId}-${refundAmount}`
+      : `refund-full-${paymentIntentId}`;
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: paymentIntentId,
+        amount: refundAmount,
+        reason: 'requested_by_customer',
+        metadata: {
+          partnerId,
+          pledgeId: pledgeId || paymentRecord.pledgeId,
+          reason: reason || 'partner_refund',
+          partial: partial ? 'true' : 'false',
+        },
       },
-    });
+      { idempotencyKey: refundIdempotencyKey },
+    );
 
     // For full refunds: void gift card and release hold
     if (!partial) {

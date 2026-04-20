@@ -1132,6 +1132,19 @@ enum PartnerPaymentStatus {
   REFUNDED      // Payment refunded
 }
 
+// Stripe webhook idempotency. We insert `eventId` before processing an
+// event and skip processing if the insert raises a unique-constraint
+// violation. This makes every Stripe event exactly-once under retries.
+model StripeWebhookEvent {
+  id          String   @id @default(cuid())
+  eventId     String   @unique
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@index([eventType])
+  @@index([processedAt])
+}
+
 // Firewall-level IP blocks. Paired with the botblock-firewall watcher in
 // scripts/botblock/ which picks up /tmp/botblock-pending and applies iptables
 // DROP rules. `expiresAt` lets the sync script age rules out.

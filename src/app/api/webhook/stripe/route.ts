@@ -48,6 +48,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Idempotency: Stripe retries events on failure and can deliver the same
+    // event.id multiple times. Attempt to record the event first; if the
+    // unique constraint on eventId fires, we've already processed it.
+    try {
+      await prisma.stripeWebhookEvent.create({
+        data: { eventId: event.id, eventType: event.type },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        logger.debug('Stripe webhook already processed, skipping', {
+          eventId: event.id,
+          eventType: event.type,
+        });
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+      throw err;
+    }
+
     // Handle the event
     switch (event.type) {
       case 'payment_intent.succeeded':
