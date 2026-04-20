@@ -4,6 +4,15 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        'divinitycoin.com',
+        'www.divinitycoin.com',
+        'localhost:3000',
+      ],
+    },
+  },
   // Ensure proper cache invalidation on deployments
   generateBuildId: async () => {
     // Use timestamp for unique build IDs
