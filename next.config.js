@@ -4,15 +4,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  experimental: {
-    serverActions: {
-      allowedOrigins: [
-        'divinitycoin.com',
-        'www.divinitycoin.com',
-        'localhost:3000',
-      ],
-    },
-  },
+  // Note: Next.js 14.0 doesn't support `experimental.serverActions.allowedOrigins`.
+  // Same-origin enforcement is handled at nginx: the proxy sets
+  // `Origin: $scheme://$host` so the framework's origin-vs-host check passes.
   // Ensure proper cache invalidation on deployments
   generateBuildId: async () => {
     // Use timestamp for unique build IDs
