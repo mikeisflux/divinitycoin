@@ -745,7 +745,7 @@ async function handleCreatePaymentIntent(
       currency,
       customer: stripeCustomerId,
       metadata: intentMetadata,
-      statement_descriptor: statement_descriptor?.substring(0, 22), // Max 22 chars
+      statement_descriptor_suffix: statement_descriptor?.substring(0, 22), // Max 22 chars; suffix required for card payments
       automatic_payment_methods: {
         enabled: true,
       },
