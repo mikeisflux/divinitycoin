@@ -1131,3 +1131,39 @@ enum PartnerPaymentStatus {
   FAILED        // Payment failed
   REFUNDED      // Payment refunded
 }
+
+// Firewall-level IP blocks. Paired with the botblock-firewall watcher in
+// scripts/botblock/ which picks up /tmp/botblock-pending and applies iptables
+// DROP rules. `expiresAt` lets the sync script age rules out.
+model BlockedIP {
+  id              String   @id @default(cuid())
+  ipAddress       String   @unique
+  reason          String
+  violationCount  Int      @default(1)
+  blockedAt       DateTime @default(now())
+  expiresAt       DateTime
+
+  lastUserAgent   String?
+  lastPath        String?
+  lastActionId    String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([ipAddress])
+  @@index([expiresAt])
+}
+
+// Audit trail of suspicious requests, whether or not they triggered a block.
+model SuspiciousActivity {
+  id         String   @id @default(cuid())
+  ipAddress  String
+  reason     String
+  actionId   String?
+  path       String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([ipAddress])
+  @@index([createdAt])
+}
