@@ -15,7 +15,10 @@
 #   */5 * * * * /usr/local/bin/botblock-sync >> /var/log/botblock.log 2>&1
 # ============================================================================
 
-set -euo pipefail
+set -eo pipefail
+# Deliberately not using -u: bash treats an empty associative array expansion
+# (e.g. ${!DB_IP_SET[@]}) as "unbound variable" under -u, which trips the
+# script on the happy path when there are zero blocked IPs in the database.
 
 # ---- Configuration (EDIT THESE) ----
 CHAIN="BOTBLOCK"
