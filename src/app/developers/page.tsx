@@ -312,10 +312,15 @@ Response:
 POST /internal?action=balance
 POST /internal?action=hold
 POST /internal?action=capture
+POST /internal?action=record_capture
 POST /internal?action=release
+POST /internal?action=create-payment-intent
+POST /internal?action=refund
+POST /internal?action=verify-payment
 GET  /internal?action=health
-GET  /internal?action=settlements&partnerId=xxx
-GET  /internal?action=captures&partnerId=xxx`}</pre>
+GET  /internal?action=settlements
+GET  /internal?action=settlement&id=xxx
+GET  /internal?action=captures`}</pre>
                   </div>
                 </CardContent>
               </Card>
@@ -524,6 +529,135 @@ GET  /internal?action=captures&partnerId=xxx`}</pre>
   "success": true,
   "releasedAmount": 25.00,
   "newAvailableBalance": 75.00
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Create Payment Intent */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=create-payment-intent
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Create a Stripe PaymentIntent for seamless in-platform payment. Returns
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">clientSecret</code>
+                    and
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">publishableKey</code>
+                    so you can mount Stripe Elements directly on your checkout — no
+                    redirect to DivinityCoin required. DC charges immediately and uses
+                    credit holds, so there is no setup-intent flow.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "amount": number,                // Required. Amount in cents (must be > 0)
+  "currency": string,              // Optional. Default "usd"
+  "platformUserId": string,        // Required. Your platform's user ID
+  "email": string,                 // Required. Customer email
+  "name": string,                  // Optional. Customer name
+  "pledgeId": string,              // Required. Your pledge/order ID
+  "projectId": string,             // Required. Project ID
+  "statement_descriptor": string,  // Optional. Max 22 chars (suffix on card statement)
+  "type": "upcharge",              // Optional. Marks this as a pledge-modification charge
+  "originalPaymentId": string      // Optional. Required when type="upcharge"; the
+                                   //   paymentIntentId of the original pledge payment
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "clientSecret": "pi_3Abc..._secret_xyz",
+  "paymentIntentId": "pi_3Abc...",
+  "publishableKey": "pk_live_...",
+  "amount": 2500
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Refund */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=refund
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Refund a partner payment. Full refunds void the gift card, release
+                    the hold, deduct from balance, and fire a
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">refund.completed</code>
+                    webhook. Partial refunds (pledge modifications) deduct from balance
+                    only — the hold and gift card stay active and no webhook is sent.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "paymentIntentId": string,  // Required (alias: paymentId). The Stripe PI to refund
+  "amount": number,           // Optional. In cents. Defaults to full payment amount
+  "reason": string,           // Optional. Free-form reason
+  "pledgeId": string,         // Optional. Override the pledge ID for hold release
+  "partial": boolean,         // Optional. Default false. true = pledge modification
+  "requestedBy": string       // Optional. Audit metadata
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "refundId": "re_3Abc...",
+  "amount": 2500,
+  "partial": false,
+  "status": "succeeded"
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Verify Payment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=verify-payment
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Server-side confirmation that a payment succeeded. Use this after
+                    Stripe Elements reports success on the client to verify against
+                    Stripe and DC&apos;s own record before fulfilling the pledge.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "paymentIntentId": string  // Required (alias: paymentId). The Stripe PI to verify
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "status": "succeeded",     // succeeded | pending | failed
+  "amount": 2500,
+  "pledgeId": "pledge_abc",
+  "projectId": "proj_xyz",
+  "platformUserId": "user_123",
+  "holdId": "hold_xyz",
+  "dcStatus": "COMPLETED"    // DC's internal record status
 }`}</pre>
                   </div>
                 </CardContent>
