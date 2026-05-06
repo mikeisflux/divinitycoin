@@ -149,6 +149,18 @@ export async function POST(request: NextRequest) {
       case 'verify-payment':
         return handleVerifyPayment(body, partnerId!);
 
+      case 'create-setup-intent':
+        return handleCreateSetupIntent(body, partnerId!);
+
+      case 'list-payment-methods':
+        return handleListPaymentMethods(body, partnerId!);
+
+      case 'detach-payment-method':
+        return handleDetachPaymentMethod(body, partnerId!);
+
+      case 'charge-saved-payment-method':
+        return handleChargeSavedPaymentMethod(body, partnerId!);
+
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -1007,6 +1019,373 @@ async function handleRefund(
     return NextResponse.json(
       { error: 'Failed to process refund' },
       { status: 500 }
+    );
+  }
+}
+
+/**
+ * Create a Stripe SetupIntent so a partner can save a card on file.
+ * Card is attached to the DC Stripe Customer for this platformUserId,
+ * then later charged off-session via charge-saved-payment-method.
+ */
+async function handleCreateSetupIntent(
+  body: {
+    platformUserId: string;
+    email: string;
+    name?: string;
+  },
+  partnerId: string,
+) {
+  const { platformUserId, email } = body;
+
+  if (!platformUserId || !email) {
+    return NextResponse.json(
+      { error: 'Missing required fields: platformUserId, email' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const stripe = await getStripeClient();
+    const stripeConfig = await getStripeConfig();
+
+    // Find or create DC user. Same upsert pattern as create-payment-intent
+    // so a fresh user can save a card without a prior pledge.
+    const dcUser = await prisma.platformUser.upsert({
+      where: { platformUserId },
+      create: { platformUserId, email, partnerId },
+      update: {},
+    });
+
+    // Find or create Stripe customer (same idempotency dance as create-payment-intent).
+    let stripeCustomerId = dcUser.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create(
+        {
+          email,
+          metadata: { platformUserId, partnerId },
+        },
+        { idempotencyKey: `customer-${platformUserId}` },
+      );
+      stripeCustomerId = customer.id;
+
+      await prisma.platformUser.updateMany({
+        where: { id: dcUser.id, stripeCustomerId: null },
+        data: { stripeCustomerId },
+      });
+
+      const refreshed = await prisma.platformUser.findUnique({
+        where: { id: dcUser.id },
+        select: { stripeCustomerId: true },
+      });
+      if (refreshed?.stripeCustomerId) stripeCustomerId = refreshed.stripeCustomerId;
+    }
+
+    const setupIntent = await stripe.setupIntents.create({
+      customer: stripeCustomerId,
+      usage: 'off_session',
+      payment_method_types: ['card'],
+      metadata: { partnerId, platformUserId, email },
+    });
+
+    logger.info('Setup intent created', {
+      setupIntentId: setupIntent.id,
+      partnerId,
+      platformUserId,
+    });
+
+    return NextResponse.json({
+      success: true,
+      clientSecret: setupIntent.client_secret,
+      setupIntentId: setupIntent.id,
+      publishableKey: stripeConfig.publishableKey,
+      customerId: stripeCustomerId,
+    });
+  } catch (error) {
+    logger.error('Failed to create setup intent', { error, partnerId, platformUserId });
+    return NextResponse.json(
+      { error: 'Failed to create setup intent' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * List saved cards for a partner's user. Returns Stripe payment_method IDs
+ * plus enough metadata to render a "manage cards" UI.
+ */
+async function handleListPaymentMethods(
+  body: { platformUserId: string },
+  partnerId: string,
+) {
+  const { platformUserId } = body;
+
+  if (!platformUserId) {
+    return NextResponse.json(
+      { error: 'platformUserId is required' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const dcUser = await prisma.platformUser.findUnique({
+      where: { platformUserId },
+    });
+
+    if (!dcUser || (dcUser.partnerId !== partnerId && partnerId !== 'internal')) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (!dcUser.stripeCustomerId) {
+      return NextResponse.json({ paymentMethods: [] });
+    }
+
+    const stripe = await getStripeClient();
+    const list = await stripe.paymentMethods.list({
+      customer: dcUser.stripeCustomerId,
+      type: 'card',
+    });
+
+    return NextResponse.json({
+      paymentMethods: list.data.map(pm => ({
+        id: pm.id,
+        brand: pm.card?.brand,
+        last4: pm.card?.last4,
+        expMonth: pm.card?.exp_month,
+        expYear: pm.card?.exp_year,
+        funding: pm.card?.funding,
+        country: pm.card?.country,
+        createdAt: new Date(pm.created * 1000).toISOString(),
+      })),
+    });
+  } catch (error) {
+    logger.error('Failed to list payment methods', { error, partnerId, platformUserId });
+    return NextResponse.json(
+      { error: 'Failed to list payment methods' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Detach a saved payment method from a partner's user. Verifies the card
+ * actually belongs to that user before detaching to prevent cross-tenant leaks.
+ */
+async function handleDetachPaymentMethod(
+  body: { platformUserId: string; paymentMethodId: string },
+  partnerId: string,
+) {
+  const { platformUserId, paymentMethodId } = body;
+
+  if (!platformUserId || !paymentMethodId) {
+    return NextResponse.json(
+      { error: 'Missing required fields: platformUserId, paymentMethodId' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const dcUser = await prisma.platformUser.findUnique({
+      where: { platformUserId },
+    });
+
+    if (!dcUser || (dcUser.partnerId !== partnerId && partnerId !== 'internal')) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const stripe = await getStripeClient();
+    const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+
+    if (pm.customer !== dcUser.stripeCustomerId) {
+      return NextResponse.json(
+        { error: 'Payment method not found' },
+        { status: 404 },
+      );
+    }
+
+    await stripe.paymentMethods.detach(paymentMethodId);
+
+    logger.info('Payment method detached', {
+      paymentMethodId,
+      partnerId,
+      platformUserId,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    logger.error('Failed to detach payment method', { error, partnerId, platformUserId });
+    return NextResponse.json(
+      { error: 'Failed to detach payment method' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Charge a previously-saved card off-session. Used by partners to bill
+ * users for things like won auctions without requiring a re-prompt.
+ *
+ * If the card declines or 3DS is required, surfaces enough info for the
+ * partner to bring the user back on-session and re-confirm via Stripe Elements.
+ */
+async function handleChargeSavedPaymentMethod(
+  body: {
+    platformUserId: string;
+    paymentMethodId: string;
+    amount: number;
+    currency?: string;
+    pledgeId: string;
+    projectId: string;
+    statement_descriptor?: string;
+    description?: string;
+  },
+  partnerId: string,
+) {
+  const {
+    platformUserId,
+    paymentMethodId,
+    amount,
+    currency = 'usd',
+    pledgeId,
+    projectId,
+    statement_descriptor,
+    description,
+  } = body;
+
+  if (!platformUserId || !paymentMethodId || !amount || !pledgeId || !projectId) {
+    return NextResponse.json(
+      { error: 'Missing required fields: platformUserId, paymentMethodId, amount, pledgeId, projectId' },
+      { status: 400 },
+    );
+  }
+
+  if (amount <= 0) {
+    return NextResponse.json(
+      { error: 'Amount must be positive' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const dcUser = await prisma.platformUser.findUnique({
+      where: { platformUserId },
+    });
+
+    if (!dcUser || (dcUser.partnerId !== partnerId && partnerId !== 'internal')) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (!dcUser.stripeCustomerId) {
+      return NextResponse.json(
+        { error: 'No saved customer for this user' },
+        { status: 400 },
+      );
+    }
+
+    const stripe = await getStripeClient();
+
+    // Verify ownership of the payment method before charging.
+    const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+    if (pm.customer !== dcUser.stripeCustomerId) {
+      return NextResponse.json(
+        { error: 'Payment method not found' },
+        { status: 404 },
+      );
+    }
+
+    const intentMetadata: Record<string, string> = {
+      type: 'partner_payment',
+      partnerId,
+      platformUserId,
+      pledgeId,
+      projectId,
+      email: dcUser.email,
+      offSession: 'true',
+    };
+
+    // Idempotency: pledgeId is the natural unique key per charge attempt.
+    // A retry from the partner returns the same PI instead of double-charging.
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount,
+        currency,
+        customer: dcUser.stripeCustomerId,
+        payment_method: paymentMethodId,
+        off_session: true,
+        confirm: true,
+        description,
+        metadata: intentMetadata,
+        statement_descriptor_suffix: statement_descriptor?.substring(0, 22),
+      },
+      { idempotencyKey: `charge-saved-${pledgeId}` },
+    );
+
+    await prisma.pendingPartnerPayment.create({
+      data: {
+        paymentIntentId: paymentIntent.id,
+        partnerId,
+        platformUserId,
+        pledgeId,
+        projectId,
+        amount,
+        currency,
+        email: dcUser.email,
+        status: paymentIntent.status === 'succeeded' ? 'COMPLETED' : 'PENDING',
+      },
+    });
+
+    logger.info('Saved payment method charged', {
+      paymentIntentId: paymentIntent.id,
+      partnerId,
+      platformUserId,
+      amount,
+      status: paymentIntent.status,
+    });
+
+    return NextResponse.json({
+      success: paymentIntent.status === 'succeeded',
+      status: paymentIntent.status,
+      paymentIntentId: paymentIntent.id,
+      amount,
+    });
+  } catch (error) {
+    // Stripe surfaces declines and 3DS-required cases as exceptions on confirm.
+    // Pass enough back to the partner to either give up or re-prompt the user.
+    const stripeErr = error as {
+      code?: string;
+      decline_code?: string;
+      message?: string;
+      payment_intent?: { id?: string; client_secret?: string; status?: string };
+    };
+
+    if (stripeErr?.code) {
+      logger.warn('Saved payment method charge failed', {
+        code: stripeErr.code,
+        declineCode: stripeErr.decline_code,
+        partnerId,
+        platformUserId,
+        paymentIntentId: stripeErr.payment_intent?.id,
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          status: stripeErr.payment_intent?.status ?? 'failed',
+          error: stripeErr.message ?? 'Charge failed',
+          code: stripeErr.code,
+          declineCode: stripeErr.decline_code,
+          paymentIntentId: stripeErr.payment_intent?.id,
+          clientSecret: stripeErr.payment_intent?.client_secret,
+        },
+        { status: 402 },
+      );
+    }
+
+    logger.error('Failed to charge saved payment method', { error, partnerId, platformUserId });
+    return NextResponse.json(
+      { error: 'Failed to charge payment method' },
+      { status: 500 },
     );
   }
 }

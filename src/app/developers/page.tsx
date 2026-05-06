@@ -317,6 +317,10 @@ POST /internal?action=release
 POST /internal?action=create-payment-intent
 POST /internal?action=refund
 POST /internal?action=verify-payment
+POST /internal?action=create-setup-intent
+POST /internal?action=list-payment-methods
+POST /internal?action=detach-payment-method
+POST /internal?action=charge-saved-payment-method
 GET  /internal?action=health
 GET  /internal?action=settlements
 GET  /internal?action=settlement&id=xxx
@@ -658,6 +662,186 @@ GET  /internal?action=captures`}</pre>
   "platformUserId": "user_123",
   "holdId": "hold_xyz",
   "dcStatus": "COMPLETED"    // DC's internal record status
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Saved-card / off-session flow */}
+              <h3 className="text-2xl font-bold text-neutral-900 mt-12 mb-2">Saved Cards & Off-Session Charges</h3>
+              <p className="text-neutral-600 mb-6">
+                Let users save a card on the partner site and charge it later
+                (e.g. when they win an auction) without prompting them again.
+                Cards are attached to the DC Stripe Customer for that
+                <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">platformUserId</code>;
+                you only ever store the returned <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>.
+              </p>
+
+              {/* Create Setup Intent */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=create-setup-intent
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Create a Stripe SetupIntent so a user can save a card on
+                    file. Returns a <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">clientSecret</code>
+                    you mount in Stripe Elements with
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">stripe.confirmCardSetup()</code>.
+                    On success the card is attached to the DC Stripe Customer
+                    for this user and is ready for off-session charges.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "platformUserId": string,  // Required. Your platform's user ID
+  "email": string,           // Required. Customer email
+  "name": string             // Optional. Customer name
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "clientSecret": "seti_3Abc..._secret_xyz",
+  "setupIntentId": "seti_3Abc...",
+  "publishableKey": "pk_live_...",
+  "customerId": "cus_..."
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* List Payment Methods */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=list-payment-methods
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    List the cards a user has on file. Use this to render a
+                    &quot;Manage payment methods&quot; UI on the partner site.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "platformUserId": string  // Required. Your platform's user ID
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "paymentMethods": [
+    {
+      "id": "pm_1Abc...",
+      "brand": "visa",
+      "last4": "4242",
+      "expMonth": 12,
+      "expYear": 2028,
+      "funding": "credit",
+      "country": "US",
+      "createdAt": "2026-05-01T10:00:00Z"
+    }
+  ]
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detach Payment Method */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=detach-payment-method
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Remove a saved card. DC verifies the card belongs to the
+                    given user before detaching, so calling with a foreign
+                    paymentMethodId returns 404.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "platformUserId": string,   // Required. Your platform's user ID
+  "paymentMethodId": string   // Required. Stripe payment_method ID to remove
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Charge Saved Payment Method */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=charge-saved-payment-method
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Charge a saved card off-session. Use this for things like
+                    won-auction billing where the user isn&apos;t actively at
+                    the checkout. The PaymentIntent is created and confirmed in
+                    one call. Idempotent on
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">pledgeId</code>
+                    — retrying the same call returns the same charge.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "platformUserId": string,        // Required. Your platform's user ID
+  "paymentMethodId": string,       // Required. Stripe payment_method ID
+  "amount": number,                // Required. Amount in cents (must be > 0)
+  "currency": string,              // Optional. Default "usd"
+  "pledgeId": string,              // Required. Your pledge/charge ID (idempotency key)
+  "projectId": string,             // Required. Project / auction ID
+  "description": string,           // Optional. Stripe description (e.g. "Auction win: Item X")
+  "statement_descriptor": string   // Optional. Max 22 chars (suffix on card statement)
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response — Success</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "status": "succeeded",
+  "paymentIntentId": "pi_3Abc...",
+  "amount": 5000
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response — Decline / Card Issue (HTTP 402)</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": false,
+  "status": "requires_payment_method",
+  "error": "Your card was declined.",
+  "code": "card_declined",
+  "declineCode": "insufficient_funds",
+  "paymentIntentId": "pi_3Abc...",
+  "clientSecret": "pi_3Abc..._secret_xyz"  // present if user re-auth could recover
 }`}</pre>
                   </div>
                 </CardContent>
