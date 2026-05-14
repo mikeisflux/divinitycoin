@@ -152,6 +152,9 @@ export async function POST(request: NextRequest) {
       case 'create-setup-intent':
         return handleCreateSetupIntent(body, partnerId!);
 
+      case 'get-setup-intent':
+        return handleGetSetupIntent(body, partnerId!);
+
       case 'list-payment-methods':
         return handleListPaymentMethods(body, partnerId!);
 
@@ -1112,6 +1115,66 @@ async function handleCreateSetupIntent(
 }
 
 /**
+ * Retrieve a SetupIntent's status and resulting payment method by ID.
+ * Lets a partner independently confirm a card-save outcome — e.g. after a
+ * 3DS redirect, or if they never got the client-side result. Authorized via
+ * the partnerId stamped into the SetupIntent metadata at creation time, so
+ * it needs no local DB record.
+ */
+async function handleGetSetupIntent(
+  body: { setupIntentId?: string },
+  partnerId: string,
+) {
+  const { setupIntentId } = body;
+
+  if (!setupIntentId) {
+    return NextResponse.json(
+      { error: 'setupIntentId is required' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const stripe = await getStripeClient();
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+
+    if (setupIntent.metadata?.partnerId !== partnerId && partnerId !== 'internal') {
+      return NextResponse.json(
+        { error: 'Setup intent not found' },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      status: setupIntent.status,
+      setupIntentId: setupIntent.id,
+      paymentMethodId: typeof setupIntent.payment_method === 'string'
+        ? setupIntent.payment_method
+        : setupIntent.payment_method?.id ?? null,
+      platformUserId: setupIntent.metadata?.platformUserId ?? null,
+      customerId: typeof setupIntent.customer === 'string'
+        ? setupIntent.customer
+        : setupIntent.customer?.id ?? null,
+    });
+  } catch (error) {
+    // Stripe throws resource_missing for an unknown ID — treat as not found.
+    const stripeErr = error as { code?: string; statusCode?: number };
+    if (stripeErr?.statusCode === 404 || stripeErr?.code === 'resource_missing') {
+      return NextResponse.json(
+        { error: 'Setup intent not found' },
+        { status: 404 },
+      );
+    }
+    logger.error('Failed to get setup intent', { error, partnerId, setupIntentId });
+    return NextResponse.json(
+      { error: 'Failed to get setup intent' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
  * List saved cards for a partner's user. Returns Stripe payment_method IDs
  * plus enough metadata to render a "manage cards" UI.
  */
@@ -1267,8 +1330,12 @@ async function handleChargeSavedPaymentMethod(
     );
   }
 
+  // Hoisted so the catch block can still persist a tracking record when the
+  // off-session charge throws (decline / 3DS-required).
+  let dcUser: Awaited<ReturnType<typeof prisma.platformUser.findUnique>> = null;
+
   try {
-    const dcUser = await prisma.platformUser.findUnique({
+    dcUser = await prisma.platformUser.findUnique({
       where: { platformUserId },
     });
 
@@ -1368,6 +1435,31 @@ async function handleChargeSavedPaymentMethod(
         paymentIntentId: stripeErr.payment_intent?.id,
       });
 
+      // Persist a tracking record for the failed/pending PI so verify-payment
+      // can independently confirm its outcome later (self-healing on a missed
+      // webhook, or after the partner pulls the user back for 3DS). Best-effort
+      // — never let this mask the original Stripe error.
+      const failedPiId = stripeErr.payment_intent?.id;
+      if (failedPiId && dcUser) {
+        await prisma.pendingPartnerPayment
+          .upsert({
+            where: { paymentIntentId: failedPiId },
+            create: {
+              paymentIntentId: failedPiId,
+              partnerId,
+              platformUserId,
+              pledgeId,
+              projectId,
+              amount,
+              currency,
+              email: dcUser.email,
+              status: 'PENDING',
+            },
+            update: {},
+          })
+          .catch(() => { /* best-effort */ });
+      }
+
       return NextResponse.json(
         {
           success: false,
@@ -1408,29 +1500,32 @@ async function handleVerifyPayment(
   }
 
   try {
-    // Look up our payment record first
+    // Look up our local tracking record, if we have one.
     const paymentRecord = await prisma.pendingPartnerPayment.findUnique({
       where: { paymentIntentId },
     });
 
-    if (!paymentRecord) {
+    // If a local record exists, authorize against it.
+    if (paymentRecord && paymentRecord.partnerId !== partnerId && partnerId !== 'internal') {
       return NextResponse.json(
         { error: 'Payment not found' },
         { status: 404 }
       );
     }
 
-    // Verify the partner owns this payment
-    if (paymentRecord.partnerId !== partnerId && partnerId !== 'internal') {
-      return NextResponse.json(
-        { error: 'Payment not found' },
-        { status: 404 }
-      );
-    }
-
-    // Verify against Stripe
+    // Verify against Stripe — the source of truth.
     const stripe = await getStripeClient();
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    // Self-healing: with no local record (missed webhook, or a charge that
+    // threw before persisting), authorize via the partnerId we stamp into
+    // the PaymentIntent metadata at creation time instead.
+    if (!paymentRecord && paymentIntent.metadata?.partnerId !== partnerId && partnerId !== 'internal') {
+      return NextResponse.json(
+        { error: 'Payment not found' },
+        { status: 404 }
+      );
+    }
 
     // Map Stripe status to simpler statuses
     let status: string;
@@ -1457,13 +1552,21 @@ async function handleVerifyPayment(
       success: true,
       status,
       amount: paymentIntent.amount,
-      pledgeId: paymentRecord.pledgeId,
-      projectId: paymentRecord.projectId,
-      platformUserId: paymentRecord.platformUserId,
-      holdId: paymentRecord.holdId,
-      dcStatus: paymentRecord.status,
+      pledgeId: paymentRecord?.pledgeId ?? paymentIntent.metadata?.pledgeId ?? null,
+      projectId: paymentRecord?.projectId ?? paymentIntent.metadata?.projectId ?? null,
+      platformUserId: paymentRecord?.platformUserId ?? paymentIntent.metadata?.platformUserId ?? null,
+      holdId: paymentRecord?.holdId ?? null,
+      dcStatus: paymentRecord?.status ?? null,
     });
   } catch (error) {
+    // Stripe throws resource_missing for an unknown ID — treat as not found.
+    const stripeErr = error as { code?: string; statusCode?: number };
+    if (stripeErr?.statusCode === 404 || stripeErr?.code === 'resource_missing') {
+      return NextResponse.json(
+        { error: 'Payment not found' },
+        { status: 404 }
+      );
+    }
     logger.error('Failed to verify payment', { error, paymentIntentId, partnerId });
     return NextResponse.json(
       { error: 'Failed to verify payment' },

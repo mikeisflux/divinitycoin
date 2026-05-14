@@ -318,6 +318,7 @@ POST /internal?action=create-payment-intent
 POST /internal?action=refund
 POST /internal?action=verify-payment
 POST /internal?action=create-setup-intent
+POST /internal?action=get-setup-intent
 POST /internal?action=list-payment-methods
 POST /internal?action=detach-payment-method
 POST /internal?action=charge-saved-payment-method
@@ -639,9 +640,20 @@ GET  /internal?action=captures`}</pre>
                 </CardHeader>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
-                    Server-side confirmation that a payment succeeded. Use this after
-                    Stripe Elements reports success on the client to verify against
-                    Stripe and DC&apos;s own record before fulfilling the pledge.
+                    Server-side confirmation of a payment&apos;s outcome by
+                    PaymentIntent ID. Use this after Stripe Elements reports
+                    success on the client, or to self-heal if a DC webhook is
+                    ever missed — it always retrieves the live status from
+                    Stripe.
+                  </p>
+                  <p className="text-neutral-600 mb-4">
+                    Works even with no local DC record yet (e.g. a saved-card
+                    charge that hit 3DS): when there&apos;s no record, the call
+                    is authorized via the PaymentIntent&apos;s
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">partnerId</code>
+                    metadata instead, and the
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">dcStatus</code>
+                    field comes back <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">null</code>.
                   </p>
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
@@ -660,8 +672,8 @@ GET  /internal?action=captures`}</pre>
   "pledgeId": "pledge_abc",
   "projectId": "proj_xyz",
   "platformUserId": "user_123",
-  "holdId": "hold_xyz",
-  "dcStatus": "COMPLETED"    // DC's internal record status
+  "holdId": "hold_xyz",      // null for saved-card charges
+  "dcStatus": "COMPLETED"    // DC's record status, or null if no local record
 }`}</pre>
                   </div>
                 </CardContent>
@@ -711,6 +723,46 @@ GET  /internal?action=captures`}</pre>
   "clientSecret": "seti_3Abc..._secret_xyz",
   "setupIntentId": "seti_3Abc...",
   "publishableKey": "pk_live_...",
+  "customerId": "cus_..."
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Get Setup Intent */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=get-setup-intent
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Independently confirm a card-save outcome by SetupIntent ID
+                    — e.g. after a 3DS redirect, or if you never received the
+                    client-side result. Returns the SetupIntent status and, once
+                    it has succeeded, the resulting
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
+                    to store.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "setupIntentId": string  // Required. The seti_... ID to look up
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "status": "succeeded",   // requires_payment_method | requires_action |
+                           //   processing | succeeded | canceled
+  "setupIntentId": "seti_3Abc...",
+  "paymentMethodId": "pm_1Abc...",  // null until status is "succeeded"
+  "platformUserId": "your_user_123",
   "customerId": "cus_..."
 }`}</pre>
                   </div>
