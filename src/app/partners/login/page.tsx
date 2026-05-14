@@ -41,7 +41,13 @@ function LoginForm() {
         return;
       }
 
-      router.push('/partners/dashboard');
+      // Honor a redirect target, but only same-origin relative paths.
+      const redirectTo = searchParams.get('redirect');
+      const safeRedirect =
+        redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+          ? redirectTo
+          : '/partners/dashboard';
+      router.push(safeRedirect);
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {
