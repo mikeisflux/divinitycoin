@@ -115,7 +115,7 @@ function CheckoutForm({ amount, transactionId, onSuccess, onError }: CheckoutFor
   );
 }
 
-interface StripeCheckoutProps {
+interface CardCheckoutProps {
   amount: number;
   email: string;
   partnerId?: string;
@@ -123,7 +123,7 @@ interface StripeCheckoutProps {
   onCancel: () => void;
 }
 
-export function StripeCheckout({ amount, email, partnerId, onSuccess, onCancel }: StripeCheckoutProps) {
+export function CardCheckout({ amount, email, partnerId, onSuccess, onCancel }: CardCheckoutProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);

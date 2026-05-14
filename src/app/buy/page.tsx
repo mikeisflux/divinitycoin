@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { AmountSelector } from '@/components/AmountSelector';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { StripeCheckout } from '@/components/checkout/StripeCheckout';
+import { CardCheckout } from '@/components/checkout/CardCheckout';
 
 interface User {
   id: string;
@@ -467,7 +467,7 @@ export default function BuyPage() {
 
           <Card className="shadow-lg">
             <CardContent className="p-6 sm:p-8">
-              <StripeCheckout
+              <CardCheckout
                 amount={amount}
                 email={user.email}
                 partnerId={selectedPartnerId}

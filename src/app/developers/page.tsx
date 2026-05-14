@@ -182,7 +182,7 @@ Response:
    │  1. Buys $100 credits  │                    │                    │
    │───────────────────────►│                    │                    │
    │                        │                    │                    │
-   │   (Stripe processes)   │                    │                    │
+   │    (card processed)   │                    │                    │
    │                        │  Funds held        │                    │
    │                        │                    │                    │
    │  2. Redeems code       │                    │                    │
@@ -209,7 +209,7 @@ Response:
    │                        │  (after 6% fee)    │                    │
    │                        │                    │                    │
    │                        │                    │  6. Creator payout │
-   │                        │                    │  (Stripe Connect)  │
+   │                        │                    │  (creator payout)  │
    │                        │                    │───────────────────►│
    │                        │                    │  $89.30            │
    │                        │                    │  (after 5% fee)    │`}</pre>
@@ -246,7 +246,7 @@ Response:
                           <td className="py-3 px-4 font-semibold">$6.00</td>
                         </tr>
                         <tr>
-                          <td className="py-3 px-4 pl-8 text-neutral-500">└ Stripe Processing</td>
+                          <td className="py-3 px-4 pl-8 text-neutral-500">└ Card Processing</td>
                           <td className="py-3 px-4 text-neutral-500">~2.9% + $0.30</td>
                           <td className="py-3 px-4 text-neutral-500">(included)</td>
                           <td className="py-3 px-4 text-neutral-500">~$3.20</td>
@@ -264,7 +264,7 @@ Response:
                           <td className="py-3 px-4">$94 × 5% = $4.70</td>
                         </tr>
                         <tr>
-                          <td className="py-3 px-4 font-medium">Stripe Connect Payout</td>
+                          <td className="py-3 px-4 font-medium">Payout Processing</td>
                           <td className="py-3 px-4">~0.25%</td>
                           <td className="py-3 px-4">Creator</td>
                           <td className="py-3 px-4">~$0.25</td>
@@ -549,11 +549,11 @@ GET  /internal?action=captures`}</pre>
                 </CardHeader>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
-                    Create a Stripe PaymentIntent for seamless in-platform payment. Returns
+                    Create a payment intent for seamless in-platform payment. Returns
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">clientSecret</code>
                     and
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">publishableKey</code>
-                    so you can mount Stripe Elements directly on your checkout — no
+                    so you can mount the embedded card fields directly on your checkout — no
                     redirect to DivinityCoin required. DC charges immediately and uses
                     credit holds, so there is no setup-intent flow.
                   </p>
@@ -608,7 +608,7 @@ GET  /internal?action=captures`}</pre>
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
-  "paymentIntentId": string,  // Required (alias: paymentId). The Stripe PI to refund
+  "paymentIntentId": string,  // Required (alias: paymentId). The payment intent to refund
   "amount": number,           // Optional. In cents. Defaults to full payment amount
   "reason": string,           // Optional. Free-form reason
   "pledgeId": string,         // Optional. Override the pledge ID for hold release
@@ -641,10 +641,10 @@ GET  /internal?action=captures`}</pre>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
                     Server-side confirmation of a payment&apos;s outcome by
-                    PaymentIntent ID. Use this after Stripe Elements reports
-                    success on the client, or to self-heal if a DC webhook is
-                    ever missed — it always retrieves the live status from
-                    Stripe.
+                    payment intent ID. Use this after the embedded card fields
+                    report success on the client, or to self-heal if a DC
+                    webhook is ever missed — it always retrieves the live
+                    status from the processor.
                   </p>
                   <p className="text-neutral-600 mb-4">
                     Works even with no local DC record yet (e.g. a saved-card
@@ -659,7 +659,7 @@ GET  /internal?action=captures`}</pre>
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
-  "paymentIntentId": string  // Required (alias: paymentId). The Stripe PI to verify
+  "paymentIntentId": string  // Required (alias: paymentId). The payment intent to verify
 }`}</pre>
                   </div>
 
@@ -684,7 +684,7 @@ GET  /internal?action=captures`}</pre>
               <p className="text-neutral-600 mb-6">
                 Let users save a card on the partner site and charge it later
                 (e.g. when they win an auction) without prompting them again.
-                Cards are attached to the DC Stripe Customer for that
+                Cards are attached to the DC customer record for that
                 <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">platformUserId</code>;
                 you only ever store the returned <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>.
               </p>
@@ -699,12 +699,12 @@ GET  /internal?action=captures`}</pre>
                 </CardHeader>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
-                    Create a Stripe SetupIntent so a user can save a card on
+                    Create a setup intent so a user can save a card on
                     file. Returns a <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">clientSecret</code>
-                    you mount in Stripe Elements with
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">stripe.confirmCardSetup()</code>.
-                    On success the card is attached to the DC Stripe Customer
-                    for this user and is ready for off-session charges.
+                    you confirm client-side with the embedded card fields to
+                    collect and store the card. On success the card is attached
+                    to the DC customer record for this user and is ready for
+                    off-session charges.
                   </p>
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
@@ -829,7 +829,7 @@ GET  /internal?action=captures`}</pre>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
   "platformUserId": string,   // Required. Your platform's user ID
-  "paymentMethodId": string   // Required. Stripe payment_method ID to remove
+  "paymentMethodId": string   // Required. The saved card's payment method ID to remove
 }`}</pre>
                   </div>
 
@@ -864,12 +864,12 @@ GET  /internal?action=captures`}</pre>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
   "platformUserId": string,        // Required. Your platform's user ID
-  "paymentMethodId": string,       // Required. Stripe payment_method ID
+  "paymentMethodId": string,       // Required. The saved card's payment method ID
   "amount": number,                // Required. Amount in cents (must be > 0)
   "currency": string,              // Optional. Default "usd"
   "pledgeId": string,              // Required. Your pledge/charge ID (idempotency key)
   "projectId": string,             // Required. Project / auction ID
-  "description": string,           // Optional. Stripe description (e.g. "Auction win: Item X")
+  "description": string,           // Optional. Charge description (e.g. "Auction win: Item X")
   "statement_descriptor": string   // Optional. Max 22 chars (suffix on card statement)
 }`}</pre>
                   </div>

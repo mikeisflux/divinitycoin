@@ -234,11 +234,11 @@ export const settlementChecklistData: ChecklistSection[] = [
     title: '1. Money Flow Overview',
     description: 'Understand the complete money flow from credit purchases to creator bank accounts',
     items: [
-      { id: 'flow-1', label: 'Understand credit purchase flow (User → Stripe → CreatorCredits)', completed: false, description: 'User buys $100 credits, Stripe processes payment, funds held by CreatorCredits' },
+      { id: 'flow-1', label: 'Understand credit purchase flow (User → Payment → CreatorCredits)', completed: false, description: 'User buys $100 credits, payment is processed, funds held by CreatorCredits' },
       { id: 'flow-2', label: 'Understand code redemption flow', completed: false, description: 'User redeems code on partner platform, credits added to balance via VPN validation' },
       { id: 'flow-3', label: 'Understand hold/capture mechanism', completed: false, description: 'Credits reserved when user backs a project, captured when project funds' },
       { id: 'flow-4', label: 'Understand settlement process', completed: false, description: 'CreatorCredits pays partner (weekly/monthly) after 6% total fee' },
-      { id: 'flow-5', label: 'Understand creator payout flow', completed: false, description: 'Partner pays creator via Stripe Connect after 5% platform fee' },
+      { id: 'flow-5', label: 'Understand creator payout flow', completed: false, description: 'Partner pays creator via their payout provider after 5% platform fee' },
     ]
   },
   {
@@ -247,7 +247,7 @@ export const settlementChecklistData: ChecklistSection[] = [
     description: 'Configure and understand the 6% total partner fee',
     items: [
       { id: 'fee-1', label: 'Configure total partner fee (default 6%)', completed: false, description: 'Located at /admin/settings/payments' },
-      { id: 'fee-2', label: 'Understand fee breakdown: Stripe processing (~2.9% + $0.30)', completed: false },
+      { id: 'fee-2', label: 'Understand fee breakdown: card processing (~2.9% + $0.30)', completed: false },
       { id: 'fee-3', label: 'Understand fee breakdown: CreatorCredits platform (~2.8%)', completed: false },
       { id: 'fee-4', label: 'Configure per-partner fee override (if needed)', completed: false, description: 'Custom fee for specific partners at /admin/partners/:id' },
       { id: 'fee-5', label: 'Document fee flow for accounting: $100 → $94 to partner → $89.30 to creator', completed: false },
@@ -263,7 +263,7 @@ export const settlementChecklistData: ChecklistSection[] = [
       { id: 'db-3', label: 'Add CreditCapture model', completed: false, description: 'Fields: id, holdId, partnerId, creatorId, creatorEmail, projectId, projectName, amount, settlementId, settledAt, capturedAt' },
       { id: 'db-4', label: 'Update Partner model with settlement fields', completed: false, description: 'Add: settlementFrequency, settlementDay, minimumSettlement, partnerFeeOverride' },
       { id: 'db-5', label: 'Add SettlementFrequency enum', completed: false, description: 'DAILY, WEEKLY, BIWEEKLY, MONTHLY' },
-      { id: 'db-6', label: 'Add Partner payment details fields', completed: false, description: 'paymentMethod, bankName, bankAccountNumber (encrypted), bankRoutingNumber, bankSwiftCode, paypalEmail, stripeAccountId' },
+      { id: 'db-6', label: 'Add Partner payment details fields', completed: false, description: 'paymentMethod, bankName, bankAccountNumber (encrypted), bankRoutingNumber, bankSwiftCode, paypalEmail, processorAccountId' },
       { id: 'db-7', label: 'Create database indexes for performance', completed: false, description: 'Index on partnerId, status, periodEnd, capturedAt, creatorId' },
       { id: 'db-8', label: 'Run Prisma migration', completed: false },
     ]
@@ -341,9 +341,9 @@ export const settlementChecklistData: ChecklistSection[] = [
     title: '8. Creator Payout (Reference)',
     description: 'Reference implementation for partner-side creator payouts',
     items: [
-      { id: 'payout-1', label: 'Document Stripe Connect integration (Express or Custom)', completed: false },
+      { id: 'payout-1', label: 'Document payout provider integration', completed: false },
       { id: 'payout-2', label: 'Document CreatorBalance model schema', completed: false, description: 'availableBalance, pendingBalance, lifetimeEarnings, lifetimePaid' },
-      { id: 'payout-3', label: 'Document CreatorEarning model schema', completed: false, description: 'Track earnings by source (STRIPE_DIRECT or CREDITS)' },
+      { id: 'payout-3', label: 'Document CreatorEarning model schema', completed: false, description: 'Track earnings by source (DIRECT or CREDITS)' },
       { id: 'payout-4', label: 'Document CreatorPayout model schema', completed: false },
       { id: 'payout-5', label: 'Document balance update flow when project funds', completed: false },
       { id: 'payout-6', label: 'Document balance update flow when settlement received', completed: false },
