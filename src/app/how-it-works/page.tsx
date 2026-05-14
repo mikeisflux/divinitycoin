@@ -33,7 +33,7 @@ export default function HowItWorksPage() {
                 </h2>
                 <p className="text-lg text-neutral-600 leading-relaxed">
                   Choose any amount between $5 and $500. We accept all major
-                  credit and debit cards through our secure Stripe checkout. No
+                  credit and debit cards through our secure checkout. No
                   account needed—just enter your email and complete the
                   purchase.
                 </p>
@@ -122,7 +122,7 @@ export default function HowItWorksPage() {
               },
               {
                 q: 'Is my payment secure?',
-                a: 'Absolutely. All payments are processed through Stripe, a PCI-compliant payment processor used by millions of businesses.',
+                a: 'Absolutely. All payments are processed through a PCI-compliant payment processor used by millions of businesses.',
               },
             ].map((item, index) => (
               <div key={index} className="bg-white rounded-xl p-6 shadow-sm">

@@ -185,8 +185,8 @@ export function Footer() {
               <div className="absolute w-4 h-4 bg-[#EB001B] rounded-full left-1" />
               <div className="absolute w-4 h-4 bg-[#F79E1B] rounded-full right-1" />
             </div>
-            {/* Stripe badge */}
-            <span className="text-xs">Powered by Stripe</span>
+            {/* Secure checkout badge */}
+            <span className="text-xs">Secure Checkout</span>
           </div>
         </div>
       </div>

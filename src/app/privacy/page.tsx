@@ -38,7 +38,7 @@ export default function PrivacyPage() {
           <ul>
             <li>Email address (required for code delivery and account creation)</li>
             <li>Name (optional, for account personalization)</li>
-            <li>Payment information (processed securely by Stripe; we do not store full card numbers)</li>
+            <li>Payment information (processed securely by our third-party payment processor; we do not store full card numbers)</li>
             <li>Partner application information (business name, contact details, tax ID for business partners)</li>
           </ul>
 
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
 
           <h3>3.3 Information from Third Parties</h3>
           <ul>
-            <li>Payment confirmation and transaction data from Stripe</li>
+            <li>Payment confirmation and transaction data from our payment processor</li>
             <li>Redemption and usage data from partner platforms</li>
           </ul>
 
@@ -74,8 +74,8 @@ export default function PrivacyPage() {
           <p>We may share your information with the following categories of recipients:</p>
           <ul>
             <li>
-              <strong>Payment Processors (Stripe):</strong> To process your payments securely.
-              Stripe's privacy policy governs their use of your data.
+              <strong>Payment Processors:</strong> To process your payments securely.
+              Our payment processor's privacy policy governs their use of your data.
             </li>
             <li>
               <strong>Email Service Providers (SendGrid/SMTP):</strong> To deliver transactional
@@ -120,7 +120,7 @@ export default function PrivacyPage() {
           </p>
           <ul>
             <li>Encryption in transit using TLS/SSL</li>
-            <li>Secure payment processing through Stripe (PCI-DSS compliant)</li>
+            <li>Secure payment processing through a PCI-DSS compliant processor</li>
             <li>Hashed storage of sensitive codes and passwords</li>
             <li>Access controls and authentication requirements</li>
             <li>Regular security assessments</li>

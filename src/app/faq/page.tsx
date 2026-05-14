@@ -12,7 +12,7 @@ const faqs = [
     questions: [
       {
         q: 'What payment methods do you accept?',
-        a: 'We accept all major credit and debit cards (Visa, Mastercard, American Express, Discover) through our secure Stripe checkout.',
+        a: 'We accept all major credit and debit cards (Visa, Mastercard, American Express, Discover) through our secure checkout.',
       },
       {
         q: 'Is there a minimum or maximum purchase amount?',
@@ -79,7 +79,7 @@ const faqs = [
     questions: [
       {
         q: 'Is my payment information secure?',
-        a: 'Absolutely. All payments are processed through Stripe, a PCI-DSS Level 1 certified payment processor. We never see or store your card details.',
+        a: 'Absolutely. All payments are processed through a PCI-DSS Level 1 certified payment processor. We never see or store your card details.',
       },
       {
         q: 'Should I share my credit code?',

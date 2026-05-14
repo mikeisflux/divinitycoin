@@ -48,8 +48,8 @@ export default function TermsPage() {
 
           <h2>4. Purchases and Payments</h2>
           <p>
-            All payments are processed securely through Stripe, a PCI-compliant
-            payment processor. We accept major credit and debit cards. All prices
+            All payments are processed securely through a PCI-compliant
+            third-party payment processor. We accept major credit and debit cards. All prices
             are displayed in United States Dollars (USD). By completing a purchase,
             you authorize us to charge your selected payment method for the total
             amount of your order.
