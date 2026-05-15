@@ -21,13 +21,14 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Check if we're on an admin or partner dashboard route
+  // Check if we're on an admin, partner dashboard, or hosted-checkout route
   const headersList = await headers();
   const pathname = headersList.get('x-pathname') || headersList.get('x-invoke-path') || '';
   const isAdminRoute = pathname.startsWith('/admin');
   const isPartnerDashboardRoute = pathname.startsWith('/partners/') && !pathname.startsWith('/partners/login');
+  const isHostedCheckoutRoute = pathname.startsWith('/checkout/');
 
-  const hideHeaderFooter = isAdminRoute || isPartnerDashboardRoute;
+  const hideHeaderFooter = isAdminRoute || isPartnerDashboardRoute || isHostedCheckoutRoute;
 
   return (
     <html lang="en">
