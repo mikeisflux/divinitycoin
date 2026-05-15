@@ -475,10 +475,11 @@ model Partner {
   activatedAt   DateTime?
 
   // Relations
-  apiKeys       PartnerApiKey[]
-  giftCards     GiftCard[]
-  settlements   PartnerSettlement[]
-  captures      CreditCapture[]
+  apiKeys          PartnerApiKey[]
+  giftCards        GiftCard[]
+  settlements      PartnerSettlement[]
+  captures         CreditCapture[]
+  checkoutSessions CheckoutSession[]
 
   @@index([slug])
   @@index([status])
@@ -1130,6 +1131,76 @@ enum PartnerPaymentStatus {
   COMPLETED     // Payment succeeded, gift card created, redeemed, held
   FAILED        // Payment failed
   REFUNDED      // Payment refunded
+}
+
+// DC-hosted checkout sessions. Optional alternative to the direct
+// PaymentIntent flow: partners create a session, redirect the user to
+// /checkout/<sessionToken>, and DC handles the card capture inside its
+// own page. In PAYMENT mode the underlying PaymentIntent is created
+// up-front and a PendingPartnerPayment row is also written, so existing
+// webhooks/settlements/refunds work identically regardless of which
+// path the partner used.
+model CheckoutSession {
+  id              String   @id @default(cuid())
+  sessionToken    String   @unique  // public bearer token; appears in URL + returned as sessionId
+
+  // Partner reference
+  partnerId       String
+  partner         Partner  @relation(fields: [partnerId], references: [id])
+
+  // Mode and state
+  mode            CheckoutSessionMode   @default(PAYMENT)
+  status          CheckoutSessionStatus @default(PENDING)
+
+  // Customer
+  platformUserId  String
+  email           String
+
+  // Payment-mode fields
+  amount          Int?
+  currency        String   @default("usd")
+  pledgeId        String?
+  projectId       String?
+  paymentIntentId String?  @unique
+
+  // Setup-mode fields (save card for later off-session use)
+  setupIntentId   String?  @unique
+
+  // Result of completion
+  paymentMethodId String?
+
+  // Display / branding on the hosted page
+  partnerName     String?
+  partnerLogoUrl  String?
+  description     String?
+
+  // Flow control
+  returnUrl       String?
+  cancelUrl       String?
+
+  // Timestamps
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedAt     DateTime?
+
+  @@index([partnerId])
+  @@index([sessionToken])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+enum CheckoutSessionMode {
+  PAYMENT       // one-time charge
+  SETUP         // save card for later off-session use
+}
+
+enum CheckoutSessionStatus {
+  PENDING       // Session created, awaiting completion
+  COMPLETE      // Payment succeeded / card saved
+  FAILED        // Payment failed
+  EXPIRED       // Session expired without completion
+  CANCELED      // User explicitly canceled
 }
 
 // Stripe webhook idempotency. We insert `eventId` before processing an

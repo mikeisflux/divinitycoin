@@ -11,7 +11,7 @@ import { prisma } from '@/lib/db';
 import { hashApiKey } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
 import { getStripeClient } from '@/lib/stripe';
-import { getStripeConfig } from '@/lib/config';
+import { getStripeConfig, getConfig } from '@/lib/config';
 import crypto from 'crypto';
 
 // Fallback to legacy INTERNAL_API_KEY for backwards compatibility
@@ -142,6 +142,12 @@ export async function POST(request: NextRequest) {
 
       case 'create-payment-intent':
         return handleCreatePaymentIntent(body, partnerId!);
+
+      case 'create-checkout-session':
+        return handleCreateCheckoutSession(body, partnerId!);
+
+      case 'get-checkout-session':
+        return handleGetCheckoutSession(body, partnerId!);
 
       case 'refund':
         return handleRefund(body, partnerId!, ipAddress);
@@ -1572,5 +1578,291 @@ async function handleVerifyPayment(
       { error: 'Failed to verify payment' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Create a DC-hosted checkout session. Optional alternative to the direct
+ * `create-payment-intent` flow — returns a `checkoutUrl` the partner can
+ * redirect the user to. In PAYMENT mode the underlying PaymentIntent is
+ * created up-front and a `PendingPartnerPayment` row is written exactly as
+ * the direct flow does, so downstream webhooks/settlements/refunds behave
+ * identically regardless of which path the partner used.
+ *
+ * Phase 1a: PAYMENT mode only. SETUP mode rejected for now.
+ */
+async function handleCreateCheckoutSession(
+  body: {
+    platformUserId: string;
+    email: string;
+    mode?: 'payment' | 'setup';
+    amount?: number;
+    currency?: string;
+    pledgeId?: string;
+    projectId?: string;
+    returnUrl: string;
+    cancelUrl?: string;
+    partnerLogoUrl?: string;
+    description?: string;
+    expiresInMinutes?: number;
+  },
+  partnerId: string,
+) {
+  const {
+    platformUserId, email,
+    mode = 'payment',
+    amount, currency = 'usd', pledgeId, projectId,
+    returnUrl, cancelUrl, partnerLogoUrl, description,
+    expiresInMinutes = 30,
+  } = body;
+
+  if (!platformUserId || !email || !returnUrl) {
+    return NextResponse.json(
+      { error: 'Missing required fields: platformUserId, email, returnUrl' },
+      { status: 400 },
+    );
+  }
+
+  try { new URL(returnUrl); } catch {
+    return NextResponse.json({ error: 'returnUrl must be a valid absolute URL' }, { status: 400 });
+  }
+  if (cancelUrl) {
+    try { new URL(cancelUrl); } catch {
+      return NextResponse.json({ error: 'cancelUrl must be a valid absolute URL' }, { status: 400 });
+    }
+  }
+
+  if (mode !== 'payment') {
+    return NextResponse.json(
+      { error: 'Only mode="payment" is supported in this version' },
+      { status: 400 },
+    );
+  }
+
+  if (!amount || !pledgeId || !projectId) {
+    return NextResponse.json(
+      { error: 'mode=payment requires amount, pledgeId, projectId' },
+      { status: 400 },
+    );
+  }
+  if (amount <= 0) {
+    return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 });
+  }
+
+  // Clamp expiry between 1 minute and 24 hours
+  const minutes = Math.min(Math.max(expiresInMinutes, 1), 24 * 60);
+  const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
+
+  try {
+    const stripe = await getStripeClient();
+
+    // Upsert PlatformUser — same pattern as create-payment-intent so a
+    // concurrent direct flow + hosted flow for the same user can't race.
+    const dcUser = await prisma.platformUser.upsert({
+      where: { platformUserId },
+      create: { platformUserId, email, partnerId },
+      update: {},
+    });
+
+    // Find or create Stripe customer (same idempotency dance as direct flow).
+    let stripeCustomerId = dcUser.stripeCustomerId;
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create(
+        { email, metadata: { platformUserId, partnerId } },
+        { idempotencyKey: `customer-${platformUserId}` },
+      );
+      stripeCustomerId = customer.id;
+
+      await prisma.platformUser.updateMany({
+        where: { id: dcUser.id, stripeCustomerId: null },
+        data: { stripeCustomerId },
+      });
+
+      const refreshed = await prisma.platformUser.findUnique({
+        where: { id: dcUser.id },
+        select: { stripeCustomerId: true },
+      });
+      if (refreshed?.stripeCustomerId) stripeCustomerId = refreshed.stripeCustomerId;
+    }
+
+    // Create the PaymentIntent up-front. Identical metadata to the direct
+    // flow so the same Stripe webhook handler picks it up and fires the
+    // existing `payment.succeeded` / `payment.failed` events.
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency,
+      customer: stripeCustomerId,
+      metadata: {
+        type: 'partner_payment',
+        partnerId,
+        platformUserId,
+        pledgeId,
+        projectId,
+        email,
+      },
+      automatic_payment_methods: { enabled: true },
+    });
+
+    // Write the same PendingPartnerPayment row the direct flow writes —
+    // this is what downstream webhook / settlement / refund code reads.
+    await prisma.pendingPartnerPayment.create({
+      data: {
+        paymentIntentId: paymentIntent.id,
+        partnerId,
+        platformUserId,
+        pledgeId,
+        projectId,
+        amount,
+        currency,
+        email,
+        status: 'PENDING',
+      },
+    });
+
+    const partner = await prisma.partner.findUnique({
+      where: { id: partnerId },
+      select: { name: true, logoUrl: true },
+    });
+
+    // Public bearer token: anyone with this can complete the checkout,
+    // same model as Stripe Checkout's `cs_...` ids.
+    const sessionToken = `cs_${crypto.randomBytes(24).toString('hex')}`;
+
+    await prisma.checkoutSession.create({
+      data: {
+        sessionToken,
+        partnerId,
+        mode: 'PAYMENT',
+        status: 'PENDING',
+        platformUserId,
+        email,
+        amount,
+        currency,
+        pledgeId,
+        projectId,
+        paymentIntentId: paymentIntent.id,
+        partnerName: partner?.name ?? null,
+        partnerLogoUrl: partnerLogoUrl ?? partner?.logoUrl ?? null,
+        description: description ?? null,
+        returnUrl,
+        cancelUrl: cancelUrl ?? null,
+        expiresAt,
+      },
+    });
+
+    const baseUrl = await getConfig(
+      'NEXT_PUBLIC_BASE_URL',
+      process.env.NEXT_PUBLIC_BASE_URL || 'https://divinitycoin.com',
+    );
+    const checkoutUrl = `${baseUrl.replace(/\/$/, '')}/checkout/${sessionToken}`;
+
+    logger.info('Checkout session created', {
+      sessionId: sessionToken,
+      partnerId,
+      platformUserId,
+      amount,
+      pledgeId,
+      mode: 'payment',
+    });
+
+    return NextResponse.json({
+      success: true,
+      sessionId: sessionToken,
+      checkoutUrl,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    logger.error('Failed to create checkout session', { error, partnerId, platformUserId });
+    return NextResponse.json(
+      { error: 'Failed to create checkout session' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Fetch the current state of a DC-hosted checkout session by its sessionId.
+ * Self-heals: if the session is still PENDING but the underlying PI has
+ * moved to a terminal state at the processor, refresh from live status —
+ * same defensive pattern as `verify-payment`.
+ */
+async function handleGetCheckoutSession(
+  body: { sessionId: string },
+  partnerId: string,
+) {
+  const { sessionId } = body;
+  if (!sessionId) {
+    return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
+  }
+
+  try {
+    const stored = await prisma.checkoutSession.findUnique({
+      where: { sessionToken: sessionId },
+    });
+    if (!stored || stored.partnerId !== partnerId) {
+      return NextResponse.json({ error: 'Checkout session not found' }, { status: 404 });
+    }
+
+    let status = stored.status;
+    let completedAt = stored.completedAt;
+    let paymentMethodId = stored.paymentMethodId;
+
+    // Lazy-expire on read.
+    if (status === 'PENDING' && stored.expiresAt < new Date()) {
+      await prisma.checkoutSession.update({
+        where: { id: stored.id },
+        data: { status: 'EXPIRED' },
+      });
+      status = 'EXPIRED';
+    }
+
+    // Self-heal against the processor for still-pending sessions.
+    if (status === 'PENDING' && stored.paymentIntentId) {
+      try {
+        const stripe = await getStripeClient();
+        const pi = await stripe.paymentIntents.retrieve(stored.paymentIntentId);
+        if (pi.status === 'succeeded') {
+          paymentMethodId = typeof pi.payment_method === 'string' ? pi.payment_method : null;
+          completedAt = new Date();
+          await prisma.checkoutSession.update({
+            where: { id: stored.id },
+            data: { status: 'COMPLETE', completedAt, paymentMethodId },
+          });
+          status = 'COMPLETE';
+        } else if (pi.status === 'canceled') {
+          await prisma.checkoutSession.update({
+            where: { id: stored.id },
+            data: { status: 'CANCELED' },
+          });
+          status = 'CANCELED';
+        }
+      } catch {
+        // ignore — return stored state if processor lookup fails
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      session: {
+        sessionId: stored.sessionToken,
+        status: status.toLowerCase(),
+        mode: stored.mode.toLowerCase(),
+        amount: stored.amount,
+        currency: stored.currency,
+        pledgeId: stored.pledgeId,
+        projectId: stored.projectId,
+        paymentIntentId: stored.paymentIntentId,
+        setupIntentId: stored.setupIntentId,
+        paymentMethodId,
+        platformUserId: stored.platformUserId,
+        email: stored.email,
+        expiresAt: stored.expiresAt.toISOString(),
+        completedAt: completedAt?.toISOString() ?? null,
+        createdAt: stored.createdAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to get checkout session', { error, partnerId, sessionId });
+    return NextResponse.json({ error: 'Failed to get checkout session' }, { status: 500 });
   }
 }
