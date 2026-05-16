@@ -20,7 +20,8 @@ interface Props {
   sessionToken: string;
   publishableKey: string;
   clientSecret: string;
-  amountLabel: string;
+  mode: 'payment' | 'setup';
+  amountLabel: string | null;     // null in setup mode
   partnerName: string | null;
   returnUrl: string | null;
   cancelUrl: string | null;
@@ -38,11 +39,12 @@ function appendSessionId(url: string, sessionToken: string): string {
 
 function InnerForm({
   sessionToken,
+  mode,
   amountLabel,
   partnerName,
   returnUrl,
   cancelUrl,
-}: Pick<Props, 'sessionToken' | 'amountLabel' | 'partnerName' | 'returnUrl' | 'cancelUrl'>) {
+}: Pick<Props, 'sessionToken' | 'mode' | 'amountLabel' | 'partnerName' | 'returnUrl' | 'cancelUrl'>) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -50,17 +52,15 @@ function InnerForm({
   const [done, setDone] = useState(false);
 
   // The same hosted-checkout page is the return target for any 3DS
-  // redirect. We detect a post-redirect arrival via the URL's
-  // ?payment_intent_client_secret= and let our server-side page render
-  // pull the now-terminal session state.
+  // redirect (both payment and setup flows). Detect post-redirect
+  // arrival via either Stripe-supplied URL param and finalize.
   useEffect(() => {
     if (typeof window === 'undefined' || !stripe) return;
     const url = new URL(window.location.href);
     const piSecret = url.searchParams.get('payment_intent_client_secret');
-    if (!piSecret) return;
+    const siSecret = url.searchParams.get('setup_intent_client_secret');
+    if (!piSecret && !siSecret) return;
 
-    // Already returning from a 3DS challenge: ask our server to mark
-    // the session terminal and bounce us to the partner.
     completeAndRedirect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stripe]);
@@ -72,7 +72,7 @@ function InnerForm({
       });
       const body = await res.json();
       if (!res.ok || !body?.success) {
-        setError(body?.error || 'Could not finalize payment');
+        setError(body?.error || (mode === 'payment' ? 'Could not finalize payment' : 'Could not finalize card setup'));
         return;
       }
       setDone(true);
@@ -81,7 +81,7 @@ function InnerForm({
         window.location.replace(target);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not finalize payment');
+      setError(err instanceof Error ? err.message : 'Could not finalize');
     }
   }
 
@@ -96,36 +96,60 @@ function InnerForm({
     // the post-redirect detection above can pick up the result.
     const returnHere = `${window.location.origin}/checkout/${sessionToken}`;
 
-    const { error: confirmErr, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { return_url: returnHere },
-      redirect: 'if_required',
-    });
+    if (mode === 'payment') {
+      const { error: confirmErr, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: returnHere },
+        redirect: 'if_required',
+      });
 
-    if (confirmErr) {
-      setError(confirmErr.message || 'Payment failed');
-      setSubmitting(false);
-      return;
+      if (confirmErr) {
+        setError(confirmErr.message || 'Payment failed');
+        setSubmitting(false);
+        return;
+      }
+
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        await completeAndRedirect();
+        return;
+      }
+    } else {
+      const { error: confirmErr, setupIntent } = await stripe.confirmSetup({
+        elements,
+        confirmParams: { return_url: returnHere },
+        redirect: 'if_required',
+      });
+
+      if (confirmErr) {
+        setError(confirmErr.message || 'Card setup failed');
+        setSubmitting(false);
+        return;
+      }
+
+      if (setupIntent && setupIntent.status === 'succeeded') {
+        await completeAndRedirect();
+        return;
+      }
     }
 
-    if (paymentIntent && paymentIntent.status === 'succeeded') {
-      await completeAndRedirect();
-      return;
-    }
-
-    // Anything else (e.g. requires_action that didn't redirect) — fall
-    // through to a generic error rather than silently spinning.
-    setError('Payment did not complete. Please try again.');
+    setError(mode === 'payment'
+      ? 'Payment did not complete. Please try again.'
+      : 'Card was not saved. Please try again.');
     setSubmitting(false);
   }
 
   const partnerCancelHref = cancelUrl ?? returnUrl ?? null;
+  const buttonLabel = submitting
+    ? 'Processing…'
+    : mode === 'payment'
+      ? `Pay ${amountLabel ?? ''}`
+      : 'Save card';
 
   if (done) {
     return (
       <div className="text-center py-6">
         <p className="text-neutral-700">
-          Payment complete. Returning to {partnerName ?? 'the partner site'}…
+          {mode === 'payment' ? 'Payment complete' : 'Card saved'}. Returning to {partnerName ?? 'the partner site'}…
         </p>
       </div>
     );
@@ -146,7 +170,7 @@ function InnerForm({
         disabled={!stripe || submitting}
         className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {submitting ? 'Processing…' : `Pay ${amountLabel}`}
+        {buttonLabel}
       </button>
 
       {partnerCancelHref && (
@@ -190,6 +214,7 @@ export function HostedCheckoutForm(props: Props) {
     >
       <InnerForm
         sessionToken={props.sessionToken}
+        mode={props.mode}
         amountLabel={props.amountLabel}
         partnerName={props.partnerName}
         returnUrl={props.returnUrl}

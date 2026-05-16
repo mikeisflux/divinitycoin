@@ -62,33 +62,54 @@ export async function POST(
       });
     }
 
-    if (!session.paymentIntentId) {
-      return NextResponse.json({ error: 'Session has no PaymentIntent' }, { status: 500 });
+    if (!session.paymentIntentId && !session.setupIntentId) {
+      return NextResponse.json({ error: 'Session has no intent' }, { status: 500 });
     }
 
-    // Authoritative status from the processor.
+    // Authoritative status from the processor — works for both PI and
+    // SI sessions. Status mapping is identical: succeeded → COMPLETE,
+    // canceled → CANCELED, requires_payment_method → FAILED, everything
+    // else (requires_action, processing) stays PENDING.
     const stripe = await getStripeClient();
-    const pi = await stripe.paymentIntents.retrieve(session.paymentIntentId);
 
     let nextStatus: 'COMPLETE' | 'FAILED' | 'CANCELED' | 'PENDING' = 'PENDING';
-    if (pi.status === 'succeeded') nextStatus = 'COMPLETE';
-    else if (pi.status === 'canceled') nextStatus = 'CANCELED';
-    else if (pi.status === 'requires_payment_method') nextStatus = 'FAILED';
+    let paymentMethodId: string | null = null;
+    let processorStatus: string;
+
+    if (session.paymentIntentId) {
+      const pi = await stripe.paymentIntents.retrieve(session.paymentIntentId);
+      processorStatus = pi.status;
+      if (pi.status === 'succeeded') {
+        nextStatus = 'COMPLETE';
+        paymentMethodId = typeof pi.payment_method === 'string' ? pi.payment_method : null;
+      } else if (pi.status === 'canceled') {
+        nextStatus = 'CANCELED';
+      } else if (pi.status === 'requires_payment_method') {
+        nextStatus = 'FAILED';
+      }
+    } else {
+      const si = await stripe.setupIntents.retrieve(session.setupIntentId!);
+      processorStatus = si.status;
+      if (si.status === 'succeeded') {
+        nextStatus = 'COMPLETE';
+        paymentMethodId = typeof si.payment_method === 'string' ? si.payment_method : null;
+      } else if (si.status === 'canceled') {
+        nextStatus = 'CANCELED';
+      } else if (si.status === 'requires_payment_method') {
+        nextStatus = 'FAILED';
+      }
+    }
 
     if (nextStatus === 'PENDING') {
       // Still in flight (requires_action / processing) — don't flip yet.
       return NextResponse.json({
         success: true,
         status: 'pending',
-        processorStatus: pi.status,
+        processorStatus,
       });
     }
 
     const completedAt = nextStatus === 'COMPLETE' ? new Date() : null;
-    const paymentMethodId =
-      nextStatus === 'COMPLETE' && typeof pi.payment_method === 'string'
-        ? pi.payment_method
-        : null;
 
     await prisma.checkoutSession.update({
       where: { id: session.id },
@@ -107,8 +128,10 @@ export async function POST(
     logger.info('Hosted checkout: session completed', {
       sessionId: sessionToken,
       partnerId: session.partnerId,
+      mode: session.mode,
       status: nextStatus,
       paymentIntentId: session.paymentIntentId,
+      setupIntentId: session.setupIntentId,
     });
 
     return NextResponse.json({

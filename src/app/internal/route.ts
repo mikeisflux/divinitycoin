@@ -1632,22 +1632,25 @@ async function handleCreateCheckoutSession(
     }
   }
 
-  if (mode !== 'payment') {
+  if (mode !== 'payment' && mode !== 'setup') {
     return NextResponse.json(
-      { error: 'Only mode="payment" is supported in this version' },
+      { error: 'mode must be "payment" or "setup"' },
       { status: 400 },
     );
   }
 
-  if (!amount || !pledgeId || !projectId) {
-    return NextResponse.json(
-      { error: 'mode=payment requires amount, pledgeId, projectId' },
-      { status: 400 },
-    );
+  if (mode === 'payment') {
+    if (!amount || !pledgeId || !projectId) {
+      return NextResponse.json(
+        { error: 'mode=payment requires amount, pledgeId, projectId' },
+        { status: 400 },
+      );
+    }
+    if (amount <= 0) {
+      return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 });
+    }
   }
-  if (amount <= 0) {
-    return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 });
-  }
+  // mode === 'setup' needs only the common fields above.
 
   // Clamp expiry between 1 minute and 24 hours
   const minutes = Math.min(Math.max(expiresInMinutes, 1), 24 * 60);
@@ -1685,39 +1688,62 @@ async function handleCreateCheckoutSession(
       if (refreshed?.stripeCustomerId) stripeCustomerId = refreshed.stripeCustomerId;
     }
 
-    // Create the PaymentIntent up-front. Identical metadata to the direct
-    // flow so the same Stripe webhook handler picks it up and fires the
-    // existing `payment.succeeded` / `payment.failed` events.
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
-      customer: stripeCustomerId,
-      metadata: {
-        type: 'partner_payment',
-        partnerId,
-        platformUserId,
-        pledgeId,
-        projectId,
-        email,
-      },
-      automatic_payment_methods: { enabled: true },
-    });
+    let paymentIntentId: string | null = null;
+    let setupIntentId: string | null = null;
 
-    // Write the same PendingPartnerPayment row the direct flow writes —
-    // this is what downstream webhook / settlement / refund code reads.
-    await prisma.pendingPartnerPayment.create({
-      data: {
-        paymentIntentId: paymentIntent.id,
-        partnerId,
-        platformUserId,
-        pledgeId,
-        projectId,
-        amount,
+    if (mode === 'payment') {
+      // Create the PaymentIntent up-front. Identical metadata to the
+      // direct flow so the same Stripe webhook handler picks it up and
+      // fires the existing payment.succeeded / payment.failed events.
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount!,
         currency,
-        email,
-        status: 'PENDING',
-      },
-    });
+        customer: stripeCustomerId,
+        metadata: {
+          type: 'partner_payment',
+          partnerId,
+          platformUserId,
+          pledgeId: pledgeId!,
+          projectId: projectId!,
+          email,
+        },
+        automatic_payment_methods: { enabled: true },
+      });
+      paymentIntentId = paymentIntent.id;
+
+      // Same PendingPartnerPayment row the direct flow writes — this is
+      // what downstream webhook / settlement / refund code reads.
+      await prisma.pendingPartnerPayment.create({
+        data: {
+          paymentIntentId: paymentIntent.id,
+          partnerId,
+          platformUserId,
+          pledgeId: pledgeId!,
+          projectId: projectId!,
+          amount: amount!,
+          currency,
+          email,
+          status: 'PENDING',
+        },
+      });
+    } else {
+      // SETUP mode: create a SetupIntent so the hosted page can capture
+      // a card the partner can later charge off-session via
+      // charge-saved-payment-method. No PendingPartnerPayment row —
+      // that table is payment-specific.
+      const setupIntent = await stripe.setupIntents.create({
+        customer: stripeCustomerId,
+        usage: 'off_session',
+        metadata: {
+          type: 'partner_setup',
+          partnerId,
+          platformUserId,
+          email,
+        },
+        automatic_payment_methods: { enabled: true },
+      });
+      setupIntentId = setupIntent.id;
+    }
 
     const partner = await prisma.partner.findUnique({
       where: { id: partnerId },
@@ -1732,15 +1758,16 @@ async function handleCreateCheckoutSession(
       data: {
         sessionToken,
         partnerId,
-        mode: 'PAYMENT',
+        mode: mode === 'payment' ? 'PAYMENT' : 'SETUP',
         status: 'PENDING',
         platformUserId,
         email,
-        amount,
+        amount: mode === 'payment' ? amount! : null,
         currency,
-        pledgeId,
-        projectId,
-        paymentIntentId: paymentIntent.id,
+        pledgeId: mode === 'payment' ? pledgeId! : null,
+        projectId: mode === 'payment' ? projectId! : null,
+        paymentIntentId,
+        setupIntentId,
         partnerName: partner?.name ?? null,
         partnerLogoUrl: partnerLogoUrl ?? partner?.logoUrl ?? null,
         description: description ?? null,
@@ -1760,9 +1787,9 @@ async function handleCreateCheckoutSession(
       sessionId: sessionToken,
       partnerId,
       platformUserId,
-      amount,
-      pledgeId,
-      mode: 'payment',
+      amount: mode === 'payment' ? amount : null,
+      pledgeId: mode === 'payment' ? pledgeId : null,
+      mode,
     });
 
     return NextResponse.json({
@@ -1817,24 +1844,43 @@ async function handleGetCheckoutSession(
     }
 
     // Self-heal against the processor for still-pending sessions.
-    if (status === 'PENDING' && stored.paymentIntentId) {
+    if (status === 'PENDING') {
       try {
         const stripe = await getStripeClient();
-        const pi = await stripe.paymentIntents.retrieve(stored.paymentIntentId);
-        if (pi.status === 'succeeded') {
-          paymentMethodId = typeof pi.payment_method === 'string' ? pi.payment_method : null;
-          completedAt = new Date();
-          await prisma.checkoutSession.update({
-            where: { id: stored.id },
-            data: { status: 'COMPLETE', completedAt, paymentMethodId },
-          });
-          status = 'COMPLETE';
-        } else if (pi.status === 'canceled') {
-          await prisma.checkoutSession.update({
-            where: { id: stored.id },
-            data: { status: 'CANCELED' },
-          });
-          status = 'CANCELED';
+        if (stored.paymentIntentId) {
+          const pi = await stripe.paymentIntents.retrieve(stored.paymentIntentId);
+          if (pi.status === 'succeeded') {
+            paymentMethodId = typeof pi.payment_method === 'string' ? pi.payment_method : null;
+            completedAt = new Date();
+            await prisma.checkoutSession.update({
+              where: { id: stored.id },
+              data: { status: 'COMPLETE', completedAt, paymentMethodId },
+            });
+            status = 'COMPLETE';
+          } else if (pi.status === 'canceled') {
+            await prisma.checkoutSession.update({
+              where: { id: stored.id },
+              data: { status: 'CANCELED' },
+            });
+            status = 'CANCELED';
+          }
+        } else if (stored.setupIntentId) {
+          const si = await stripe.setupIntents.retrieve(stored.setupIntentId);
+          if (si.status === 'succeeded') {
+            paymentMethodId = typeof si.payment_method === 'string' ? si.payment_method : null;
+            completedAt = new Date();
+            await prisma.checkoutSession.update({
+              where: { id: stored.id },
+              data: { status: 'COMPLETE', completedAt, paymentMethodId },
+            });
+            status = 'COMPLETE';
+          } else if (si.status === 'canceled') {
+            await prisma.checkoutSession.update({
+              where: { id: stored.id },
+              data: { status: 'CANCELED' },
+            });
+            status = 'CANCELED';
+          }
         }
       } catch {
         // ignore — return stored state if processor lookup fails

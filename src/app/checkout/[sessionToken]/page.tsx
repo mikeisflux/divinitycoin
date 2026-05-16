@@ -36,29 +36,51 @@ async function loadSession(sessionToken: string) {
     status = 'EXPIRED';
   }
 
-  // Self-heal: if PENDING in our DB but the underlying PI has already
-  // completed at the processor (e.g., webhook hasn't landed yet), trust
-  // live status.
-  if (status === 'PENDING' && session.paymentIntentId) {
+  // Self-heal: if PENDING in our DB but the underlying intent has
+  // already completed at the processor (e.g., webhook hasn't landed
+  // yet), trust live status. Handles both PaymentIntent (PAYMENT mode)
+  // and SetupIntent (SETUP mode).
+  if (status === 'PENDING') {
     try {
       const stripe = await getStripeClient();
-      const pi = await stripe.paymentIntents.retrieve(session.paymentIntentId);
-      if (pi.status === 'succeeded') {
-        await prisma.checkoutSession.update({
-          where: { id: session.id },
-          data: {
-            status: 'COMPLETE',
-            completedAt: new Date(),
-            paymentMethodId: typeof pi.payment_method === 'string' ? pi.payment_method : null,
-          },
-        });
-        status = 'COMPLETE';
-      } else if (pi.status === 'canceled') {
-        await prisma.checkoutSession.update({
-          where: { id: session.id },
-          data: { status: 'CANCELED' },
-        });
-        status = 'CANCELED';
+      if (session.paymentIntentId) {
+        const pi = await stripe.paymentIntents.retrieve(session.paymentIntentId);
+        if (pi.status === 'succeeded') {
+          await prisma.checkoutSession.update({
+            where: { id: session.id },
+            data: {
+              status: 'COMPLETE',
+              completedAt: new Date(),
+              paymentMethodId: typeof pi.payment_method === 'string' ? pi.payment_method : null,
+            },
+          });
+          status = 'COMPLETE';
+        } else if (pi.status === 'canceled') {
+          await prisma.checkoutSession.update({
+            where: { id: session.id },
+            data: { status: 'CANCELED' },
+          });
+          status = 'CANCELED';
+        }
+      } else if (session.setupIntentId) {
+        const si = await stripe.setupIntents.retrieve(session.setupIntentId);
+        if (si.status === 'succeeded') {
+          await prisma.checkoutSession.update({
+            where: { id: session.id },
+            data: {
+              status: 'COMPLETE',
+              completedAt: new Date(),
+              paymentMethodId: typeof si.payment_method === 'string' ? si.payment_method : null,
+            },
+          });
+          status = 'COMPLETE';
+        } else if (si.status === 'canceled') {
+          await prisma.checkoutSession.update({
+            where: { id: session.id },
+            data: { status: 'CANCELED' },
+          });
+          status = 'CANCELED';
+        }
       }
     } catch (error) {
       logger.error('Hosted checkout: failed to refresh session from processor', {
@@ -205,26 +227,31 @@ export default async function HostedCheckoutPage({
     );
   }
 
-  // PENDING — render the checkout form. Pull a fresh clientSecret from
+  // PENDING — render the checkout form. Pull a fresh client_secret from
   // the processor so a stale session doesn't ship a dead secret.
   const stripe = await getStripeClient();
   const stripeConfig = await getStripeConfig();
+  const isSetup = session.mode === 'SETUP';
 
-  if (!session.paymentIntentId) {
-    // Should never happen for PAYMENT mode, but guard anyway.
+  if (isSetup ? !session.setupIntentId : !session.paymentIntentId) {
     notFound();
   }
 
   let clientSecret: string;
   try {
-    const pi = await stripe.paymentIntents.retrieve(session.paymentIntentId);
-    if (!pi.client_secret) {
-      throw new Error('PaymentIntent missing client_secret');
+    if (isSetup) {
+      const si = await stripe.setupIntents.retrieve(session.setupIntentId!);
+      if (!si.client_secret) throw new Error('SetupIntent missing client_secret');
+      clientSecret = si.client_secret;
+    } else {
+      const pi = await stripe.paymentIntents.retrieve(session.paymentIntentId!);
+      if (!pi.client_secret) throw new Error('PaymentIntent missing client_secret');
+      clientSecret = pi.client_secret;
     }
-    clientSecret = pi.client_secret;
   } catch (error) {
-    logger.error('Hosted checkout: failed to retrieve PaymentIntent', {
+    logger.error('Hosted checkout: failed to retrieve intent', {
       sessionId: session.sessionToken,
+      mode: session.mode,
       error,
     });
     return (
@@ -232,7 +259,7 @@ export default async function HostedCheckoutPage({
         <div className="bg-white rounded-xl border border-neutral-200 p-6 text-center">
           <h1 className="text-lg font-semibold text-neutral-900">Checkout unavailable</h1>
           <p className="text-sm text-neutral-600 mt-2">
-            We couldn't load this payment. Please return to{' '}
+            We couldn't load this {isSetup ? 'card setup' : 'payment'}. Please return to{' '}
             {session.partnerName ?? 'the partner site'} and try again.
           </p>
         </div>
@@ -240,14 +267,28 @@ export default async function HostedCheckoutPage({
     );
   }
 
+  const amountLabel = isSetup ? null : formatAmount(session.amount ?? 0, session.currency);
+
   return (
     <CheckoutShell session={session}>
       <div className="bg-white rounded-xl border border-neutral-200 p-6">
         <div className="mb-6">
-          <p className="text-sm text-neutral-500">Total due</p>
-          <p className="text-3xl font-bold text-neutral-900 mt-1">
-            {formatAmount(session.amount ?? 0, session.currency)}
-          </p>
+          {isSetup ? (
+            <>
+              <p className="text-sm text-neutral-500">Save card on file</p>
+              <p className="text-lg font-semibold text-neutral-900 mt-1">
+                No charge today
+              </p>
+              <p className="text-sm text-neutral-600 mt-1">
+                {session.partnerName ?? 'The partner'} will use this card for future pledges.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-neutral-500">Total due</p>
+              <p className="text-3xl font-bold text-neutral-900 mt-1">{amountLabel}</p>
+            </>
+          )}
           {session.description && (
             <p className="text-sm text-neutral-600 mt-2">{session.description}</p>
           )}
@@ -257,7 +298,8 @@ export default async function HostedCheckoutPage({
           sessionToken={session.sessionToken}
           publishableKey={stripeConfig.publishableKey}
           clientSecret={clientSecret}
-          amountLabel={formatAmount(session.amount ?? 0, session.currency)}
+          mode={isSetup ? 'setup' : 'payment'}
+          amountLabel={amountLabel}
           partnerName={session.partnerName ?? null}
           returnUrl={session.returnUrl ?? null}
           cancelUrl={session.cancelUrl ?? null}
