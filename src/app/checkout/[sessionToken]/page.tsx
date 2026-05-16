@@ -14,7 +14,7 @@ import { TerminalRedirect } from './TerminalRedirect';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
-  title: 'Checkout - DivinityCoin',
+  title: 'Checkout - Divinity Payments',
   robots: 'noindex, nofollow',
 };
 
@@ -128,7 +128,7 @@ function CheckoutShell({
             <span className="text-white font-bold">D</span>
           </div>
           <span className="font-semibold text-neutral-900">
-            Divinity<span className="text-primary-600">Coin</span>
+            Divinity <span className="text-primary-600">Payments</span>
           </span>
         </div>
       </header>
@@ -156,7 +156,7 @@ function CheckoutShell({
           {children}
 
           <p className="text-center text-xs text-neutral-400 mt-8">
-            Secure payment by DivinityCoin
+            Secure payment by Divinity Payments
           </p>
         </div>
       </main>
