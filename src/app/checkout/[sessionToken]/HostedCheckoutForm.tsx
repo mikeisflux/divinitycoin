@@ -1,38 +1,36 @@
 'use client';
 
 // app/checkout/[sessionToken]/HostedCheckoutForm.tsx
-// Stripe Elements form mounted inside the DC-hosted checkout page.
 //
-// Three contexts this component runs in, each with slightly different
-// behavior:
+// Top-level orchestrator for the hosted-checkout payment surface. Routes
+// to one of three sub-views depending on context, with a deliberate
+// "don't load Stripe.js until the user demonstrates intent" gate:
 //
 //   1. Top-level (default).
-//      Renders Express Checkout (Apple Pay / Google Pay / Link) on top of
-//      the standard Payment Element. Submits via Stripe.confirmPayment /
-//      confirmSetup, posts to /api/checkout/<token>/complete, redirects
-//      to the partner's returnUrl with ?session_id=...
+//      Renders a "Continue to pay" CTA. Until the user taps it, Stripe.js
+//      is NOT loaded — nothing on the page references js.stripe.com or
+//      m.stripe.network in network logs. Casual visitors / devtools
+//      pokers who never tap don't trigger any third-party calls.
+//      On tap, we mount Elements, which loads Stripe.js, and the real
+//      Payment Element + Express Checkout (Apple Pay / Google Pay / Link)
+//      render. Standard confirm-and-finalize flow from there.
 //
-//   2. Embedded inside a partner-origin iframe.
-//      Same submit flow as #1, but additionally posts a ready/resize/
-//      complete message stream to window.parent so the partner page can
-//      auto-size the iframe and react to terminal state. On completion
-//      we top-nav to the partner's returnUrl by default (escapes the
-//      iframe naturally); partners that want to intercept can listen
-//      for the "complete" postMessage and hide the iframe before we
-//      navigate.
+//   2. Embedded inside an iframe on iOS WebKit.
+//      3DS / SCA and wallets can't reliably run in a cross-origin iframe
+//      on WebKit, so we don't try. Skips both the reveal gate AND the
+//      Elements mount — renders a "Continue securely" button that opens
+//      the same checkout URL in a top-level popup window. The popup
+//      runs as context #1, autoreveals (since it has an opener), loads
+//      Stripe, and completes payment. It postMessages the result back to
+//      the iframe + closes itself; the iframe also polls
+//      /api/checkout/<token>/status as a backstop in case the popup is
+//      killed or its message is blocked.
 //
-//   3. Embedded inside an iframe on iOS WebKit (mobile Safari, in-app
-//      browsers).
-//      3DS / SCA challenges and wallet buttons can't reliably execute
-//      inside a cross-origin iframe on WebKit, so we don't try. Instead
-//      we render a "Continue securely" button that opens the same
-//      checkout URL in a top-level popup window — that popup runs as
-//      context #1 (top-level, no iframe), so everything just works.
-//      When the popup completes it postMessages back to the opener
-//      iframe; the iframe also polls /api/checkout/<token>/status as a
-//      backstop in case the popup is closed forcibly or postMessage is
-//      blocked. Either path triggers the same top-nav to the partner's
-//      returnUrl.
+//   3. Returning from a 3DS / SCA redirect.
+//      Stripe sends the user back to this same URL with
+//      ?payment_intent_client_secret=... or ?setup_intent_client_secret=...
+//      We MUST complete the flow when that happens, so we skip the
+//      reveal gate entirely and mount Elements immediately.
 
 import { useEffect, useMemo, useState } from 'react';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
@@ -53,46 +51,24 @@ interface Props {
   partnerName: string | null;
   returnUrl: string | null;
   cancelUrl: string | null;
-  /**
-   * When true, the iframe still emits the `complete` postMessage on
-   * terminal state but does NOT top-nav to returnUrl. The embedding
-   * partner is responsible for navigation (typical when they want to
-   * transition their own UI in place after receiving the message).
-   */
   disableAutoRedirect: boolean;
 }
 
-// All postMessage payloads we exchange (iframe ↔ partner, popup ↔ opener)
-// share this namespace so the partner page can cheaply filter ours from
-// any other postMessage traffic on the window.
 const MSG_NAMESPACE = 'divinitycoin-checkout';
 
-function appendSessionId(url: string, sessionToken: string): string {
-  try {
-    const u = new URL(url);
-    u.searchParams.set('session_id', sessionToken);
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
+// ─── Utilities ──────────────────────────────────────────────────────
 
 function isInIframe(): boolean {
   if (typeof window === 'undefined') return false;
   try {
     return window.self !== window.top;
   } catch {
-    // SecurityError accessing window.top means we're in a cross-origin
-    // frame, which by definition means we're in an iframe.
     return true;
   }
 }
 
 function isWebkitIos(): boolean {
   if (typeof navigator === 'undefined') return false;
-  // Covers iPhone / iPad / iPod regardless of which browser app
-  // (Safari, Chrome, Firefox, in-app webviews) — they all use WebKit on
-  // iOS and share the same iframe-restriction behavior for 3DS.
   return /iP(ad|hone|od)/.test(navigator.userAgent);
 }
 
@@ -103,6 +79,12 @@ function hasOpener(): boolean {
   } catch {
     return false;
   }
+}
+
+function has3dsReturnParams(): boolean {
+  if (typeof window === 'undefined') return false;
+  const sp = new URL(window.location.href).searchParams;
+  return sp.has('payment_intent_client_secret') || sp.has('setup_intent_client_secret');
 }
 
 function safeTopNav(url: string) {
@@ -122,15 +104,13 @@ function postToParent(payload: Record<string, unknown>) {
   try {
     window.parent.postMessage({ namespace: MSG_NAMESPACE, ...payload }, '*');
   } catch {
-    // swallow — partner page is opaque to us, message just doesn't land
+    // swallow
   }
 }
 
 function postToOpener(payload: Record<string, unknown>) {
   if (typeof window === 'undefined' || !window.opener) return;
   try {
-    // Same-origin (the opener IS our own iframe at divinitycoin.com), so
-    // we can restrict the target origin tightly.
     window.opener.postMessage(
       { namespace: MSG_NAMESPACE, ...payload },
       window.location.origin,
@@ -140,68 +120,66 @@ function postToOpener(payload: Record<string, unknown>) {
   }
 }
 
-function InnerForm({
+// ─── Reveal CTA — pre-Stripe gate ──────────────────────────────────
+
+function RevealCTA({
+  mode,
+  amountLabel,
+  onReveal,
+}: {
+  mode: 'payment' | 'setup';
+  amountLabel: string | null;
+  onReveal: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        onClick={onReveal}
+        className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition"
+      >
+        {mode === 'payment'
+          ? `Continue to pay ${amountLabel ?? ''}`
+          : 'Continue to save your card'}
+      </button>
+      <p className="text-xs text-neutral-500 text-center">
+        Secure payment form loads only after you proceed.
+      </p>
+    </div>
+  );
+}
+
+// ─── Popup-failover UI — context #2 ────────────────────────────────
+// No Stripe Elements mounted here; the actual payment happens in the
+// popup window, which runs as context #1 (auto-revealed via opener).
+
+function PopupFailoverUI({
   sessionToken,
   mode,
   amountLabel,
   partnerName,
-  returnUrl,
-  cancelUrl,
   disableAutoRedirect,
-}: Pick<Props, 'sessionToken' | 'mode' | 'amountLabel' | 'partnerName' | 'returnUrl' | 'cancelUrl' | 'disableAutoRedirect'>) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-  const [walletsReady, setWalletsReady] = useState(false);
-  const [popupMode, setPopupMode] = useState(false);
+}: Pick<Props, 'sessionToken' | 'mode' | 'amountLabel' | 'partnerName' | 'disableAutoRedirect'>) {
   const [popupOpened, setPopupOpened] = useState(false);
   const [popupBlocked, setPopupBlocked] = useState(false);
+  const [done, setDone] = useState(false);
 
-  // ── Detect context #3 (iframe + iOS WebKit) and switch to popup UX ──
-  useEffect(() => {
-    if (isInIframe() && isWebkitIos()) {
-      setPopupMode(true);
+  function handleTerminal(status: string, redirectUrl: string | null) {
+    setDone(true);
+    if (isInIframe()) {
+      postToParent({
+        type: 'complete',
+        sessionId: sessionToken,
+        status,
+        redirectUrl,
+        disableAutoRedirect,
+      });
     }
-  }, []);
+    if (redirectUrl && !disableAutoRedirect) safeTopNav(redirectUrl);
+  }
 
-  // ── Iframe → partner page: announce ready + stream resize events ──
   useEffect(() => {
-    if (typeof window === 'undefined' || !isInIframe()) return;
-
-    postToParent({ type: 'ready', sessionId: sessionToken });
-
-    const sendResize = () => {
-      const height = document.body.scrollHeight;
-      postToParent({ type: 'resize', sessionId: sessionToken, height });
-    };
-    sendResize();
-
-    if (typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(sendResize);
-    ro.observe(document.body);
-    return () => ro.disconnect();
-  }, [sessionToken]);
-
-  // ── Post-3DS-redirect detection (Stripe sent us back with a secret
-  // in the URL); finalize and redirect. ─────────────────────────────
-  useEffect(() => {
-    if (typeof window === 'undefined' || !stripe) return;
-    const url = new URL(window.location.href);
-    const piSecret = url.searchParams.get('payment_intent_client_secret');
-    const siSecret = url.searchParams.get('setup_intent_client_secret');
-    if (!piSecret && !siSecret) return;
-    completeAndRedirect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stripe]);
-
-  // ── Popup-mode: while the popup is open in another tab, listen for
-  // its completion postMessage AND poll a lightweight status endpoint
-  // as a backstop in case the popup is closed forcibly or its message
-  // never lands. ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!popupMode || !popupOpened) return;
+    if (!popupOpened) return;
 
     const handleMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
@@ -224,7 +202,7 @@ function InnerForm({
           handleTerminal(body.status, body.redirectUrl);
         }
       } catch {
-        // ignore transient errors; next tick retries
+        // ignore transient errors
       }
     }, 2500);
 
@@ -233,7 +211,95 @@ function InnerForm({
       window.clearInterval(poll);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [popupMode, popupOpened, sessionToken]);
+  }, [popupOpened, sessionToken]);
+
+  function openPopup() {
+    if (typeof window === 'undefined') return;
+    const url = window.location.href;
+    const features = 'popup=1,width=440,height=720,scrollbars=yes,resizable=yes';
+    const w = window.open(url, 'dc_checkout', features);
+    if (!w) {
+      setPopupBlocked(true);
+      return;
+    }
+    setPopupBlocked(false);
+    setPopupOpened(true);
+    try { w.focus(); } catch { /* swallow */ }
+  }
+
+  if (done) {
+    return (
+      <div className="text-center py-6">
+        <p className="text-neutral-700">
+          {mode === 'payment' ? 'Payment complete' : 'Card saved'}. Returning to {partnerName ?? 'the partner site'}…
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <p className="text-sm text-amber-900">
+          For secure 3D Secure verification on this device, please complete your payment in a new tab.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={openPopup}
+        disabled={popupOpened}
+        className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition disabled:opacity-60 disabled:cursor-default"
+      >
+        {popupOpened
+          ? 'Waiting for payment in the new tab…'
+          : mode === 'payment'
+            ? `Continue securely · ${amountLabel ?? ''}`
+            : 'Continue to save your card'}
+      </button>
+
+      {popupBlocked && (
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
+          Your browser blocked the new tab. Tap the button again, or{' '}
+          <a
+            href={typeof window !== 'undefined' ? window.location.href : '#'}
+            target="_top"
+            className="underline font-medium"
+          >
+            open in this tab
+          </a>{' '}
+          instead.
+        </div>
+      )}
+
+      {popupOpened && (
+        <button
+          type="button"
+          onClick={() => setPopupOpened(false)}
+          className="block text-xs text-neutral-500 underline mx-auto"
+        >
+          Cancel and try a different way
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Stripe form — mounted inside <Elements>, assumes Stripe loaded ─
+
+function StripeForm({
+  sessionToken,
+  mode,
+  amountLabel,
+  partnerName,
+  disableAutoRedirect,
+}: Pick<Props, 'sessionToken' | 'mode' | 'amountLabel' | 'partnerName' | 'disableAutoRedirect'>) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [walletsReady, setWalletsReady] = useState(false);
 
   function handleTerminal(status: string, redirectUrl: string | null) {
     setDone(true);
@@ -246,13 +312,17 @@ function InnerForm({
         disableAutoRedirect,
       });
     }
-    // When disableAutoRedirect is true, we intentionally stop here —
-    // the partner has taken ownership of post-completion navigation.
-    // (We queue the top-nav synchronously, so the partner's message
-    // handler can't reliably cancel a pending nav after the fact —
-    // not navigating in the first place is the only clean answer.)
     if (redirectUrl && !disableAutoRedirect) safeTopNav(redirectUrl);
   }
+
+  // Post-3DS-redirect detection: if we landed on this URL with Stripe's
+  // return-params, immediately finalize without waiting for user input.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !stripe) return;
+    if (!has3dsReturnParams()) return;
+    completeAndRedirect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripe]);
 
   async function completeAndRedirect() {
     try {
@@ -272,9 +342,8 @@ function InnerForm({
       const target = body.redirectUrl as string | null;
       const status = body.status as string;
 
-      // If we're a popup opened by the iframe (context #3 from the
-      // header comment), hand off to our opener and close ourselves —
-      // the iframe takes over and navigates the top frame.
+      // If we're a popup opened from the iframe failover, hand off to
+      // the opener and close ourselves.
       if (hasOpener()) {
         postToOpener({
           type: 'complete',
@@ -287,7 +356,6 @@ function InnerForm({
         return;
       }
 
-      // Top-level or iframe (contexts #1 / #2). Same terminal handling.
       handleTerminal(status, target);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not finalize');
@@ -339,22 +407,6 @@ function InnerForm({
     await runConfirmFlow();
   }
 
-  function openPopup() {
-    if (typeof window === 'undefined') return;
-    const url = window.location.href;
-    const features = 'popup=1,width=440,height=720,scrollbars=yes,resizable=yes';
-    // Deliberately NOT 'noopener' — we want the popup's window.opener
-    // so it can postMessage results back to us.
-    const w = window.open(url, 'dc_checkout', features);
-    if (!w) {
-      setPopupBlocked(true);
-      return;
-    }
-    setPopupBlocked(false);
-    setPopupOpened(true);
-    try { w.focus(); } catch { /* swallow */ }
-  }
-
   const buttonLabel = submitting
     ? 'Processing…'
     : mode === 'payment'
@@ -371,61 +423,8 @@ function InnerForm({
     );
   }
 
-  // ── Popup-failover UI (context #3) ────────────────────────────────
-  if (popupMode) {
-    return (
-      <div className="space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <p className="text-sm text-amber-900">
-            For secure 3D Secure verification on this device, please complete your payment in a new tab.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={openPopup}
-          disabled={popupOpened}
-          className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition disabled:opacity-60 disabled:cursor-default"
-        >
-          {popupOpened
-            ? 'Waiting for payment in the new tab…'
-            : mode === 'payment'
-              ? `Continue securely · ${amountLabel ?? ''}`
-              : 'Continue to save your card'}
-        </button>
-
-        {popupBlocked && (
-          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
-            Your browser blocked the new tab. Tap the button again, or{' '}
-            <a
-              href={typeof window !== 'undefined' ? window.location.href : '#'}
-              target="_top"
-              className="underline font-medium"
-            >
-              open in this tab
-            </a>{' '}
-            instead.
-          </div>
-        )}
-
-        {popupOpened && (
-          <button
-            type="button"
-            onClick={() => setPopupOpened(false)}
-            className="block text-xs text-neutral-500 underline mx-auto"
-          >
-            Cancel and try a different way
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // ── Standard form (contexts #1 and #2) ────────────────────────────
   return (
     <div className="space-y-5">
-      {/* Wallet buttons (Apple Pay / Google Pay / Link). Renders nothing
-          when no wallet is available in the user's browser. */}
       <ExpressCheckoutElement
         onConfirm={() => { void runConfirmFlow(); }}
         onReady={(event) => {
@@ -465,11 +464,87 @@ function InnerForm({
   );
 }
 
+// ─── Top-level orchestrator ────────────────────────────────────────
+
 export function HostedCheckoutForm(props: Props) {
-  const stripePromise = useMemo<Promise<Stripe | null>>(
-    () => loadStripe(props.publishableKey),
-    [props.publishableKey],
+  const [popupMode, setPopupMode] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  // Context detection on mount. Priority order:
+  //   1. Returning from a 3DS challenge → auto-reveal, skip popup mode
+  //      (we MUST mount Elements to finalize).
+  //   2. iOS WebKit inside iframe → popup-failover mode, don't load Stripe
+  //      in this frame at all (the popup will load it instead).
+  //   3. Opened as a popup from our own iframe → user already committed
+  //      to paying upstream, auto-reveal.
+  //   4. Otherwise → render the reveal CTA, defer Stripe.js entirely
+  //      until the user taps it.
+  useEffect(() => {
+    if (has3dsReturnParams()) {
+      setRevealed(true);
+      return;
+    }
+    if (isInIframe() && isWebkitIos()) {
+      setPopupMode(true);
+      return;
+    }
+    if (hasOpener()) {
+      setRevealed(true);
+    }
+  }, []);
+
+  // Iframe → parent page: announce ready + stream resize events. Fires
+  // regardless of which sub-view we render so partners get the same
+  // event timing whether the user has interacted yet or not.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isInIframe()) return;
+
+    postToParent({ type: 'ready', sessionId: props.sessionToken });
+
+    const sendResize = () => {
+      postToParent({
+        type: 'resize',
+        sessionId: props.sessionToken,
+        height: document.body.scrollHeight,
+      });
+    };
+    sendResize();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(sendResize);
+    ro.observe(document.body);
+    return () => ro.disconnect();
+  }, [props.sessionToken]);
+
+  // Lazy stripePromise — loadStripe only fires after the user reveals
+  // (or we auto-revealed). Before then, no js.stripe.com request hits
+  // the network, no Stripe origins appear in devtools.
+  const stripePromise = useMemo<Promise<Stripe | null> | null>(
+    () => (revealed ? loadStripe(props.publishableKey) : null),
+    [revealed, props.publishableKey],
   );
+
+  if (popupMode) {
+    return (
+      <PopupFailoverUI
+        sessionToken={props.sessionToken}
+        mode={props.mode}
+        amountLabel={props.amountLabel}
+        partnerName={props.partnerName}
+        disableAutoRedirect={props.disableAutoRedirect}
+      />
+    );
+  }
+
+  if (!revealed || !stripePromise) {
+    return (
+      <RevealCTA
+        mode={props.mode}
+        amountLabel={props.amountLabel}
+        onReveal={() => setRevealed(true)}
+      />
+    );
+  }
 
   return (
     <Elements
@@ -490,13 +565,11 @@ export function HostedCheckoutForm(props: Props) {
         },
       }}
     >
-      <InnerForm
+      <StripeForm
         sessionToken={props.sessionToken}
         mode={props.mode}
         amountLabel={props.amountLabel}
         partnerName={props.partnerName}
-        returnUrl={props.returnUrl}
-        cancelUrl={props.cancelUrl}
         disableAutoRedirect={props.disableAutoRedirect}
       />
     </Elements>
