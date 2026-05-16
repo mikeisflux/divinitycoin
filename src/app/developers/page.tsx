@@ -631,6 +631,59 @@ GET  /internal?action=captures`}</pre>
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">charge-saved-payment-method</code>.
                   </p>
                   <p className="text-neutral-600 mb-3">
+                    <strong>Iframe embedding (optional).</strong> Instead of redirecting the user
+                    to the <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkoutUrl</code>,
+                    you can mount it in an iframe on your own page. We have to
+                    allowlist your origin via our
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">CHECKOUT_FRAME_ANCESTORS</code>
+                    config — send us the origin(s) you want enabled (apex, www,
+                    staging, etc.). Once enabled, the iframe streams three
+                    postMessages to your page (all share
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">namespace: &quot;divinitycoin-checkout&quot;</code>):
+                  </p>
+                  <ul className="text-neutral-600 mb-3 ml-6 list-disc text-sm space-y-1">
+                    <li><code className="font-mono text-xs">type: &quot;ready&quot;</code> — on initial load, with the <code className="font-mono text-xs">sessionId</code>.</li>
+                    <li><code className="font-mono text-xs">type: &quot;resize&quot;</code> — whenever the content height changes, with <code className="font-mono text-xs">height</code> in pixels. Apply it to your iframe&apos;s height for an auto-sized embed.</li>
+                    <li><code className="font-mono text-xs">type: &quot;complete&quot;</code> — when the session reaches a terminal state, with <code className="font-mono text-xs">status</code> (complete / failed / expired / canceled) and <code className="font-mono text-xs">redirectUrl</code>. We also top-nav the browser to <code className="font-mono text-xs">redirectUrl</code> right after; if you want to suppress that and handle navigation yourself, hide the iframe before the next animation frame on receiving the message.</li>
+                  </ul>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    On mobile WebKit (iOS Safari, iOS Chrome, in-app webviews)
+                    3DS challenges and Apple/Google Pay can&apos;t reliably run
+                    inside a cross-origin iframe, so on those devices we
+                    automatically render a &quot;Continue securely&quot; button
+                    that opens the same checkout URL in a top-level popup. The
+                    popup completes payment and postMessages the iframe; the
+                    iframe also polls a lightweight status endpoint as a
+                    backstop. From the partner&apos;s perspective the final
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">complete</code>
+                    message and the top-nav to <code className="font-mono text-xs">returnUrl</code>
+                    behave identically — no mobile-specific code needed on your side.
+                  </p>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`<!-- Minimal partner embed snippet -->
+<iframe
+  id="dc-checkout"
+  src="https://divinitycoin.com/checkout/cs_..."
+  style="width: 100%; border: 0; min-height: 480px;"
+  allow="payment *; publickey-credentials-get *"
+></iframe>
+<script>
+  window.addEventListener('message', (e) => {
+    if (e.origin !== 'https://divinitycoin.com') return;
+    const d = e.data;
+    if (!d || d.namespace !== 'divinitycoin-checkout') return;
+    if (d.type === 'resize') {
+      document.getElementById('dc-checkout').style.height = d.height + 'px';
+    } else if (d.type === 'complete') {
+      // d.status, d.sessionId, d.redirectUrl
+      // Default: we'll top-nav to d.redirectUrl right after this message.
+      // Override by setting window.location yourself + hiding the iframe.
+    }
+  });
+</script>`}</pre>
+                  </div>
+
+                  <p className="text-neutral-600 mb-3">
                     DC also fires dedicated session-level events when a hosted
                     session reaches a terminal state:
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.completed</code>,
