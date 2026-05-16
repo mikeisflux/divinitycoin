@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
+  ExpressCheckoutElement,
   PaymentElement,
   useElements,
   useStripe,
@@ -50,6 +51,7 @@ function InnerForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [walletsReady, setWalletsReady] = useState(false);
 
   // The same hosted-checkout page is the return target for any 3DS
   // redirect (both payment and setup flows). Detect post-redirect
@@ -85,57 +87,52 @@ function InnerForm({
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-
-    setSubmitting(true);
-    setError(null);
-
-    // Hand the user back to this same URL after any 3DS challenge so
-    // the post-redirect detection above can pick up the result.
-    const returnHere = `${window.location.origin}/checkout/${sessionToken}`;
-
+  // Confirms via the appropriate processor API for the session's mode
+  // and returns a structured result. Used by both the card form submit
+  // and the ExpressCheckoutElement (Apple Pay / Google Pay / Link) path.
+  async function confirmCurrent(returnHere: string): Promise<{ ok: boolean; error?: string }> {
+    if (!stripe || !elements) return { ok: false, error: 'Payment not ready' };
     if (mode === 'payment') {
       const { error: confirmErr, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: { return_url: returnHere },
         redirect: 'if_required',
       });
-
-      if (confirmErr) {
-        setError(confirmErr.message || 'Payment failed');
-        setSubmitting(false);
-        return;
-      }
-
-      if (paymentIntent && paymentIntent.status === 'succeeded') {
-        await completeAndRedirect();
-        return;
-      }
+      if (confirmErr) return { ok: false, error: confirmErr.message || 'Payment failed' };
+      if (paymentIntent && paymentIntent.status === 'succeeded') return { ok: true };
+      return { ok: false, error: 'Payment did not complete. Please try again.' };
     } else {
       const { error: confirmErr, setupIntent } = await stripe.confirmSetup({
         elements,
         confirmParams: { return_url: returnHere },
         redirect: 'if_required',
       });
+      if (confirmErr) return { ok: false, error: confirmErr.message || 'Card setup failed' };
+      if (setupIntent && setupIntent.status === 'succeeded') return { ok: true };
+      return { ok: false, error: 'Card was not saved. Please try again.' };
+    }
+  }
 
-      if (confirmErr) {
-        setError(confirmErr.message || 'Card setup failed');
-        setSubmitting(false);
-        return;
-      }
+  async function runConfirmFlow() {
+    if (!stripe || !elements) return;
+    setSubmitting(true);
+    setError(null);
 
-      if (setupIntent && setupIntent.status === 'succeeded') {
-        await completeAndRedirect();
-        return;
-      }
+    const returnHere = `${window.location.origin}/checkout/${sessionToken}`;
+    const result = await confirmCurrent(returnHere);
+
+    if (!result.ok) {
+      setError(result.error ?? 'Could not complete');
+      setSubmitting(false);
+      return;
     }
 
-    setError(mode === 'payment'
-      ? 'Payment did not complete. Please try again.'
-      : 'Card was not saved. Please try again.');
-    setSubmitting(false);
+    await completeAndRedirect();
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await runConfirmFlow();
   }
 
   const partnerCancelHref = cancelUrl ?? returnUrl ?? null;
@@ -156,34 +153,56 @@ function InnerForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <PaymentElement options={{ layout: 'tabs' }} />
+    <div className="space-y-5">
+      {/* Wallet buttons (Apple Pay / Google Pay / Link). Renders nothing
+          if no wallet is available on the user's browser. */}
+      <ExpressCheckoutElement
+        onConfirm={() => { void runConfirmFlow(); }}
+        onReady={(event) => {
+          const available = event.availablePaymentMethods;
+          setWalletsReady(
+            !!available && Object.values(available).some(Boolean),
+          );
+        }}
+      />
 
-      {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {error}
+      {walletsReady && (
+        <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-neutral-400">
+          <div className="flex-1 h-px bg-neutral-200" />
+          <span>or pay with card</span>
+          <div className="flex-1 h-px bg-neutral-200" />
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={!stripe || submitting}
-        className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {buttonLabel}
-      </button>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <PaymentElement options={{ layout: 'tabs' }} />
 
-      {partnerCancelHref && (
-        <div className="text-center">
-          <a
-            href={appendSessionId(partnerCancelHref, sessionToken)}
-            className="text-sm text-neutral-500 hover:text-neutral-700 underline"
-          >
-            Cancel and return to {partnerName ?? 'partner site'}
-          </a>
-        </div>
-      )}
-    </form>
+        {error && (
+          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={!stripe || submitting}
+          className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {buttonLabel}
+        </button>
+
+        {partnerCancelHref && (
+          <div className="text-center">
+            <a
+              href={appendSessionId(partnerCancelHref, sessionToken)}
+              className="text-sm text-neutral-500 hover:text-neutral-700 underline"
+            >
+              Cancel and return to {partnerName ?? 'partner site'}
+            </a>
+          </div>
+        )}
+      </form>
+    </div>
   );
 }
 
