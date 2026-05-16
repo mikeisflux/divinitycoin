@@ -355,7 +355,6 @@ function InnerForm({
     try { w.focus(); } catch { /* swallow */ }
   }
 
-  const partnerCancelHref = cancelUrl ?? returnUrl ?? null;
   const buttonLabel = submitting
     ? 'Processing…'
     : mode === 'payment'
@@ -418,18 +417,6 @@ function InnerForm({
             Cancel and try a different way
           </button>
         )}
-
-        {partnerCancelHref && !popupOpened && (
-          <div className="text-center">
-            <a
-              href={appendSessionId(partnerCancelHref, sessionToken)}
-              target="_top"
-              className="text-sm text-neutral-500 hover:text-neutral-700 underline"
-            >
-              Cancel and return to {partnerName ?? 'partner site'}
-            </a>
-          </div>
-        )}
       </div>
     );
   }
@@ -473,18 +460,6 @@ function InnerForm({
         >
           {buttonLabel}
         </button>
-
-        {partnerCancelHref && (
-          <div className="text-center">
-            <a
-              href={appendSessionId(partnerCancelHref, sessionToken)}
-              target={isInIframe() ? '_top' : undefined}
-              className="text-sm text-neutral-500 hover:text-neutral-700 underline"
-            >
-              Cancel and return to {partnerName ?? 'partner site'}
-            </a>
-          </div>
-        )}
       </form>
     </div>
   );
