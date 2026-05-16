@@ -388,12 +388,26 @@ export default function PartnerDetailPage() {
       title={partner.name}
       description={`Partner details for ${partner.slug}`}
       actions={
-        <Link
-          href={`/admin/partners/${partner.id}/edit`}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
-        >
-          Edit Partner
-        </Link>
+        <div className="flex items-center gap-2">
+          <form
+            action={`/api/admin/partners/${partner.id}/impersonate`}
+            method="POST"
+          >
+            <button
+              type="submit"
+              className="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-50 transition"
+              title="Sign in to the partner portal as this partner. Audit-logged. The partner's own session is left intact."
+            >
+              View as Partner
+            </button>
+          </form>
+          <Link
+            href={`/admin/partners/${partner.id}/edit`}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
+          >
+            Edit Partner
+          </Link>
+        </div>
       }
     >
       {message && (
