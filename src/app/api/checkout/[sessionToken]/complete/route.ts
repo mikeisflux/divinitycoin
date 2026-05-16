@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
 import { logger } from '@/lib/logger';
+import { fireCheckoutWebhookIfNeeded } from '@/lib/checkout/webhook';
 
 function appendSessionId(url: string, sessionToken: string): string {
   try {
@@ -54,6 +55,7 @@ export async function POST(
         where: { id: session.id },
         data: { status: 'EXPIRED' },
       });
+      await fireCheckoutWebhookIfNeeded(session.id);
       const target = session.cancelUrl ?? session.returnUrl;
       return NextResponse.json({
         success: true,
@@ -119,6 +121,10 @@ export async function POST(
         paymentMethodId,
       },
     });
+
+    // Fire the partner's checkout.* webhook (idempotent — no-op if
+    // already fired by a different code path).
+    await fireCheckoutWebhookIfNeeded(session.id);
 
     const target =
       nextStatus === 'COMPLETE'

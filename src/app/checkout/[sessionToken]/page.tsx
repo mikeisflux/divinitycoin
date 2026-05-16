@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
 import { getStripeConfig } from '@/lib/config';
 import { logger } from '@/lib/logger';
+import { fireCheckoutWebhookIfNeeded } from '@/lib/checkout/webhook';
 import { HostedCheckoutForm } from './HostedCheckoutForm';
 import { TerminalRedirect } from './TerminalRedirect';
 
@@ -34,6 +35,7 @@ async function loadSession(sessionToken: string) {
       data: { status: 'EXPIRED' },
     });
     status = 'EXPIRED';
+    await fireCheckoutWebhookIfNeeded(session.id);
   }
 
   // Self-heal: if PENDING in our DB but the underlying intent has
@@ -43,6 +45,7 @@ async function loadSession(sessionToken: string) {
   if (status === 'PENDING') {
     try {
       const stripe = await getStripeClient();
+      let transitioned = false;
       if (session.paymentIntentId) {
         const pi = await stripe.paymentIntents.retrieve(session.paymentIntentId);
         if (pi.status === 'succeeded') {
@@ -55,12 +58,14 @@ async function loadSession(sessionToken: string) {
             },
           });
           status = 'COMPLETE';
+          transitioned = true;
         } else if (pi.status === 'canceled') {
           await prisma.checkoutSession.update({
             where: { id: session.id },
             data: { status: 'CANCELED' },
           });
           status = 'CANCELED';
+          transitioned = true;
         }
       } else if (session.setupIntentId) {
         const si = await stripe.setupIntents.retrieve(session.setupIntentId);
@@ -74,13 +79,18 @@ async function loadSession(sessionToken: string) {
             },
           });
           status = 'COMPLETE';
+          transitioned = true;
         } else if (si.status === 'canceled') {
           await prisma.checkoutSession.update({
             where: { id: session.id },
             data: { status: 'CANCELED' },
           });
           status = 'CANCELED';
+          transitioned = true;
         }
+      }
+      if (transitioned) {
+        await fireCheckoutWebhookIfNeeded(session.id);
       }
     } catch (error) {
       logger.error('Hosted checkout: failed to refresh session from processor', {

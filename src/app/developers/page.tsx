@@ -620,14 +620,36 @@ GET  /internal?action=captures`}</pre>
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.succeeded</code>
                     /
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.failed</code>
-                    webhooks fire exactly as they do for the direct flow — no
-                    new webhook events to subscribe to. For SETUP mode, learn
-                    the saved
+                    webhooks fire exactly as they do for the direct flow. For
+                    SETUP mode, learn the saved
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
                     by calling
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">get-checkout-session</code>
                     after the user returns; that id is then valid input for
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">charge-saved-payment-method</code>.
+                  </p>
+                  <p className="text-neutral-600 mb-3">
+                    DC also fires dedicated session-level events when a hosted
+                    session reaches a terminal state:
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.completed</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.failed</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.expired</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.canceled</code>.
+                    Each event delivers the same envelope as our other
+                    webhooks and includes
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">sessionId</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">mode</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentIntentId</code>
+                    /
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">setupIntentId</code>,
+                    and
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
+                    (on COMPLETE) — particularly useful for SETUP mode where no
+                    payment.* event would otherwise fire, and at-most-once on
+                    our side so they can be safely combined with the existing
+                    payment.* events without double-processing. Subscribe via
+                    the partner portal → Settings → Webhooks (or leave your
+                    event allowlist empty to receive everything).
                   </p>
                 </CardContent>
               </Card>

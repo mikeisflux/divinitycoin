@@ -12,6 +12,7 @@ import { hashApiKey } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
 import { getStripeClient } from '@/lib/stripe';
 import { getStripeConfig, getConfig } from '@/lib/config';
+import { fireCheckoutWebhookIfNeeded } from '@/lib/checkout/webhook';
 import crypto from 'crypto';
 
 // Fallback to legacy INTERNAL_API_KEY for backwards compatibility
@@ -1841,10 +1842,12 @@ async function handleGetCheckoutSession(
         data: { status: 'EXPIRED' },
       });
       status = 'EXPIRED';
+      await fireCheckoutWebhookIfNeeded(stored.id);
     }
 
     // Self-heal against the processor for still-pending sessions.
     if (status === 'PENDING') {
+      let transitioned = false;
       try {
         const stripe = await getStripeClient();
         if (stored.paymentIntentId) {
@@ -1857,12 +1860,14 @@ async function handleGetCheckoutSession(
               data: { status: 'COMPLETE', completedAt, paymentMethodId },
             });
             status = 'COMPLETE';
+            transitioned = true;
           } else if (pi.status === 'canceled') {
             await prisma.checkoutSession.update({
               where: { id: stored.id },
               data: { status: 'CANCELED' },
             });
             status = 'CANCELED';
+            transitioned = true;
           }
         } else if (stored.setupIntentId) {
           const si = await stripe.setupIntents.retrieve(stored.setupIntentId);
@@ -1874,16 +1879,21 @@ async function handleGetCheckoutSession(
               data: { status: 'COMPLETE', completedAt, paymentMethodId },
             });
             status = 'COMPLETE';
+            transitioned = true;
           } else if (si.status === 'canceled') {
             await prisma.checkoutSession.update({
               where: { id: stored.id },
               data: { status: 'CANCELED' },
             });
             status = 'CANCELED';
+            transitioned = true;
           }
         }
       } catch {
         // ignore — return stored state if processor lookup fails
+      }
+      if (transitioned) {
+        await fireCheckoutWebhookIfNeeded(stored.id);
       }
     }
 

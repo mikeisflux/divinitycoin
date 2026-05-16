@@ -1184,6 +1184,13 @@ model CheckoutSession {
   updatedAt       DateTime  @updatedAt
   completedAt     DateTime?
 
+  // Webhook delivery — set once when we have fired (or deliberately
+  // skipped firing) the terminal-state webhook to the partner. Used
+  // as the idempotency guard so a session's checkout.* event fires
+  // at most once from our side regardless of which code path
+  // transitioned the session to terminal.
+  webhookFiredAt  DateTime?
+
   @@index([partnerId])
   @@index([sessionToken])
   @@index([status])
