@@ -168,11 +168,34 @@ export function middleware(request: NextRequest) {
   // Add security headers to all responses
   const securityHeaders: Record<string, string> = {
     'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
     'X-XSS-Protection': '1; mode=block',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   };
+
+  // Frame embedding policy. Default-deny for everything via
+  // X-Frame-Options: DENY. The DC-hosted checkout (/checkout/*) is the
+  // one exception — partners may want to mount it inside their own
+  // page instead of redirecting users to divinitycoin.com. Allowlist
+  // those origins via the CHECKOUT_FRAME_ANCESTORS env var
+  // (whitespace- or comma-separated, e.g. "https://indiecrowdfund.com
+  // https://*.indiecrowdfund.com"). Empty / unset = frame-ancestors
+  // 'none' for /checkout/* too, which behaves identically to DENY.
+  // We use Content-Security-Policy: frame-ancestors here because
+  // X-Frame-Options can't allowlist multiple specific origins.
+  const isHostedCheckoutPath = pathname.startsWith('/checkout/');
+  if (isHostedCheckoutPath) {
+    const allowList = (process.env.CHECKOUT_FRAME_ANCESTORS || '')
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const sources = allowList.length > 0
+      ? `'self' ${allowList.join(' ')}`
+      : `'none'`;
+    securityHeaders['Content-Security-Policy'] = `frame-ancestors ${sources}`;
+  } else {
+    securityHeaders['X-Frame-Options'] = 'DENY';
+  }
 
   // Add HSTS header in production
   if (process.env.NODE_ENV === 'production') {
