@@ -620,6 +620,8 @@ GET  /internal?action=captures`}</pre>
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.succeeded</code>
                     /
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.failed</code>
+                    /
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.requires_action</code>
                     webhooks fire exactly as they do for the direct flow. For
                     SETUP mode, learn the saved
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
@@ -1072,6 +1074,39 @@ GET  /internal?action=captures`}</pre>
   "clientSecret": "pi_3Abc..._secret_xyz"  // present if user re-auth could recover
 }`}</pre>
                   </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2 mt-4">Async notification when SCA is required</h4>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    If you missed the synchronous
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">requires_action</code>
+                    response (server crash, network blip, etc.), DC also fires a
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.requires_action</code>
+                    webhook to your endpoint when the PaymentIntent enters that state.
+                    Same envelope and signature as other partner webhooks, including
+                    the <code className="font-mono text-xs">clientSecret</code> so you
+                    can mount Stripe.js with it on your recovery page to let the
+                    cardholder complete the challenge.
+                  </p>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`// event: "payment.requires_action"
+{
+  "paymentIntentId": "pi_3Abc...",
+  "amount": 5000,
+  "platformUserId": "user_xyz",
+  "pledgeId": "pledge_xyz",
+  "projectId": "proj_xyz",
+  "type": "initial" | "upcharge",
+  "clientSecret": "pi_3Abc..._secret_xyz",
+  "nextActionType": "use_stripe_sdk" | "redirect_to_url" | null
+}`}</pre>
+                  </div>
+                  <p className="text-neutral-600 mt-3 text-sm">
+                    Hosted-checkout sessions also produce
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.requires_action</code>
+                    events for their underlying PaymentIntent, but in the hosted
+                    flow DC drives the challenge on its own page so the event is
+                    informational rather than actionable for your side.
+                  </p>
                 </CardContent>
               </Card>
 

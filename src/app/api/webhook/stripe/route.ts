@@ -75,6 +75,10 @@ export async function POST(request: NextRequest) {
         await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
 
+      case 'payment_intent.requires_action':
+        await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent);
+        break;
+
       case 'checkout.session.completed':
         await handleSuccessfulPayment(event.data.object as Stripe.Checkout.Session);
         break;
@@ -700,4 +704,67 @@ async function handlePartnerPaymentSucceeded(paymentIntent: Stripe.PaymentIntent
 
     throw error;
   }
+}
+
+/**
+ * Notify the partner when one of their PaymentIntents has transitioned
+ * into the requires_action state — i.e., the cardholder needs to
+ * complete SCA / 3DS before the charge can proceed. Most actionable for
+ * partners using charge-saved-payment-method off-session, who otherwise
+ * have to react to the requires_action result synchronously and may have
+ * missed it (server crash, network blip, etc.). Hosted-checkout PIs
+ * also pass through here, but in that flow we drive the challenge on
+ * our own page so the event is informational rather than actionable
+ * for the partner.
+ *
+ * Same envelope and signature as other partner webhooks. Includes
+ * client_secret so partners can mount Stripe.js with it and let the
+ * cardholder complete the challenge on their side when needed.
+ */
+async function handlePaymentIntentRequiresAction(paymentIntent: Stripe.PaymentIntent) {
+  // Only partner-initiated payments
+  if (
+    paymentIntent.metadata?.type !== 'partner_payment' &&
+    paymentIntent.metadata?.type !== 'partner_upcharge'
+  ) {
+    return;
+  }
+
+  const partnerId = paymentIntent.metadata.partnerId;
+  const platformUserId = paymentIntent.metadata.platformUserId;
+  const pledgeId = paymentIntent.metadata.pledgeId;
+  const projectId = paymentIntent.metadata.projectId;
+
+  if (!partnerId) {
+    logger.warn('PaymentIntent.requires_action with no partnerId metadata', {
+      paymentIntentId: paymentIntent.id,
+    });
+    return;
+  }
+
+  const partner = await prisma.partner.findUnique({
+    where: { id: partnerId },
+    select: { webhookUrl: true, webhookSecret: true },
+  });
+  if (!partner?.webhookUrl || !partner?.webhookSecret) return;
+
+  const isUpcharge = paymentIntent.metadata?.type === 'partner_upcharge';
+
+  await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'payment.requires_action', {
+    paymentIntentId: paymentIntent.id,
+    amount: paymentIntent.amount,
+    platformUserId,
+    pledgeId,
+    projectId,
+    type: isUpcharge ? 'upcharge' : 'initial',
+    clientSecret: paymentIntent.client_secret,
+    nextActionType: paymentIntent.next_action?.type ?? null,
+  });
+
+  logger.info('Partner payment.requires_action delivered', {
+    paymentIntentId: paymentIntent.id,
+    partnerId,
+    platformUserId,
+    nextActionType: paymentIntent.next_action?.type ?? null,
+  });
 }
