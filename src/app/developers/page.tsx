@@ -322,6 +322,8 @@ POST /internal?action=get-setup-intent
 POST /internal?action=list-payment-methods
 POST /internal?action=detach-payment-method
 POST /internal?action=charge-saved-payment-method
+POST /internal?action=create-checkout-session
+POST /internal?action=get-checkout-session
 GET  /internal?action=health
 GET  /internal?action=settlements
 GET  /internal?action=settlement&id=xxx
@@ -583,6 +585,158 @@ GET  /internal?action=captures`}</pre>
   "paymentIntentId": "pi_3Abc...",
   "publishableKey": "pk_live_...",
   "amount": 2500
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Hosted Checkout — intro */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Hosted Checkout (optional)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-3">
+                    An alternative path for partners who want DC to host the
+                    card capture surface instead of mounting Stripe Elements on
+                    their own checkout. Create a session, redirect the user to
+                    the returned <code className="font-mono text-xs bg-neutral-100 px-1 rounded">checkoutUrl</code>,
+                    user pays (or saves a card) on a DC-branded page, then DC
+                    redirects them back to your <code className="font-mono text-xs bg-neutral-100 px-1 rounded">returnUrl</code>
+                    with a <code className="font-mono text-xs bg-neutral-100 px-1 rounded">session_id</code> query param.
+                  </p>
+                  <p className="text-neutral-600 mb-3">
+                    This is fully opt-in and coexists with the direct
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">create-payment-intent</code>
+                    flow above — existing integrations are unaffected. Use this
+                    when you want SCA / 3DS, card brand UI, and any Stripe
+                    Elements branding to live entirely on
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">divinitycoin.com</code>
+                    rather than your own page.
+                  </p>
+                  <p className="text-neutral-600 mb-3">
+                    For PAYMENT mode the underlying PaymentIntent is created
+                    up-front, so the existing
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.succeeded</code>
+                    /
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.failed</code>
+                    webhooks fire exactly as they do for the direct flow — no
+                    new webhook events to subscribe to. For SETUP mode, learn
+                    the saved
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
+                    by calling
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">get-checkout-session</code>
+                    after the user returns; that id is then valid input for
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">charge-saved-payment-method</code>.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Create Checkout Session */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=create-checkout-session
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Create a hosted checkout session and receive a
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkoutUrl</code>
+                    to redirect the user to. Session expires after
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">expiresInMinutes</code>
+                    (default 30, max 1440).
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body — common fields</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "mode": "payment" | "setup", // Optional. Default "payment"
+  "platformUserId": string,    // Required. Your platform's user ID
+  "email": string,             // Required. Customer email
+  "returnUrl": string,         // Required. Absolute URL we redirect to on terminal state
+  "cancelUrl": string,         // Optional. Absolute URL for cancel/expired/failed (default: returnUrl)
+  "partnerLogoUrl": string,    // Optional. Shown in the hosted page header (defaults to your Partner.logoUrl)
+  "description": string,       // Optional. Short blurb shown above the card field
+  "expiresInMinutes": number   // Optional. 1-1440, default 30
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Additional fields when <code className="font-mono text-xs">mode="payment"</code></h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "amount": number,            // Required. Amount in cents (must be > 0)
+  "currency": string,          // Optional. Default "usd"
+  "pledgeId": string,          // Required. Your pledge/order ID
+  "projectId": string          // Required. Your project ID
+}`}</pre>
+                  </div>
+
+                  <p className="text-neutral-600 mb-4 text-sm">
+                    In <code className="font-mono text-xs">mode="setup"</code> the payment-specific fields above are ignored — DC creates a SetupIntent for the customer that can later be charged off-session via <code className="font-mono text-xs">charge-saved-payment-method</code>.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "sessionId": "cs_a1b2c3...",
+  "checkoutUrl": "https://divinitycoin.com/checkout/cs_a1b2c3...",
+  "expiresAt": "2026-05-15T16:30:00.000Z"
+}`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Get Checkout Session */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=get-checkout-session
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Look up the current state of a hosted checkout session.
+                    Self-heals: if our local state is still
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">pending</code>
+                    but the underlying PaymentIntent / SetupIntent has moved on
+                    at the processor, we refresh from live status before
+                    responding. Call this after the user returns to your
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">returnUrl</code>
+                    with the <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">session_id</code> query param.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "sessionId": string          // Required. The cs_... id we returned
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "session": {
+    "sessionId": "cs_a1b2c3...",
+    "status": "complete",          // pending | complete | failed | expired | canceled
+    "mode": "payment",             // payment | setup
+    "amount": 2500,                // null in setup mode
+    "currency": "usd",
+    "pledgeId": "pledge_xyz",      // null in setup mode
+    "projectId": "proj_xyz",       // null in setup mode
+    "paymentIntentId": "pi_3Abc...", // present in payment mode
+    "setupIntentId": null,           // present in setup mode
+    "paymentMethodId": "pm_1Xyz...", // present once status=complete
+    "platformUserId": "user_xyz",
+    "email": "buyer@example.com",
+    "expiresAt": "2026-05-15T16:30:00.000Z",
+    "completedAt": "2026-05-15T16:14:22.412Z",
+    "createdAt": "2026-05-15T16:00:00.000Z"
+  }
 }`}</pre>
                   </div>
                 </CardContent>
