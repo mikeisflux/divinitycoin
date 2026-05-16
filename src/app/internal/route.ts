@@ -1606,6 +1606,7 @@ async function handleCreateCheckoutSession(
     partnerLogoUrl?: string;
     description?: string;
     expiresInMinutes?: number;
+    disableAutoRedirect?: boolean;
   },
   partnerId: string,
 ) {
@@ -1615,6 +1616,7 @@ async function handleCreateCheckoutSession(
     amount, currency = 'usd', pledgeId, projectId,
     returnUrl, cancelUrl, partnerLogoUrl, description,
     expiresInMinutes = 30,
+    disableAutoRedirect = false,
   } = body;
 
   if (!platformUserId || !email || !returnUrl) {
@@ -1774,6 +1776,7 @@ async function handleCreateCheckoutSession(
         description: description ?? null,
         returnUrl,
         cancelUrl: cancelUrl ?? null,
+        disableAutoRedirect,
         expiresAt,
       },
     });

@@ -1178,6 +1178,13 @@ model CheckoutSession {
   returnUrl       String?
   cancelUrl       String?
 
+  // When true, the hosted page emits the checkout.* postMessage events
+  // but does NOT top-nav the browser on terminal state — the embedding
+  // partner is responsible for all navigation. Defaults to false (we
+  // auto-nav to returnUrl) for the simple-redirect and unsophisticated-
+  // iframe cases.
+  disableAutoRedirect Boolean @default(false)
+
   // Timestamps
   expiresAt       DateTime
   createdAt       DateTime  @default(now())

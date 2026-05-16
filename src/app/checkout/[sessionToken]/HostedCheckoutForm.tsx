@@ -53,6 +53,13 @@ interface Props {
   partnerName: string | null;
   returnUrl: string | null;
   cancelUrl: string | null;
+  /**
+   * When true, the iframe still emits the `complete` postMessage on
+   * terminal state but does NOT top-nav to returnUrl. The embedding
+   * partner is responsible for navigation (typical when they want to
+   * transition their own UI in place after receiving the message).
+   */
+  disableAutoRedirect: boolean;
 }
 
 // All postMessage payloads we exchange (iframe ↔ partner, popup ↔ opener)
@@ -140,7 +147,8 @@ function InnerForm({
   partnerName,
   returnUrl,
   cancelUrl,
-}: Pick<Props, 'sessionToken' | 'mode' | 'amountLabel' | 'partnerName' | 'returnUrl' | 'cancelUrl'>) {
+  disableAutoRedirect,
+}: Pick<Props, 'sessionToken' | 'mode' | 'amountLabel' | 'partnerName' | 'returnUrl' | 'cancelUrl' | 'disableAutoRedirect'>) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -235,9 +243,15 @@ function InnerForm({
         sessionId: sessionToken,
         status,
         redirectUrl,
+        disableAutoRedirect,
       });
     }
-    if (redirectUrl) safeTopNav(redirectUrl);
+    // When disableAutoRedirect is true, we intentionally stop here —
+    // the partner has taken ownership of post-completion navigation.
+    // (We queue the top-nav synchronously, so the partner's message
+    // handler can't reliably cancel a pending nav after the fact —
+    // not navigating in the first place is the only clean answer.)
+    if (redirectUrl && !disableAutoRedirect) safeTopNav(redirectUrl);
   }
 
   async function completeAndRedirect() {
@@ -508,6 +522,7 @@ export function HostedCheckoutForm(props: Props) {
         partnerName={props.partnerName}
         returnUrl={props.returnUrl}
         cancelUrl={props.cancelUrl}
+        disableAutoRedirect={props.disableAutoRedirect}
       />
     </Elements>
   );

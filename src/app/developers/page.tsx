@@ -644,7 +644,7 @@ GET  /internal?action=captures`}</pre>
                   <ul className="text-neutral-600 mb-3 ml-6 list-disc text-sm space-y-1">
                     <li><code className="font-mono text-xs">type: &quot;ready&quot;</code> — on initial load, with the <code className="font-mono text-xs">sessionId</code>.</li>
                     <li><code className="font-mono text-xs">type: &quot;resize&quot;</code> — whenever the content height changes, with <code className="font-mono text-xs">height</code> in pixels. Apply it to your iframe&apos;s height for an auto-sized embed.</li>
-                    <li><code className="font-mono text-xs">type: &quot;complete&quot;</code> — when the session reaches a terminal state, with <code className="font-mono text-xs">status</code> (complete / failed / expired / canceled) and <code className="font-mono text-xs">redirectUrl</code>. We also top-nav the browser to <code className="font-mono text-xs">redirectUrl</code> right after; if you want to suppress that and handle navigation yourself, hide the iframe before the next animation frame on receiving the message.</li>
+                    <li><code className="font-mono text-xs">type: &quot;complete&quot;</code> — when the session reaches a terminal state, with <code className="font-mono text-xs">status</code> (complete / failed / expired / canceled), <code className="font-mono text-xs">redirectUrl</code>, and <code className="font-mono text-xs">disableAutoRedirect</code> echoing the session&apos;s setting. By default we also top-nav the browser to <code className="font-mono text-xs">redirectUrl</code> right after the message. To handle navigation yourself instead, pass <code className="font-mono text-xs">disableAutoRedirect: true</code> when creating the session — we&apos;ll then emit the message and stop, leaving navigation entirely to your handler. (Trying to cancel our nav from the message handler is racy because the nav is queued on <code className="font-mono text-xs">window.top</code> at the same instant the message is sent; the session flag is the only clean way to opt out.)</li>
                   </ul>
                   <p className="text-neutral-600 mb-3 text-sm">
                     On mobile WebKit (iOS Safari, iOS Chrome, in-app webviews)
@@ -729,14 +729,21 @@ GET  /internal?action=captures`}</pre>
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body — common fields</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
-  "mode": "payment" | "setup", // Optional. Default "payment"
-  "platformUserId": string,    // Required. Your platform's user ID
-  "email": string,             // Required. Customer email
-  "returnUrl": string,         // Required. Absolute URL we redirect to on terminal state
-  "cancelUrl": string,         // Optional. Absolute URL for cancel/expired/failed (default: returnUrl)
-  "partnerLogoUrl": string,    // Optional. Shown in the hosted page header (defaults to your Partner.logoUrl)
-  "description": string,       // Optional. Short blurb shown above the card field
-  "expiresInMinutes": number   // Optional. 1-1440, default 30
+  "mode": "payment" | "setup",      // Optional. Default "payment"
+  "platformUserId": string,         // Required. Your platform's user ID
+  "email": string,                  // Required. Customer email
+  "returnUrl": string,              // Required. Absolute URL we redirect to on terminal state
+  "cancelUrl": string,              // Optional. Absolute URL for cancel/expired/failed (default: returnUrl)
+  "partnerLogoUrl": string,         // Optional. Shown in the hosted page header (defaults to your Partner.logoUrl)
+  "description": string,            // Optional. Short blurb shown above the card field
+  "expiresInMinutes": number,       // Optional. 1-1440, default 30
+  "disableAutoRedirect": boolean    // Optional. Default false. When true, the hosted
+                                    //   page emits the "complete" postMessage on
+                                    //   terminal state but does NOT top-nav to
+                                    //   returnUrl — you handle navigation yourself
+                                    //   in the message handler. Useful for iframe
+                                    //   embeds that want to transition their own UI
+                                    //   in place after completion.
 }`}</pre>
                   </div>
 

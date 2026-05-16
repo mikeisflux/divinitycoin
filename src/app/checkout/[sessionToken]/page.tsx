@@ -313,6 +313,7 @@ export default async function HostedCheckoutPage({
           partnerName={session.partnerName ?? null}
           returnUrl={session.returnUrl ?? null}
           cancelUrl={session.cancelUrl ?? null}
+          disableAutoRedirect={session.disableAutoRedirect}
         />
       </div>
     </CheckoutShell>
