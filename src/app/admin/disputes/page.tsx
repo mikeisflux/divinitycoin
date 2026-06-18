@@ -50,7 +50,7 @@ async function downloadBundle(transactionRef: string, vrol?: string | null) {
   const blob = await res.blob();
   const disposition = res.headers.get('Content-Disposition') ?? '';
   const match = /filename="([^"]+)"/.exec(disposition);
-  const filename = match?.[1] ?? `dispute-evidence-${Date.now()}.zip`;
+  const filename = match?.[1] ?? `dispute-evidence-${Date.now()}.pdf`;
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

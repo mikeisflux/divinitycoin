@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         paymentIntentId: result.evidence.paymentIntentId,
         source: result.evidence.source,
         vrolCase: vrolCase ?? null,
-        bundleSize: result.zip.length,
+        bundleSize: result.pdf.length,
       },
       getClientIP(request),
       getUserAgent(request),

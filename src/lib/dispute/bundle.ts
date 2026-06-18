@@ -3,7 +3,6 @@
 // zip bundle suitable for uploading as a chargeback response.
 
 import PDFDocument from 'pdfkit';
-import JSZip from 'jszip';
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '@/lib/db';
