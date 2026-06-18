@@ -7,7 +7,7 @@ export default function TermsPage() {
         <h1 className="text-4xl font-bold text-neutral-900 mb-4">
           Terms of Service
         </h1>
-        <p className="text-neutral-500 mb-12">Last Updated: December 2024</p>
+        <p className="text-neutral-500 mb-12">Last Updated: June 2026</p>
 
         <div className="prose prose-neutral max-w-none">
           <h2>1. Agreement to Terms</h2>
@@ -44,6 +44,25 @@ export default function TermsPage() {
             between purchasers and partner platforms. The credits purchased
             through our Service function similarly to gift cards or stored value
             cards under applicable Indiana and federal law.
+          </p>
+          <p>
+            <strong>Nature of Our Product.</strong> DivinityCoin sells, exclusively,
+            digital prepaid credits. We do not sell, manufacture, ship, deliver,
+            warehouse, or otherwise fulfill any physical merchandise, tangible goods,
+            services, rewards, experiences, or other deliverables of any kind. Any
+            physical merchandise, rewards, perks, experiences, or services offered,
+            advertised, pledged, or promised through, on, or in connection with a
+            partner platform — including but not limited to crowdfunding rewards,
+            backer perks, retail goods, digital downloads outside the credit
+            balance itself, subscriptions, or any creator-fulfilled deliverable —
+            are sold and fulfilled by that partner platform and/or the underlying
+            project creator, not by DivinityCoin. DivinityCoin&apos;s product, and
+            DivinityCoin&apos;s sole deliverable to you in any transaction, is the
+            digital credit balance itself. The credit balance is deemed delivered
+            and our performance is deemed complete upon issuance of the credit
+            code (or, where the credits are issued and consumed automatically as
+            part of a partner platform transaction, upon successful application of
+            the credit balance to that partner platform transaction).
           </p>
 
           <h2>4. Purchases and Payments</h2>
@@ -82,6 +101,27 @@ export default function TermsPage() {
             the services, content, availability, or policies of partner platforms.
             Once credits are redeemed to a partner platform, any disputes regarding
             the use of those credits must be resolved with the partner platform directly.
+          </p>
+          <p>
+            <strong>Physical Merchandise, Rewards, and Services.</strong> Any
+            physical merchandise, tangible goods, services, experiences, rewards,
+            perks, or other non-credit deliverables offered, advertised, pledged,
+            or promised through a partner platform (including but not limited to
+            crowdfunding pledges and backer rewards) are sold and fulfilled by the
+            partner platform and/or the underlying project creator, and not by
+            DivinityCoin. DivinityCoin&apos;s only obligation in any transaction is
+            the delivery and successful redemption of the digital credit balance.
+            Any dispute, complaint, claim, or chargeback concerning the
+            non-delivery, late delivery, partial delivery, condition, quality,
+            shipping, fulfillment, cancellation, or non-performance of physical
+            merchandise, rewards, or services associated with a partner-platform
+            transaction must be pursued against the partner platform and/or the
+            project creator. DivinityCoin will not refund, replace, reverse, or
+            otherwise be liable for the non-delivery or non-performance of any
+            physical merchandise, rewards, or services that are not, and have
+            never been, our deliverable. The cardholder&apos;s remedy for any such
+            non-delivery is with the partner platform and creator, not with
+            DivinityCoin.
           </p>
 
           <h2>7. Refunds</h2>
