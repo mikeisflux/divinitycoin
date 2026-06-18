@@ -1217,6 +1217,49 @@ enum CheckoutSessionStatus {
   CANCELED      // User explicitly canceled
 }
 
+// A chargeback case an admin is tracking. One row is created/updated each
+// time an evidence bundle is generated for a transaction; the row is a
+// lightweight log (the zip itself is regenerated on demand, never stored).
+// Admins delete the row when the dispute is resolved.
+model DisputeCase {
+  id              String   @id @default(cuid())
+
+  // What was disputed — the id the admin pasted (pi_... or internal id)
+  transactionRef  String
+  paymentIntentId String?
+  vrolCase        String?
+
+  // Denormalized context for the list view (so we don't re-query on render)
+  partnerId       String?
+  partnerName     String?
+  amountCents     Int?
+  currency        String   @default("usd")
+  customerEmail   String?
+
+  // Workflow
+  status          DisputeStatus @default(OPEN)
+  notes           String?       @db.Text
+
+  // Who generated it + how many times
+  createdByAdminId String?
+  bundleCount      Int      @default(1)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([transactionRef])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum DisputeStatus {
+  OPEN          // Actively working the dispute
+  SUBMITTED     // Evidence submitted to the issuer
+  WON           // Dispute resolved in our favor
+  LOST          // Dispute lost
+  CLOSED        // Closed without a win/loss outcome
+}
+
 // Stripe webhook idempotency. We insert `eventId` before processing an
 // event and skip processing if the insert raises a unique-constraint
 // violation. This makes every Stripe event exactly-once under retries.

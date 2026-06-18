@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { buildEvidenceBundle } from '@/lib/dispute/bundle';
+import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,43 @@ export async function GET(request: NextRequest) {
       getClientIP(request),
       getUserAgent(request),
     );
+
+    // Log (or update) a DisputeCase row so the admin has a tracking list
+    // they can manage and delete when the dispute is resolved. Keyed on
+    // the pasted transactionRef so regenerating a kit bumps the existing
+    // row's bundleCount rather than creating a duplicate.
+    const ev = result.evidence;
+    try {
+      const existing = await prisma.disputeCase.findFirst({
+        where: { transactionRef: id },
+      });
+      if (existing) {
+        await prisma.disputeCase.update({
+          where: { id: existing.id },
+          data: {
+            bundleCount: { increment: 1 },
+            vrolCase: vrolCase ?? existing.vrolCase,
+          },
+        });
+      } else {
+        await prisma.disputeCase.create({
+          data: {
+            transactionRef: id,
+            paymentIntentId: ev.paymentIntentId,
+            vrolCase: vrolCase ?? null,
+            partnerId: ev.partner?.id ?? null,
+            partnerName: ev.partner?.name ?? null,
+            amountCents: ev.amountCents,
+            currency: ev.currency,
+            customerEmail: ev.email,
+            createdByAdminId: admin.id,
+          },
+        });
+      }
+    } catch (logErr) {
+      // Non-fatal — the kit still downloads even if the tracking row fails.
+      logger.warn('Failed to upsert DisputeCase record', { error: logErr, id });
+    }
 
     return new NextResponse(result.zip, {
       status: 200,
