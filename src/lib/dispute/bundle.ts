@@ -234,14 +234,24 @@ function sectionHeader(doc: PDFKit.PDFDocument, title: string) {
 function pdfBuffer(build: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    // font: false prevents pdfkit from eagerly initializing the built-in
-    // Helvetica AFM (which would ENOENT). We register our own fonts and
-    // set the default before any text is drawn.
-    const doc = new PDFDocument({ size: 'LETTER', margin: 50, font: false as never });
+    // Pass the vendored TTF file PATH directly as the document's default
+    // font. pdfkit's initFonts routes this through PDFFontFactory.open,
+    // which detects a TTF file and loads it through fontkit — meaning
+    // pdfkit's Helvetica.afm code path (which 500s at runtime under
+    // Next's server bundling, where pdfkit's __dirname resolves to the
+    // chunk directory and the AFM data files aren't there) is never
+    // touched. Belt + suspenders: we also register the three weights
+    // under logical names so any subsequent .font(F.bold) etc. uses our
+    // registered TTFs rather than letting pdfkit fall back to anything.
+    const doc = new PDFDocument({
+      size: 'LETTER',
+      margin: 50,
+      font: FONTS.regular,
+    });
     try {
-      doc.registerFont(F.regular, fs.readFileSync(FONTS.regular));
-      doc.registerFont(F.bold, fs.readFileSync(FONTS.bold));
-      doc.registerFont(F.italic, fs.readFileSync(FONTS.italic));
+      doc.registerFont(F.regular, FONTS.regular);
+      doc.registerFont(F.bold, FONTS.bold);
+      doc.registerFont(F.italic, FONTS.italic);
       doc.font(F.regular);
     } catch (err) {
       reject(err);
