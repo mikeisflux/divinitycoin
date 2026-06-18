@@ -231,37 +231,65 @@ function sectionHeader(doc: PDFKit.PDFDocument, title: string) {
   doc.moveDown(0.4);
 }
 
+// Read the TTF font buffers ONCE at module load. Using Buffers (not
+// paths) for both the document default and the registerFont calls
+// removes any runtime file-resolution risk — if process.cwd() drifts
+// or the bundler relocates anything, we still have the bytes in
+// memory from when this module first loaded.
+let FONT_REGULAR_BUF: Buffer | null = null;
+let FONT_BOLD_BUF: Buffer | null = null;
+let FONT_ITALIC_BUF: Buffer | null = null;
+function loadFonts() {
+  if (FONT_REGULAR_BUF) return;
+  FONT_REGULAR_BUF = fs.readFileSync(FONTS.regular);
+  FONT_BOLD_BUF = fs.readFileSync(FONTS.bold);
+  FONT_ITALIC_BUF = fs.readFileSync(FONTS.italic);
+}
+
 function pdfBuffer(build: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    // Pass the vendored TTF file PATH directly as the document's default
-    // font. pdfkit's initFonts routes this through PDFFontFactory.open,
-    // which detects a TTF file and loads it through fontkit — meaning
-    // pdfkit's Helvetica.afm code path (which 500s at runtime under
-    // Next's server bundling, where pdfkit's __dirname resolves to the
-    // chunk directory and the AFM data files aren't there) is never
-    // touched. Belt + suspenders: we also register the three weights
-    // under logical names so any subsequent .font(F.bold) etc. uses our
-    // registered TTFs rather than letting pdfkit fall back to anything.
-    const doc = new PDFDocument({
-      size: 'LETTER',
-      margin: 50,
-      font: FONTS.regular,
-    });
     try {
-      doc.registerFont(F.regular, FONTS.regular);
-      doc.registerFont(F.bold, FONTS.bold);
-      doc.registerFont(F.italic, FONTS.italic);
+      loadFonts();
+    } catch (err) {
+      reject(new Error(
+        `Failed to load vendored fonts from ${FONT_DIR}: ${err instanceof Error ? err.message : err}`,
+      ));
+      return;
+    }
+    const chunks: Buffer[] = [];
+    // Pass the Liberation Sans Regular TTF Buffer directly as the
+    // document's default font. pdfkit's initFonts routes this through
+    // PDFFontFactory.open which accepts Buffer input and loads via
+    // fontkit — so pdfkit's Helvetica.afm code path (which 500s at
+    // runtime under Next's server bundling) is never touched.
+    let doc: PDFKit.PDFDocument;
+    try {
+      doc = new PDFDocument({
+        size: 'LETTER',
+        margin: 50,
+        font: FONT_REGULAR_BUF as unknown as string,
+      });
+      doc.registerFont(F.regular, FONT_REGULAR_BUF!);
+      doc.registerFont(F.bold, FONT_BOLD_BUF!);
+      doc.registerFont(F.italic, FONT_ITALIC_BUF!);
       doc.font(F.regular);
     } catch (err) {
-      reject(err);
+      reject(new Error(
+        `pdfkit init failed (fontReg=${FONT_REGULAR_BUF?.length} fontBold=${FONT_BOLD_BUF?.length} fontIta=${FONT_ITALIC_BUF?.length}): ${err instanceof Error ? err.message : err}`,
+      ));
       return;
     }
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
-    build(doc);
-    doc.end();
+    try {
+      build(doc);
+      doc.end();
+    } catch (err) {
+      reject(new Error(
+        `PDF builder failed: ${err instanceof Error ? err.message + '\n' + err.stack : err}`,
+      ));
+    }
   });
 }
 

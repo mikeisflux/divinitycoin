@@ -93,7 +93,12 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error('Failed to generate dispute evidence bundle', { error, id });
+    logger.error('Failed to generate dispute evidence bundle', {
+      id,
+      errorName: error instanceof Error ? error.name : 'unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json({ error: 'Failed to generate evidence bundle' }, { status: 500 });
   }
 }
