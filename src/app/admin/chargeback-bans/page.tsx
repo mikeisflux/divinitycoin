@@ -163,7 +163,7 @@ export default function ChargebackBansPage() {
       description="Cached ban signals from partner feeds, match log, and CGNAT allowlist."
       actions={
         <button
-          onClick={() => handleSync('indiecrowdfund')}
+          onClick={() => handleSync('indiecrowdfund-com')}
           disabled={syncBusy}
           className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
         >

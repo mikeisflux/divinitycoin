@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const DEFAULT_FEED_URLS: Record<string, string> = {
-  indiecrowdfund: 'https://indiecrowdfund.com/api/divinitycoin/chargeback-ban-signals',
+  'indiecrowdfund-com': 'https://indiecrowdfund.com/api/divinitycoin/chargeback-ban-signals',
 };
 
 async function authorizeCron(request: NextRequest): Promise<NextResponse | null> {
