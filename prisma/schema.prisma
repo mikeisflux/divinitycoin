@@ -20,55 +20,55 @@ model User {
   passwordHash  String?
 
   // Profile
-  name          String?
+  name String?
 
   // Stripe
   stripeCustomerId String? @unique
 
   // Account status
-  bannedAt      DateTime?
-  banReason     String?
+  bannedAt  DateTime?
+  banReason String?
 
   // Timestamps
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  purchasedCards       GiftCard[]            @relation("PurchasedCards")
-  redeemedCards        GiftCard[]            @relation("RedeemedCards")
-  creditBalances       CreditBalance[]
-  transactions         Transaction[]
-  sessions             Session[]
-  passwordResetTokens  PasswordResetToken[]
+  purchasedCards      GiftCard[]           @relation("PurchasedCards")
+  redeemedCards       GiftCard[]           @relation("RedeemedCards")
+  creditBalances      CreditBalance[]
+  transactions        Transaction[]
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
   @@index([stripeCustomerId])
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token        String   @unique
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   // Session metadata
-  ipAddress    String?
-  userAgent    String?
+  ipAddress String?
+  userAgent String?
 
   @@index([token])
   @@index([userId])
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([token])
   @@index([userId])
@@ -79,54 +79,54 @@ model PasswordResetToken {
 // ============================================
 
 model GiftCard {
-  id            String         @id @default(cuid())
+  id String @id @default(cuid())
 
   // Code (stored as SHA-256 hash)
-  codeHash      String         @unique
-  codeLast4     String         // Last 4 chars for display
+  codeHash  String @unique
+  codeLast4 String // Last 4 chars for display
 
   // Value
-  amount        Decimal        @db.Decimal(10, 2)
-  initialBalance Int           @default(0) // Initial balance in cents for tracking
-  currency      String         @default("USD")
+  amount         Decimal @db.Decimal(10, 2)
+  initialBalance Int     @default(0) // Initial balance in cents for tracking
+  currency       String  @default("USD")
 
   // Status
-  status        GiftCardStatus @default(PENDING)
+  status GiftCardStatus @default(PENDING)
 
   // Purchase info
-  purchaserId   String?
-  purchaser     User?          @relation("PurchasedCards", fields: [purchaserId], references: [id])
-  purchasedByEmail String?     // For guest purchases
+  purchaserId      String?
+  purchaser        User?   @relation("PurchasedCards", fields: [purchaserId], references: [id])
+  purchasedByEmail String? // For guest purchases
 
   // Partner reference
-  partnerId     String?
-  partner       Partner?       @relation(fields: [partnerId], references: [id])
+  partnerId String?
+  partner   Partner? @relation(fields: [partnerId], references: [id])
 
   // Stripe
-  stripePaymentIntentId String? @unique
+  stripePaymentIntentId   String? @unique
   stripeCheckoutSessionId String? @unique
 
   // Redemption info
-  redeemedById  String?
-  redeemedBy    User?          @relation("RedeemedCards", fields: [redeemedById], references: [id])
-  redeemedByEmail String?      // Email of redeemer
-  redeemedAt    DateTime?
-  redeemedOnPlatform String?   // Which platform redeemed it
+  redeemedById             String?
+  redeemedBy               User?     @relation("RedeemedCards", fields: [redeemedById], references: [id])
+  redeemedByEmail          String? // Email of redeemer
+  redeemedAt               DateTime?
+  redeemedOnPlatform       String? // Which platform redeemed it
   redeemedByPlatformUserId String? // Platform user ID
 
   // Validity
-  activatedAt   DateTime?
-  expiresAt     DateTime?
+  activatedAt DateTime?
+  expiresAt   DateTime?
 
   // Metadata
-  metadata      String?        @db.Text
+  metadata String? @db.Text
 
   // Transactions
-  transactions  Transaction[]
+  transactions Transaction[]
 
   // Timestamps
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([codeHash])
   @@index([status])
@@ -136,11 +136,11 @@ model GiftCard {
 }
 
 enum GiftCardStatus {
-  PENDING    // Created but payment not confirmed
-  ACTIVE     // Paid and ready to redeem
-  REDEEMED   // Already used
-  EXPIRED    // Past expiration date
-  REVOKED    // Manually revoked (refund, fraud, etc.)
+  PENDING // Created but payment not confirmed
+  ACTIVE // Paid and ready to redeem
+  REDEEMED // Already used
+  EXPIRED // Past expiration date
+  REVOKED // Manually revoked (refund, fraud, etc.)
 }
 
 // ============================================
@@ -148,55 +148,55 @@ enum GiftCardStatus {
 // ============================================
 
 model CreditBalance {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // User (linked via platform user ID)
-  platformUserId  String   @unique  // User ID from IndieCrowdfund
-  email           String?  // Email for matching
+  platformUserId String  @unique // User ID from IndieCrowdfund
+  email          String? // Email for matching
 
   // Or local user for account linking
-  userId          String?  @unique
-  user            User?    @relation(fields: [userId], references: [id])
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
 
   // Balance
-  availableBalance Decimal @db.Decimal(10, 2) @default(0)
-  heldBalance      Decimal @db.Decimal(10, 2) @default(0)
+  availableBalance Decimal @default(0) @db.Decimal(10, 2)
+  heldBalance      Decimal @default(0) @db.Decimal(10, 2)
 
   // Timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  holds           CreditHold[]
-  ledgerEntries   CreditLedger[]
+  holds         CreditHold[]
+  ledgerEntries CreditLedger[]
 
   @@index([platformUserId])
   @@index([email])
 }
 
 model CreditHold {
-  id              String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Balance reference
   creditBalanceId String
-  creditBalance   CreditBalance   @relation(fields: [creditBalanceId], references: [id])
+  creditBalance   CreditBalance @relation(fields: [creditBalanceId], references: [id])
 
   // Hold details
-  amount          Decimal         @db.Decimal(10, 2)
-  pledgeId        String          @unique  // IndieCrowdfund pledge ID
-  projectId       String          // IndieCrowdfund project ID
+  amount    Decimal @db.Decimal(10, 2)
+  pledgeId  String  @unique // IndieCrowdfund pledge ID
+  projectId String // IndieCrowdfund project ID
 
   // Status
-  status          HoldStatus      @default(ACTIVE)
+  status HoldStatus @default(ACTIVE)
 
   // Timestamps
-  createdAt       DateTime        @default(now())
-  expiresAt       DateTime?       // Auto-release if project deadline passes
-  capturedAt      DateTime?
-  releasedAt      DateTime?
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime? // Auto-release if project deadline passes
+  capturedAt DateTime?
+  releasedAt DateTime?
 
   // Relations
-  capture         CreditCapture?
+  capture CreditCapture?
 
   @@index([pledgeId])
   @@index([creditBalanceId])
@@ -204,36 +204,36 @@ model CreditHold {
 }
 
 enum HoldStatus {
-  ACTIVE     // Credits held for pending pledge
-  CAPTURED   // Project funded, credits transferred
-  RELEASED   // Project failed or pledge cancelled
-  EXPIRED    // Hold expired without action
+  ACTIVE // Credits held for pending pledge
+  CAPTURED // Project funded, credits transferred
+  RELEASED // Project failed or pledge cancelled
+  EXPIRED // Hold expired without action
 }
 
 model CreditLedger {
-  id              String           @id @default(cuid())
+  id String @id @default(cuid())
 
   // Balance reference
   creditBalanceId String
-  creditBalance   CreditBalance    @relation(fields: [creditBalanceId], references: [id])
+  creditBalance   CreditBalance @relation(fields: [creditBalanceId], references: [id])
 
   // Transaction details
-  type            LedgerEntryType
-  amount          Decimal          @db.Decimal(10, 2) // Positive = credit, Negative = debit
+  type   LedgerEntryType
+  amount Decimal         @db.Decimal(10, 2) // Positive = credit, Negative = debit
 
   // Running balance after this entry
-  balanceAfter    Decimal          @db.Decimal(10, 2)
+  balanceAfter Decimal @db.Decimal(10, 2)
 
   // References
-  giftCardId      String?
-  holdId          String?
-  description     String
+  giftCardId  String?
+  holdId      String?
+  description String
 
   // Metadata
-  metadata        Json?
+  metadata Json?
 
   // Timestamps
-  createdAt       DateTime         @default(now())
+  createdAt DateTime @default(now())
 
   @@index([creditBalanceId])
   @@index([type])
@@ -241,12 +241,12 @@ model CreditLedger {
 }
 
 enum LedgerEntryType {
-  REDEMPTION       // Gift card redeemed, credits added
-  HOLD_PLACED      // Credits held for pledge
-  HOLD_RELEASED    // Held credits returned (project failed)
-  HOLD_CAPTURED    // Held credits transferred to creator
-  ADJUSTMENT       // Manual adjustment
-  REFUND           // Refund processed
+  REDEMPTION // Gift card redeemed, credits added
+  HOLD_PLACED // Credits held for pledge
+  HOLD_RELEASED // Held credits returned (project failed)
+  HOLD_CAPTURED // Held credits transferred to creator
+  ADJUSTMENT // Manual adjustment
+  REFUND // Refund processed
 }
 
 // ============================================
@@ -254,36 +254,36 @@ enum LedgerEntryType {
 // ============================================
 
 model Transaction {
-  id              String            @id @default(cuid())
+  id String @id @default(cuid())
 
   // User (optional for guest purchases)
-  userId          String?
-  user            User?             @relation(fields: [userId], references: [id])
-  guestEmail      String?
+  userId     String?
+  user       User?   @relation(fields: [userId], references: [id])
+  guestEmail String?
 
   // Transaction details
-  type            TransactionType
-  amount          Decimal           @db.Decimal(10, 2)
-  currency        String            @default("USD")
-  status          TransactionStatus @default(PENDING)
+  type     TransactionType
+  amount   Decimal           @db.Decimal(10, 2)
+  currency String            @default("USD")
+  status   TransactionStatus @default(PENDING)
 
   // Stripe references
-  stripePaymentIntentId    String?
-  stripeCheckoutSessionId  String?
-  stripeRefundId           String?
+  stripePaymentIntentId   String?
+  stripeCheckoutSessionId String?
+  stripeRefundId          String?
 
   // Related gift card
-  giftCardId      String?
-  giftCard        GiftCard?         @relation(fields: [giftCardId], references: [id])
+  giftCardId String?
+  giftCard   GiftCard? @relation(fields: [giftCardId], references: [id])
 
   // Metadata
-  metadata        Json?
-  failureReason   String?
+  metadata      Json?
+  failureReason String?
 
   // Timestamps
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  completedAt     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
 
   @@index([userId])
   @@index([stripePaymentIntentId])
@@ -292,8 +292,8 @@ model Transaction {
 }
 
 enum TransactionType {
-  PURCHASE    // Gift card purchase
-  REFUND      // Refund issued
+  PURCHASE // Gift card purchase
+  REFUND // Refund issued
 }
 
 enum TransactionStatus {
@@ -309,22 +309,22 @@ enum TransactionStatus {
 // ============================================
 
 model RedemptionAttempt {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Attempt details
-  codeHashAttempt String   // Hash of attempted code
-  codeLast4       String?  // Last 4 chars for display
+  codeHashAttempt String // Hash of attempted code
+  codeLast4       String? // Last 4 chars for display
   ipAddress       String?
   userAgent       String?
   platformUserId  String?
 
   // Result
-  success         Boolean
-  errorCode       String?
-  failureReason   String?
+  success       Boolean
+  errorCode     String?
+  failureReason String?
 
   // Timestamps
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([ipAddress, createdAt])
   @@index([platformUserId, createdAt])
@@ -349,75 +349,76 @@ model SystemConfig {
 // ============================================
 
 model AdminUser {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
 
   // Profile
-  name          String
+  name String
 
   // Role & Permissions
-  role          AdminRole @default(ADMIN)
-  permissions   Json?     // Granular permissions override
+  role        AdminRole @default(ADMIN)
+  permissions Json? // Granular permissions override
 
   // Security
-  mfaEnabled    Boolean   @default(false)
-  mfaSecret     String?
-  lastLoginAt   DateTime?
-  lastLoginIp   String?
-  failedLoginAttempts Int @default(0)
-  lockedUntil   DateTime?
+  mfaEnabled          Boolean   @default(false)
+  mfaSecret           String?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
 
   // Timestamps
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  sessions      AdminSession[]
-  auditLogs     AdminAuditLog[]
+  sessions              AdminSession[]
+  auditLogs             AdminAuditLog[]
+  chargebackBanCgnatIps ChargebackBanCgnatIp[]
 
   @@index([email])
 }
 
 enum AdminRole {
-  SUPER_ADMIN   // Full access to everything
-  ADMIN         // Full access except admin management
-  FINANCE       // Transactions, payments, reports only
-  SUPPORT       // Users, gift cards, transactions (read-only finance)
-  VIEWER        // Read-only access to everything
+  SUPER_ADMIN // Full access to everything
+  ADMIN // Full access except admin management
+  FINANCE // Transactions, payments, reports only
+  SUPPORT // Users, gift cards, transactions (read-only finance)
+  VIEWER // Read-only access to everything
 }
 
 model AdminSession {
-  id          String    @id @default(cuid())
-  adminId     String
-  admin       AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  id      String    @id @default(cuid())
+  adminId String
+  admin   AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
-  token       String    @unique
-  ipAddress   String?
-  userAgent   String?
-  expiresAt   DateTime
+  token          String    @unique
+  ipAddress      String?
+  userAgent      String?
+  expiresAt      DateTime
   lastActivityAt DateTime?
-  createdAt   DateTime  @default(now())
+  createdAt      DateTime  @default(now())
 
   @@index([token])
   @@index([adminId])
 }
 
 model AdminAuditLog {
-  id          String    @id @default(cuid())
-  adminId     String
-  admin       AdminUser @relation(fields: [adminId], references: [id])
+  id      String    @id @default(cuid())
+  adminId String
+  admin   AdminUser @relation(fields: [adminId], references: [id])
 
-  action      String    // e.g., "settings.update", "giftcard.revoke"
-  resource    String    // e.g., "GiftCard", "Partner"
-  resourceId  String?
+  action     String // e.g., "settings.update", "giftcard.revoke"
+  resource   String // e.g., "GiftCard", "Partner"
+  resourceId String?
 
-  details     String?   @db.Text  // JSON string of details
+  details String? @db.Text // JSON string of details
 
-  ipAddress   String?
-  userAgent   String?
+  ipAddress String?
+  userAgent String?
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([adminId])
   @@index([action])
@@ -429,57 +430,58 @@ model AdminAuditLog {
 // ============================================
 
 model Partner {
-  id            String        @id @default(cuid())
+  id String @id @default(cuid())
 
   // Identity
-  name          String        // "IndieCrowdfund"
-  slug          String        @unique // "indiecrowdfund"
+  name String // "IndieCrowdfund"
+  slug String @unique // "indiecrowdfund"
 
   // Contact
-  contactName   String?
-  contactEmail  String?
-  website       String?
+  contactName  String?
+  contactEmail String?
+  website      String?
 
   // Configuration
   status        PartnerStatus @default(PENDING)
-  vpnIp         String?       // Partner's VPN IP (e.g., 10.10.0.2)
-  webhookUrl    String?       // Partner's webhook endpoint
-  webhookSecret String?       // HMAC secret for webhook signatures
+  vpnIp         String? // Partner's VPN IP (e.g., 10.10.0.2)
+  webhookUrl    String? // Partner's webhook endpoint
+  webhookSecret String? // HMAC secret for webhook signatures
   webhookEvents String[]      @default([]) // Subscribed event types
 
   // Settlement Configuration
-  settlementFrequency SettlementFrequency @default(WEEKLY)
-  minimumSettlement   Decimal             @db.Decimal(10, 2) @default(100)
-  partnerFeePercent   Decimal             @db.Decimal(5, 4) @default(0.06) // 6% default
-  paymentMethod       String?             // wire, ach, paypal, etc.
-  bankName            String?
-  bankAccountLast4    String?
-  bankAccountEncrypted String?   @db.Text  // AES-256-GCM encrypted account number
-  bankRoutingEncrypted String?   @db.Text  // AES-256-GCM encrypted routing number
-  paypalEmail         String?
+  settlementFrequency  SettlementFrequency @default(WEEKLY)
+  minimumSettlement    Decimal             @default(100) @db.Decimal(10, 2)
+  partnerFeePercent    Decimal             @default(0.06) @db.Decimal(5, 4) // 6% default
+  paymentMethod        String? // wire, ach, paypal, etc.
+  bankName             String?
+  bankAccountLast4     String?
+  bankAccountEncrypted String?             @db.Text // AES-256-GCM encrypted account number
+  bankRoutingEncrypted String?             @db.Text // AES-256-GCM encrypted routing number
+  paypalEmail          String?
 
   // Onboarding
-  onboardingStep      Int       @default(0)  // 0=not started, 1=password, 2=company, 3=banking, 4=complete
-  onboardingComplete  Boolean   @default(false)
+  onboardingStep     Int     @default(0) // 0=not started, 1=password, 2=company, 3=banking, 4=complete
+  onboardingComplete Boolean @default(false)
 
   // Branding
-  logoUrl       String?
-  description   String?
+  logoUrl     String?
+  description String?
 
   // Settings
-  settings      Json?         // Partner-specific settings
+  settings Json? // Partner-specific settings
 
   // Timestamps
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  activatedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  activatedAt DateTime?
 
   // Relations
-  apiKeys          PartnerApiKey[]
-  giftCards        GiftCard[]
-  settlements      PartnerSettlement[]
-  captures         CreditCapture[]
-  checkoutSessions CheckoutSession[]
+  apiKeys              PartnerApiKey[]
+  giftCards            GiftCard[]
+  settlements          PartnerSettlement[]
+  captures             CreditCapture[]
+  checkoutSessions     CheckoutSession[]
+  chargebackBanSignals ChargebackBanSignal[]
 
   @@index([slug])
   @@index([status])
@@ -493,36 +495,36 @@ enum SettlementFrequency {
 }
 
 enum PartnerStatus {
-  PENDING       // Awaiting setup
-  ACTIVE        // Live and operational
-  SUSPENDED     // Temporarily disabled
-  DEACTIVATED   // Permanently disabled
+  PENDING // Awaiting setup
+  ACTIVE // Live and operational
+  SUSPENDED // Temporarily disabled
+  DEACTIVATED // Permanently disabled
 }
 
 model PartnerApiKey {
-  id           String    @id @default(cuid())
-  partnerId    String
-  partner      Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
-  name         String    // "Production", "Staging"
-  keyHash      String    @unique // SHA-256 hash of the key
-  keyPrefix    String    // First 10 chars for identification
-  encryptedKey String?   @db.Text // Encrypted version of the key
+  name         String // "Production", "Staging"
+  keyHash      String  @unique // SHA-256 hash of the key
+  keyPrefix    String // First 10 chars for identification
+  encryptedKey String? @db.Text // Encrypted version of the key
 
   // Permissions
-  permissions  Json?     // Specific endpoint permissions
+  permissions Json? // Specific endpoint permissions
 
   // Usage
   lastUsedAt   DateTime?
   requestCount BigInt    @default(0)
 
   // Status
-  isActive     Boolean   @default(true)
-  expiresAt    DateTime?
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
 
   // Timestamps
-  createdAt    DateTime  @default(now())
-  revokedAt    DateTime?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
 
   @@index([keyHash])
   @@index([partnerId])
@@ -533,32 +535,32 @@ model PartnerApiKey {
 // ============================================
 
 model ApiRequestLog {
-  id            String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Partner reference
-  partnerId     String?
-  apiKeyId      String?
+  partnerId String?
+  apiKeyId  String?
 
   // Request details
-  method        String    // GET, POST, etc.
-  endpoint      String    // /api/v1/cards
-  path          String    // Full path with params
+  method   String // GET, POST, etc.
+  endpoint String // /api/v1/cards
+  path     String // Full path with params
 
   // Client info
-  ipAddress     String
-  userAgent     String?
+  ipAddress String
+  userAgent String?
 
   // Response
-  statusCode    Int
+  statusCode     Int
   responseTimeMs Int
 
   // Optional data
-  requestBody   String?   @db.Text
-  responseBody  String?   @db.Text
-  errorMessage  String?
+  requestBody  String? @db.Text
+  responseBody String? @db.Text
+  errorMessage String?
 
   // Timestamp
-  timestamp     DateTime  @default(now())
+  timestamp DateTime @default(now())
 
   @@index([partnerId])
   @@index([apiKeyId])
@@ -572,22 +574,22 @@ model ApiRequestLog {
 // ============================================
 
 model EmailLog {
-  id            String      @id @default(cuid())
+  id String @id @default(cuid())
 
   // Recipient
-  toEmail       String
-  toName        String?
+  toEmail String
+  toName  String?
 
   // Sender
-  fromEmail     String
-  fromName      String
+  fromEmail String
+  fromName  String
 
   // Content
-  templateId    String?
-  template      EmailTemplate? @relation(fields: [templateId], references: [id])
-  subject       String
-  htmlContent   String?     @db.Text
-  textContent   String?     @db.Text
+  templateId  String?
+  template    EmailTemplate? @relation(fields: [templateId], references: [id])
+  subject     String
+  htmlContent String?        @db.Text
+  textContent String?        @db.Text
 
   // SendGrid
   sendgridMessageId String? @unique
@@ -597,10 +599,10 @@ model EmailLog {
   statusMessage String?
 
   // Tracking
-  deliveredAt   DateTime?
-  openedAt      DateTime?
-  clickedAt     DateTime?
-  bouncedAt     DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
 
   // Relations
   userId        String?
@@ -608,11 +610,11 @@ model EmailLog {
   giftCardId    String?
 
   // Timestamps
-  createdAt     DateTime    @default(now())
-  sentAt        DateTime?
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
 
   // Events from SendGrid webhooks
-  events        EmailEvent[]
+  events EmailEvent[]
 
   @@index([toEmail])
   @@index([status])
@@ -633,61 +635,61 @@ enum EmailStatus {
 }
 
 model EmailEvent {
-  id          String    @id @default(cuid())
-  emailLogId  String
-  emailLog    EmailLog  @relation(fields: [emailLogId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  emailLogId String
+  emailLog   EmailLog @relation(fields: [emailLogId], references: [id], onDelete: Cascade)
 
-  event       String    // delivered, open, click, bounce, etc.
-  timestamp   DateTime
-  data        Json?     // Raw event data from SendGrid
+  event     String // delivered, open, click, bounce, etc.
+  timestamp DateTime
+  data      Json? // Raw event data from SendGrid
 
   @@index([emailLogId])
 }
 
 model EmailTemplate {
-  id          String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Identity
-  name        String    // Internal name
-  slug        String    @unique // purchase_confirmation, etc.
+  name        String // Internal name
+  slug        String  @unique // purchase_confirmation, etc.
   description String?
 
   // Content
   subject     String
-  htmlContent String    @db.Text
-  textContent String?   @db.Text
+  htmlContent String  @db.Text
+  textContent String? @db.Text
 
   // Settings
-  isActive    Boolean   @default(true)
-  accountId   String?   // Which email account to use
+  isActive  Boolean @default(true)
+  accountId String? // Which email account to use
 
   // Versioning
-  version     Int       @default(1)
+  version Int @default(1)
 
   // Timestamps
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  emailLogs   EmailLog[]
-  versions    EmailTemplateVersion[]
+  emailLogs EmailLog[]
+  versions  EmailTemplateVersion[]
 }
 
 model EmailTemplateVersion {
-  id          String        @id @default(cuid())
-  templateId  String
-  template    EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id         String        @id @default(cuid())
+  templateId String
+  template   EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   version     Int
   subject     String
-  htmlContent String        @db.Text
-  textContent String?       @db.Text
+  htmlContent String  @db.Text
+  textContent String? @db.Text
 
   // Who made the change
-  changedBy   String?
-  changeNote  String?
+  changedBy  String?
+  changeNote String?
 
-  createdAt   DateTime      @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([templateId, version])
 }
@@ -697,45 +699,45 @@ model EmailTemplateVersion {
 // ============================================
 
 model PartnerSettlement {
-  id            String            @id @default(cuid())
+  id String @id @default(cuid())
 
   // Partner reference
-  partnerId     String
-  partner       Partner           @relation(fields: [partnerId], references: [id])
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id])
 
   // Period
-  periodStart   DateTime
-  periodEnd     DateTime
+  periodStart DateTime
+  periodEnd   DateTime
 
   // Amounts
-  grossAmount   Decimal           @db.Decimal(12, 2)  // Total captured amount
-  partnerFee    Decimal           @db.Decimal(12, 2)  // Platform fee (6%)
-  feePercentage Decimal           @db.Decimal(5, 4)   // Fee percentage used
-  netAmount     Decimal           @db.Decimal(12, 2)  // Amount to pay partner
-  currency      String            @default("USD")
+  grossAmount   Decimal @db.Decimal(12, 2) // Total captured amount
+  partnerFee    Decimal @db.Decimal(12, 2) // Platform fee (6%)
+  feePercentage Decimal @db.Decimal(5, 4) // Fee percentage used
+  netAmount     Decimal @db.Decimal(12, 2) // Amount to pay partner
+  currency      String  @default("USD")
 
   // Status
-  status        SettlementStatus  @default(PENDING)
+  status SettlementStatus @default(PENDING)
 
   // Payment details
-  paymentMethod String?           // wire, ach, paypal
-  paymentRef    String?           // Wire reference, PayPal transaction ID, etc.
+  paymentMethod String? // wire, ach, paypal
+  paymentRef    String? // Wire reference, PayPal transaction ID, etc.
   paidAt        DateTime?
 
   // Admin notes
-  adminNotes    String?           @db.Text
-  disputeReason String?           @db.Text
+  adminNotes    String? @db.Text
+  disputeReason String? @db.Text
 
   // Approval tracking
-  approvedBy    String?           // Admin user ID
-  approvedAt    DateTime?
+  approvedBy String? // Admin user ID
+  approvedAt DateTime?
 
   // Timestamps
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  captures      CreditCapture[]
+  captures CreditCapture[]
 
   @@index([partnerId])
   @@index([status])
@@ -744,40 +746,40 @@ model PartnerSettlement {
 }
 
 enum SettlementStatus {
-  PENDING     // Awaiting approval
-  APPROVED    // Approved, ready for payment
-  PROCESSING  // Payment initiated
-  PAID        // Payment confirmed
-  FAILED      // Payment failed
-  DISPUTED    // Under dispute
+  PENDING // Awaiting approval
+  APPROVED // Approved, ready for payment
+  PROCESSING // Payment initiated
+  PAID // Payment confirmed
+  FAILED // Payment failed
+  DISPUTED // Under dispute
 }
 
 model CreditCapture {
-  id            String            @id @default(cuid())
+  id String @id @default(cuid())
 
   // Partner reference
-  partnerId     String
-  partner       Partner           @relation(fields: [partnerId], references: [id])
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id])
 
   // Hold reference
-  holdId        String            @unique
-  hold          CreditHold        @relation(fields: [holdId], references: [id])
+  holdId String     @unique
+  hold   CreditHold @relation(fields: [holdId], references: [id])
 
   // Creator info (from partner)
-  creatorId     String            // Partner's creator ID
-  creatorEmail  String?
-  projectId     String            // Partner's project ID
-  projectName   String?
+  creatorId    String // Partner's creator ID
+  creatorEmail String?
+  projectId    String // Partner's project ID
+  projectName  String?
 
   // Amount
-  amount        Decimal           @db.Decimal(10, 2)
+  amount Decimal @db.Decimal(10, 2)
 
   // Settlement reference (null until settled)
-  settlementId  String?
-  settlement    PartnerSettlement? @relation(fields: [settlementId], references: [id])
+  settlementId String?
+  settlement   PartnerSettlement? @relation(fields: [settlementId], references: [id])
 
   // Timestamps
-  capturedAt    DateTime          @default(now())
+  capturedAt DateTime @default(now())
 
   @@index([partnerId])
   @@index([settlementId])
@@ -791,96 +793,96 @@ model CreditCapture {
 // ============================================
 
 model Mailbox {
-  id            String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Email address
-  email         String    @unique  // support@divinitycoin.com
-  name          String              // "Support", "Sales", etc.
+  email String @unique // support@divinitycoin.com
+  name  String // "Support", "Sales", etc.
 
   // Settings
-  isActive      Boolean   @default(true)
-  isDefault     Boolean   @default(false)
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false)
 
   // Auto-reply settings
-  autoReplyEnabled  Boolean @default(false)
-  autoReplySubject  String?
-  autoReplyMessage  String? @db.Text
+  autoReplyEnabled Boolean @default(false)
+  autoReplySubject String?
+  autoReplyMessage String? @db.Text
 
   // Signature
-  signature     String?   @db.Text
+  signature String? @db.Text
 
   // Timestamps
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  emails        Email[]
+  emails Email[]
 
   @@index([email])
   @@index([isActive])
 }
 
 model Email {
-  id            String      @id @default(cuid())
+  id String @id @default(cuid())
 
   // Mailbox reference
-  mailboxId     String
-  mailbox       Mailbox     @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  mailboxId String
+  mailbox   Mailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
 
   // Direction
-  direction     EmailDirection @default(INBOUND)
+  direction EmailDirection @default(INBOUND)
 
   // Sender
-  fromEmail     String
-  fromName      String?
+  fromEmail String
+  fromName  String?
 
   // Recipients
-  toEmail       String
-  toName        String?
-  ccEmails      String[]    @default([])
-  bccEmails     String[]    @default([])
+  toEmail   String
+  toName    String?
+  ccEmails  String[] @default([])
+  bccEmails String[] @default([])
 
   // Content
-  subject       String
-  textBody      String?     @db.Text
-  htmlBody      String?     @db.Text
+  subject  String
+  textBody String? @db.Text
+  htmlBody String? @db.Text
 
   // Threading
-  threadId      String?     // Group related emails
-  inReplyTo     String?     // Message-ID of parent email
-  messageId     String?     @unique  // Unique message ID
+  threadId  String? // Group related emails
+  inReplyTo String? // Message-ID of parent email
+  messageId String? @unique // Unique message ID
 
   // Status
-  isRead        Boolean     @default(false)
-  isStarred     Boolean     @default(false)
-  isArchived    Boolean     @default(false)
-  isDeleted     Boolean     @default(false)
-  isSpam        Boolean     @default(false)
-  isDraft       Boolean     @default(false)
+  isRead     Boolean @default(false)
+  isStarred  Boolean @default(false)
+  isArchived Boolean @default(false)
+  isDeleted  Boolean @default(false)
+  isSpam     Boolean @default(false)
+  isDraft    Boolean @default(false)
 
   // Labels/folders
-  labels        String[]    @default([])
-  folder        EmailFolder @default(INBOX)
+  labels String[]    @default([])
+  folder EmailFolder @default(INBOX)
 
   // SendGrid tracking
   sendgridMessageId String?
 
   // Spam info
-  spamScore     Float?
-  senderIp      String?
+  spamScore Float?
+  senderIp  String?
 
   // Attachments
-  hasAttachments Boolean    @default(false)
+  hasAttachments Boolean @default(false)
 
   // Timestamps
-  receivedAt    DateTime    @default(now())
-  sentAt        DateTime?
-  readAt        DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  receivedAt DateTime  @default(now())
+  sentAt     DateTime?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   // Relations
-  attachments   EmailAttachment[]
+  attachments EmailAttachment[]
 
   @@index([mailboxId])
   @@index([direction])
@@ -907,19 +909,19 @@ enum EmailFolder {
 }
 
 model EmailAttachment {
-  id            String    @id @default(cuid())
-  emailId       String
-  email         Email     @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  emailId String
+  email   Email  @relation(fields: [emailId], references: [id], onDelete: Cascade)
 
-  filename      String
-  contentType   String
-  size          Int       // Size in bytes
+  filename    String
+  contentType String
+  size        Int // Size in bytes
 
   // Storage
-  storageKey    String?   // S3/storage key
-  url           String?   // Direct URL if available
+  storageKey String? // S3/storage key
+  url        String? // Direct URL if available
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([emailId])
 }
@@ -929,40 +931,40 @@ model EmailAttachment {
 // ============================================
 
 model RefundRequest {
-  id                String              @id @default(cuid())
+  id String @id @default(cuid())
 
   // Request info
-  transactionId     String
-  giftCardId        String?
-  userId            String?
-  email             String
-  amount            Decimal             @db.Decimal(10, 2)
-  reason            String?             @db.Text
+  transactionId String
+  giftCardId    String?
+  userId        String?
+  email         String
+  amount        Decimal @db.Decimal(10, 2)
+  reason        String? @db.Text
 
   // Status
-  status            RefundRequestStatus @default(PENDING)
+  status RefundRequestStatus @default(PENDING)
 
   // Partner webhook (if code was redeemed)
-  partnerId         String?
-  partnerName       String?
-  webhookSent       Boolean             @default(false)
-  webhookSentAt     DateTime?
-  webhookResponse   Json?
-  partnerRefundId   String?             // ID returned by partner
+  partnerId       String?
+  partnerName     String?
+  webhookSent     Boolean   @default(false)
+  webhookSentAt   DateTime?
+  webhookResponse Json?
+  partnerRefundId String? // ID returned by partner
 
   // Original redemption info (for partner webhook)
-  originalCardCode  String?             // Last 4 chars only
-  redeemedAmount    Decimal?            @db.Decimal(10, 2)
+  originalCardCode String? // Last 4 chars only
+  redeemedAmount   Decimal? @db.Decimal(10, 2)
 
   // Stripe refund
-  stripeRefundId    String?
+  stripeRefundId String?
 
   // Timestamps
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  processedAt       DateTime?
-  failedAt          DateTime?
-  failureReason     String?             @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  processedAt   DateTime?
+  failedAt      DateTime?
+  failureReason String?   @db.Text
 
   @@index([transactionId])
   @@index([giftCardId])
@@ -973,13 +975,13 @@ model RefundRequest {
 }
 
 enum RefundRequestStatus {
-  PENDING           // Awaiting processing
-  AWAITING_PARTNER  // Webhook sent to partner, awaiting response
-  APPROVED          // Approved, ready for Stripe refund
-  PROCESSING        // Stripe refund in progress
-  COMPLETED         // Refund completed
-  FAILED            // Refund failed (partner rejected or Stripe error)
-  REJECTED          // Admin rejected
+  PENDING // Awaiting processing
+  AWAITING_PARTNER // Webhook sent to partner, awaiting response
+  APPROVED // Approved, ready for Stripe refund
+  PROCESSING // Stripe refund in progress
+  COMPLETED // Refund completed
+  FAILED // Refund failed (partner rejected or Stripe error)
+  REJECTED // Admin rejected
 }
 
 // ============================================
@@ -987,49 +989,49 @@ enum RefundRequestStatus {
 // ============================================
 
 model EmailQueue {
-  id            String           @id @default(cuid())
+  id String @id @default(cuid())
 
   // Recipient
-  toEmail       String
-  toName        String?
+  toEmail String
+  toName  String?
 
   // Sender (override defaults if provided)
-  fromEmail     String?
-  fromName      String?
+  fromEmail String?
+  fromName  String?
 
   // Content
-  subject       String
-  htmlBody      String           @db.Text
-  textBody      String?          @db.Text
+  subject  String
+  htmlBody String  @db.Text
+  textBody String? @db.Text
 
   // Mailbox reference (optional, for inbox tracking)
-  mailboxId     String?
+  mailboxId String?
 
   // Status
-  status        EmailQueueStatus @default(PENDING)
+  status EmailQueueStatus @default(PENDING)
 
   // Priority (lower = higher priority)
-  priority      Int              @default(10)
+  priority Int @default(10)
 
   // Retry tracking
-  attempts      Int              @default(0)
-  maxAttempts   Int              @default(3)
-  lastError     String?          @db.Text
-  nextRetryAt   DateTime?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  lastError   String?   @db.Text
+  nextRetryAt DateTime?
 
   // Bulk send tracking
-  bulkSendId    String?          // Group emails from same bulk send
-  bulkSendIndex Int?             // Position in bulk send
+  bulkSendId    String? // Group emails from same bulk send
+  bulkSendIndex Int? // Position in bulk send
 
   // Result
   sendgridMessageId String?
-  sentAt        DateTime?
+  sentAt            DateTime?
 
   // Timestamps
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  scheduledAt   DateTime?        // Schedule for future sending
-  processedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  scheduledAt DateTime? // Schedule for future sending
+  processedAt DateTime?
 
   @@index([status])
   @@index([priority])
@@ -1039,11 +1041,11 @@ model EmailQueue {
 }
 
 enum EmailQueueStatus {
-  PENDING       // Waiting to be sent
-  PROCESSING    // Currently being sent
-  SENT          // Successfully sent
-  FAILED        // All retries exhausted
-  CANCELLED     // Manually cancelled
+  PENDING // Waiting to be sent
+  PROCESSING // Currently being sent
+  SENT // Successfully sent
+  FAILED // All retries exhausted
+  CANCELLED // Manually cancelled
 }
 
 // ============================================
@@ -1051,24 +1053,24 @@ enum EmailQueueStatus {
 // ============================================
 
 model PlatformUser {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Partner reference
-  partnerId         String
+  partnerId String
 
   // Platform identity
-  platformUserId    String    @unique  // User ID from partner platform
-  email             String
+  platformUserId String @unique // User ID from partner platform
+  email          String
 
   // Stripe customer on DC's account
-  stripeCustomerId  String?   @unique
+  stripeCustomerId String? @unique
 
   // Timestamps
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  pendingPayments   PendingPartnerPayment[]
+  pendingPayments PendingPartnerPayment[]
 
   @@index([partnerId])
   @@index([platformUserId])
@@ -1076,48 +1078,48 @@ model PlatformUser {
 }
 
 model PendingPartnerPayment {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Stripe payment intent
-  paymentIntentId   String    @unique
+  paymentIntentId String @unique
 
   // Partner reference
-  partnerId         String
+  partnerId String
 
   // Platform user reference
-  platformUserId    String
-  platformUser      PlatformUser? @relation(fields: [platformUserId], references: [platformUserId])
+  platformUserId String
+  platformUser   PlatformUser? @relation(fields: [platformUserId], references: [platformUserId])
 
   // Pledge/project reference (from partner)
-  pledgeId          String
-  projectId         String
+  pledgeId  String
+  projectId String
 
   // Payment details
-  amount            Int       // Amount in cents
-  currency          String    @default("usd")
-  email             String
+  amount   Int // Amount in cents
+  currency String @default("usd")
+  email    String
 
   // Status tracking
-  status            PartnerPaymentStatus @default(PENDING)
+  status PartnerPaymentStatus @default(PENDING)
 
   // Gift card created after payment succeeds
-  giftCardId        String?
+  giftCardId String?
 
   // Hold created after auto-redemption
-  holdId            String?
+  holdId String?
 
   // Refund info
-  refundId          String?
-  refundedAt        DateTime?
+  refundId   String?
+  refundedAt DateTime?
 
   // Webhook delivery tracking
-  webhookSent       Boolean   @default(false)
-  webhookSentAt     DateTime?
+  webhookSent   Boolean   @default(false)
+  webhookSentAt DateTime?
 
   // Timestamps
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  completedAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
 
   @@index([partnerId])
   @@index([platformUserId])
@@ -1126,11 +1128,11 @@ model PendingPartnerPayment {
 }
 
 enum PartnerPaymentStatus {
-  PENDING       // PaymentIntent created, awaiting payment
-  PROCESSING    // Payment in progress
-  COMPLETED     // Payment succeeded, gift card created, redeemed, held
-  FAILED        // Payment failed
-  REFUNDED      // Payment refunded
+  PENDING // PaymentIntent created, awaiting payment
+  PROCESSING // Payment in progress
+  COMPLETED // Payment succeeded, gift card created, redeemed, held
+  FAILED // Payment failed
+  REFUNDED // Payment refunded
 }
 
 // DC-hosted checkout sessions. Optional alternative to the direct
@@ -1141,42 +1143,42 @@ enum PartnerPaymentStatus {
 // webhooks/settlements/refunds work identically regardless of which
 // path the partner used.
 model CheckoutSession {
-  id              String   @id @default(cuid())
-  sessionToken    String   @unique  // public bearer token; appears in URL + returned as sessionId
+  id           String @id @default(cuid())
+  sessionToken String @unique // public bearer token; appears in URL + returned as sessionId
 
   // Partner reference
-  partnerId       String
-  partner         Partner  @relation(fields: [partnerId], references: [id])
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id])
 
   // Mode and state
-  mode            CheckoutSessionMode   @default(PAYMENT)
-  status          CheckoutSessionStatus @default(PENDING)
+  mode   CheckoutSessionMode   @default(PAYMENT)
+  status CheckoutSessionStatus @default(PENDING)
 
   // Customer
-  platformUserId  String
-  email           String
+  platformUserId String
+  email          String
 
   // Payment-mode fields
   amount          Int?
-  currency        String   @default("usd")
+  currency        String  @default("usd")
   pledgeId        String?
   projectId       String?
-  paymentIntentId String?  @unique
+  paymentIntentId String? @unique
 
   // Setup-mode fields (save card for later off-session use)
-  setupIntentId   String?  @unique
+  setupIntentId String? @unique
 
   // Result of completion
   paymentMethodId String?
 
   // Display / branding on the hosted page
-  partnerName     String?
-  partnerLogoUrl  String?
-  description     String?
+  partnerName    String?
+  partnerLogoUrl String?
+  description    String?
 
   // Flow control
-  returnUrl       String?
-  cancelUrl       String?
+  returnUrl String?
+  cancelUrl String?
 
   // When true, the hosted page emits the checkout.* postMessage events
   // but does NOT top-nav the browser on terminal state — the embedding
@@ -1186,17 +1188,17 @@ model CheckoutSession {
   disableAutoRedirect Boolean @default(false)
 
   // Timestamps
-  expiresAt       DateTime
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  completedAt     DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
 
   // Webhook delivery — set once when we have fired (or deliberately
   // skipped firing) the terminal-state webhook to the partner. Used
   // as the idempotency guard so a session's checkout.* event fires
   // at most once from our side regardless of which code path
   // transitioned the session to terminal.
-  webhookFiredAt  DateTime?
+  webhookFiredAt DateTime?
 
   @@index([partnerId])
   @@index([sessionToken])
@@ -1205,16 +1207,16 @@ model CheckoutSession {
 }
 
 enum CheckoutSessionMode {
-  PAYMENT       // one-time charge
-  SETUP         // save card for later off-session use
+  PAYMENT // one-time charge
+  SETUP // save card for later off-session use
 }
 
 enum CheckoutSessionStatus {
-  PENDING       // Session created, awaiting completion
-  COMPLETE      // Payment succeeded / card saved
-  FAILED        // Payment failed
-  EXPIRED       // Session expired without completion
-  CANCELED      // User explicitly canceled
+  PENDING // Session created, awaiting completion
+  COMPLETE // Payment succeeded / card saved
+  FAILED // Payment failed
+  EXPIRED // Session expired without completion
+  CANCELED // User explicitly canceled
 }
 
 // A chargeback case an admin is tracking. One row is created/updated each
@@ -1222,7 +1224,7 @@ enum CheckoutSessionStatus {
 // lightweight log (the zip itself is regenerated on demand, never stored).
 // Admins delete the row when the dispute is resolved.
 model DisputeCase {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // What was disputed — the id the admin pasted (pi_... or internal id)
   transactionRef  String
@@ -1230,22 +1232,22 @@ model DisputeCase {
   vrolCase        String?
 
   // Denormalized context for the list view (so we don't re-query on render)
-  partnerId       String?
-  partnerName     String?
-  amountCents     Int?
-  currency        String   @default("usd")
-  customerEmail   String?
+  partnerId     String?
+  partnerName   String?
+  amountCents   Int?
+  currency      String  @default("usd")
+  customerEmail String?
 
   // Workflow
-  status          DisputeStatus @default(OPEN)
-  notes           String?       @db.Text
+  status DisputeStatus @default(OPEN)
+  notes  String?       @db.Text
 
   // Who generated it + how many times
   createdByAdminId String?
-  bundleCount      Int      @default(1)
+  bundleCount      Int     @default(1)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([transactionRef])
   @@index([status])
@@ -1253,11 +1255,11 @@ model DisputeCase {
 }
 
 enum DisputeStatus {
-  OPEN          // Actively working the dispute
-  SUBMITTED     // Evidence submitted to the issuer
-  WON           // Dispute resolved in our favor
-  LOST          // Dispute lost
-  CLOSED        // Closed without a win/loss outcome
+  OPEN // Actively working the dispute
+  SUBMITTED // Evidence submitted to the issuer
+  WON // Dispute resolved in our favor
+  LOST // Dispute lost
+  CLOSED // Closed without a win/loss outcome
 }
 
 // Stripe webhook idempotency. We insert `eventId` before processing an
@@ -1277,19 +1279,19 @@ model StripeWebhookEvent {
 // scripts/botblock/ which picks up /tmp/botblock-pending and applies iptables
 // DROP rules. `expiresAt` lets the sync script age rules out.
 model BlockedIP {
-  id              String   @id @default(cuid())
-  ipAddress       String   @unique
-  reason          String
-  violationCount  Int      @default(1)
-  blockedAt       DateTime @default(now())
-  expiresAt       DateTime
+  id             String   @id @default(cuid())
+  ipAddress      String   @unique
+  reason         String
+  violationCount Int      @default(1)
+  blockedAt      DateTime @default(now())
+  expiresAt      DateTime
 
-  lastUserAgent   String?
-  lastPath        String?
-  lastActionId    String?
+  lastUserAgent String?
+  lastPath      String?
+  lastActionId  String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ipAddress])
   @@index([expiresAt])
@@ -1297,14 +1299,145 @@ model BlockedIP {
 
 // Audit trail of suspicious requests, whether or not they triggered a block.
 model SuspiciousActivity {
-  id         String   @id @default(cuid())
-  ipAddress  String
-  reason     String
-  actionId   String?
-  path       String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  ipAddress String
+  reason    String
+  actionId  String?
+  path      String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
   @@index([ipAddress])
   @@index([createdAt])
+}
+
+// ─── Chargeback ban prefilter ────────────────────────────────────
+// One row per banned account reported by a partner's chargeback-ban
+// feed (see docs/divinitycoin-chargeback-ban-prefilter-spec). Identifiers
+// (email, phone, card fingerprint, billing address, IP, device fp) are
+// stored as separate ChargebackBanIdentifier rows so we can index each
+// type for sub-millisecond lookups on the create-payment-intent path.
+model ChargebackBanSignal {
+  id           String    @id @default(cuid())
+  partnerId    String
+  partner      Partner   @relation(fields: [partnerId], references: [id])
+  sourceUserId String
+  bannedAt     DateTime
+  reason       String    @default("chargeback")
+  // Last time this signal was present in the feed. The sync run marks
+  // rows it didn't see as removedAt = now (graceful — the spec promises
+  // bans are permanent, but a partner could correct a mistake).
+  lastSeenAt   DateTime  @default(now())
+  removedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  identifiers ChargebackBanIdentifier[]
+
+  @@unique([partnerId, sourceUserId])
+  @@index([partnerId])
+  @@index([lastSeenAt])
+  @@index([removedAt])
+}
+
+enum ChargebackBanIdentifierType {
+  EMAIL // canonicalized (gmail dot+plus stripped, lowercased)
+  PHONE // E.164
+  CARD_FINGERPRINT // Stripe payment_method.card.fingerprint
+  BILLING_NAME // whitespace-collapsed lowercased name
+  BILLING_ADDRESS_KEY // line1|postal|country (lowercased, no spaces in postal)
+  IP // exact IPv4/IPv6 string
+  DEVICE_FINGERPRINT // partner-provided device hash
+}
+
+model ChargebackBanIdentifier {
+  id        String                      @id @default(cuid())
+  signalId  String
+  signal    ChargebackBanSignal         @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  partnerId String
+  type      ChargebackBanIdentifierType
+  value     String
+  createdAt DateTime                    @default(now())
+
+  @@unique([signalId, type, value])
+  @@index([partnerId, type, value])
+  @@index([type, value])
+}
+
+enum ChargebackBanDecision {
+  HARD_BLOCK
+  SOFT_FLAG
+  ALLOW // matched nothing
+  LOGGED_ONLY // matched in log_only mode — would have blocked
+}
+
+// Audit row written for every prefilter run that found at least one
+// match OR that hard-blocked. Lets ops measure firing rate, debug
+// false positives, and back-feed the report-back webhook.
+model ChargebackBanMatch {
+  id               String                @id @default(cuid())
+  partnerId        String
+  decision         ChargebackBanDecision
+  // The decision the prefilter *would* have made in enforce mode.
+  // In log_only this is HARD_BLOCK or SOFT_FLAG while `decision` is
+  // LOGGED_ONLY, so we can compare what enforcement would do.
+  intendedDecision ChargebackBanDecision
+  matchedSignals   String[] // identifier types that matched (e.g., ["EMAIL","IP"])
+  sourceUserIds    String[] // banned source_user_ids that matched
+
+  attemptedAction          String // "create-payment-intent" | "charge-saved-payment-method"
+  attemptedAmountCents     Int?
+  attemptedCurrency        String?
+  attemptedEmail           String?
+  attemptedPhone           String?
+  attemptedIp              String?
+  attemptedCardFingerprint String?
+  attemptedCardLast4       String?
+  attemptedCardBrand       String?
+  attemptedBillingPostal   String?
+  attemptedPlatformUserId  String?
+  attemptedPledgeId        String?
+
+  feedTimestamp DateTime? // updated_at of the feed snapshot used
+  reportedAt    DateTime? // when report-back webhook succeeded
+  reportError   String? // last report-back failure, if any
+
+  createdAt DateTime @default(now())
+
+  @@index([partnerId, createdAt])
+  @@index([decision, createdAt])
+  @@index([createdAt])
+}
+
+// One row per sync run; lets ops see if the feed is healthy and how
+// many signals were added / removed each cycle.
+model ChargebackBanFeedSync {
+  id             String    @id @default(cuid())
+  partnerId      String
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  feedTimestamp  DateTime?
+  signalsTotal   Int?
+  signalsAdded   Int?
+  signalsUpdated Int?
+  signalsRemoved Int?
+  ok             Boolean   @default(false)
+  errorMessage   String?
+
+  @@index([partnerId, startedAt])
+}
+
+// Admin-curated allowlist of IP addresses (e.g., known CGNAT exits)
+// to ignore as a ban signal even if the feed reports them. Per the
+// spec, IP-only is already a soft-flag — this just suppresses the
+// flag entirely.
+model ChargebackBanCgnatIp {
+  id        String     @id @default(cuid())
+  ipAddress String     @unique
+  note      String?
+  addedById String?
+  addedBy   AdminUser? @relation(fields: [addedById], references: [id])
+  createdAt DateTime   @default(now())
+
+  @@index([ipAddress])
 }

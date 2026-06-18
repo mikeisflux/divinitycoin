@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger';
 import { getStripeClient } from '@/lib/stripe';
 import { getStripeConfig, getConfig } from '@/lib/config';
 import { fireCheckoutWebhookIfNeeded } from '@/lib/checkout/webhook';
+import { runPrefilter, HARD_BLOCK_RESPONSE } from '@/lib/chargeback-ban/prefilter';
 import crypto from 'crypto';
 
 // Fallback to legacy INTERNAL_API_KEY for backwards compatibility
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
         return handleRecordCapture(body);
 
       case 'create-payment-intent':
-        return handleCreatePaymentIntent(body, partnerId!);
+        return handleCreatePaymentIntent(body, partnerId!, ipAddress);
 
       case 'create-checkout-session':
         return handleCreateCheckoutSession(body, partnerId!);
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
         return handleDetachPaymentMethod(body, partnerId!);
 
       case 'charge-saved-payment-method':
-        return handleChargeSavedPaymentMethod(body, partnerId!);
+        return handleChargeSavedPaymentMethod(body, partnerId!, ipAddress);
 
       default:
         return NextResponse.json(
@@ -678,17 +679,24 @@ async function handleCreatePaymentIntent(
     platformUserId: string;
     email: string;
     name?: string;
+    phone?: string;
     pledgeId: string;
     projectId: string;
     statement_descriptor?: string;
     type?: string;
     originalPaymentId?: string;
+    billingAddress?: {
+      line1?: string;
+      postal_code?: string;
+      country?: string;
+    };
   },
-  partnerId: string
+  partnerId: string,
+  ipAddress: string,
 ) {
   const {
     amount, currency = 'usd', platformUserId, email, pledgeId, projectId,
-    statement_descriptor, type, originalPaymentId,
+    statement_descriptor, type, originalPaymentId, name, phone, billingAddress,
   } = body;
 
   // Validate required fields
@@ -707,6 +715,36 @@ async function handleCreatePaymentIntent(
   }
 
   const isUpcharge = type === 'upcharge';
+
+  // Chargeback ban prefilter — runs at every create-payment-intent so a
+  // banned user can't slip through under a new email by re-using their
+  // card / IP / billing identity. Only fires for partners listed in the
+  // CHARGEBACK_BAN_PARTNER_SLUGS config; in log_only mode (default) it
+  // never blocks, just audits. Card-fingerprint identifier isn't
+  // available at this point — that's caught on the off-session path or
+  // by the same prefilter rerunning at PI confirm via a webhook hook.
+  const prefilter = await runPrefilter({
+    partnerId,
+    attemptedAction: 'create-payment-intent',
+    attempt: {
+      email,
+      phone: phone ?? null,
+      billingName: name ?? null,
+      billingAddress: billingAddress ?? null,
+      ipAddress,
+    },
+    amountCents: amount,
+    currency,
+    platformUserId,
+    pledgeId,
+    billingPostal: billingAddress?.postal_code ?? null,
+  });
+  if (prefilter.decision === 'HARD_BLOCK') {
+    return NextResponse.json(
+      { ...HARD_BLOCK_RESPONSE, matched_signals: prefilter.matchedSignals },
+      { status: 402 },
+    );
+  }
 
   try {
     const stripe = await getStripeClient();
@@ -814,6 +852,7 @@ async function handleCreatePaymentIntent(
       paymentIntentId: paymentIntent.id,
       publishableKey: stripeConfig.publishableKey,
       amount,
+      ...(prefilter.softFlags.length > 0 ? { soft_flags: prefilter.softFlags } : {}),
     });
   } catch (error) {
     logger.error('Failed to create payment intent', { error, partnerId, platformUserId, amount });
@@ -1311,6 +1350,7 @@ async function handleChargeSavedPaymentMethod(
     description?: string;
   },
   partnerId: string,
+  ipAddress: string,
 ) {
   const {
     platformUserId,
@@ -1368,6 +1408,45 @@ async function handleChargeSavedPaymentMethod(
       );
     }
 
+    // Off-session prefilter — same rules as on-session, but here we
+    // also have the saved card's fingerprint and billing details, so
+    // the matcher gets full coverage. Per the spec, IndieCrowdfund's
+    // chargeback policy applies to upcharges and modifications too.
+    const cardFp =
+      pm.card?.fingerprint ?? null;
+    const billingAddr = pm.billing_details?.address ?? null;
+    const prefilter = await runPrefilter({
+      partnerId,
+      attemptedAction: 'charge-saved-payment-method',
+      attempt: {
+        email: dcUser.email,
+        billingName: pm.billing_details?.name ?? null,
+        billingAddress: billingAddr
+          ? {
+              line1: billingAddr.line1 ?? null,
+              postal_code: billingAddr.postal_code ?? null,
+              country: billingAddr.country ?? null,
+            }
+          : null,
+        cardFingerprint: cardFp,
+        ipAddress,
+        phone: pm.billing_details?.phone ?? null,
+      },
+      amountCents: amount,
+      currency,
+      platformUserId,
+      pledgeId,
+      cardLast4: pm.card?.last4 ?? null,
+      cardBrand: pm.card?.brand ?? null,
+      billingPostal: billingAddr?.postal_code ?? null,
+    });
+    if (prefilter.decision === 'HARD_BLOCK') {
+      return NextResponse.json(
+        { ...HARD_BLOCK_RESPONSE, matched_signals: prefilter.matchedSignals },
+        { status: 402 },
+      );
+    }
+
     const intentMetadata: Record<string, string> = {
       type: 'partner_payment',
       partnerId,
@@ -1422,6 +1501,7 @@ async function handleChargeSavedPaymentMethod(
       status: paymentIntent.status,
       paymentIntentId: paymentIntent.id,
       amount,
+      ...(prefilter.softFlags.length > 0 ? { soft_flags: prefilter.softFlags } : {}),
     });
   } catch (error) {
     // Stripe surfaces declines and 3DS-required cases as exceptions on confirm.
