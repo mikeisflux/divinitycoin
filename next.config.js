@@ -4,6 +4,14 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // pdfkit ships its standard-14 font metrics as .afm data files and
+  // loads them from disk at runtime. Next's bundler doesn't trace these
+  // (they're read via a runtime path, not a static import), so the
+  // dispute-evidence PDF route 500s with ENOENT on Helvetica.afm unless
+  // we explicitly include the pdfkit data dir in that route's bundle.
+  outputFileTracingIncludes: {
+    '/api/admin/disputes/bundle': ['./node_modules/pdfkit/js/data/**/*'],
+  },
   // Note: Next.js 14.0 doesn't support `experimental.serverActions.allowedOrigins`.
   // Same-origin enforcement is handled at nginx: the proxy sets
   // `Origin: $scheme://$host` so the framework's origin-vs-host check passes.

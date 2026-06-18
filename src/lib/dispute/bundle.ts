@@ -4,9 +4,27 @@
 
 import PDFDocument from 'pdfkit';
 import JSZip from 'jszip';
+import path from 'path';
+import fs from 'fs';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getStripeClient } from '@/lib/stripe';
+
+// pdfkit's built-in standard-14 fonts (Helvetica etc.) are loaded from
+// .afm metric files relative to pdfkit's __dirname, which doesn't survive
+// Next's server bundling (ENOENT on Helvetica.afm at runtime). To avoid
+// that entirely we register vendored TrueType fonts (Liberation Sans,
+// metric-compatible with Helvetica/Arial, OFL-licensed) by absolute path.
+// fontkit parses + embeds the TTF, so no .afm lookup ever happens.
+const FONT_DIR = path.join(process.cwd(), 'src/lib/dispute/fonts');
+const FONTS = {
+  regular: path.join(FONT_DIR, 'LiberationSans-Regular.ttf'),
+  bold: path.join(FONT_DIR, 'LiberationSans-Bold.ttf'),
+  italic: path.join(FONT_DIR, 'LiberationSans-Italic.ttf'),
+};
+// Logical names used throughout the PDF builders. Mapped to the vendored
+// TTFs at document creation in pdfBuffer().
+const F = { regular: 'body', bold: 'body-bold', italic: 'body-italic' } as const;
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -200,14 +218,14 @@ function formatDate(d: Date | null): string {
 
 function fieldRow(doc: PDFKit.PDFDocument, label: string, value: string) {
   const startX = doc.x;
-  doc.font('Helvetica-Bold').fontSize(9).text(label, { continued: true });
-  doc.font('Helvetica').fontSize(9).text(`  ${value}`);
+  doc.font(F.bold).fontSize(9).text(label, { continued: true });
+  doc.font(F.regular).fontSize(9).text(`  ${value}`);
   doc.x = startX;
 }
 
 function sectionHeader(doc: PDFKit.PDFDocument, title: string) {
   doc.moveDown(0.8);
-  doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000').text(title);
+  doc.font(F.bold).fontSize(11).fillColor('#000000').text(title);
   doc.moveTo(doc.x, doc.y + 2).lineTo(doc.x + 495, doc.y + 2)
     .strokeColor('#cccccc').lineWidth(0.5).stroke();
   doc.moveDown(0.4);
@@ -216,7 +234,19 @@ function sectionHeader(doc: PDFKit.PDFDocument, title: string) {
 function pdfBuffer(build: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
+    // font: false prevents pdfkit from eagerly initializing the built-in
+    // Helvetica AFM (which would ENOENT). We register our own fonts and
+    // set the default before any text is drawn.
+    const doc = new PDFDocument({ size: 'LETTER', margin: 50, font: false as never });
+    try {
+      doc.registerFont(F.regular, fs.readFileSync(FONTS.regular));
+      doc.registerFont(F.bold, fs.readFileSync(FONTS.bold));
+      doc.registerFont(F.italic, fs.readFileSync(FONTS.italic));
+      doc.font(F.regular);
+    } catch (err) {
+      reject(err);
+      return;
+    }
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
@@ -230,12 +260,12 @@ function pdfBuffer(build: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
 export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
   return pdfBuffer((doc) => {
     // Header
-    doc.fillColor('#2563eb').fontSize(20).font('Helvetica-Bold').text('Divinity Payments', { align: 'left' });
-    doc.fontSize(9).fillColor('#666666').font('Helvetica').text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com');
+    doc.fillColor('#2563eb').fontSize(20).font(F.bold).text('Divinity Payments', { align: 'left' });
+    doc.fontSize(9).fillColor('#666666').font(F.regular).text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com');
     doc.moveDown(0.5);
 
-    doc.fillColor('#000000').fontSize(16).font('Helvetica-Bold').text('Transaction Receipt', { align: 'left' });
-    doc.fontSize(9).fillColor('#666666').font('Helvetica').text(
+    doc.fillColor('#000000').fontSize(16).font(F.bold).text('Transaction Receipt', { align: 'left' });
+    doc.fontSize(9).fillColor('#666666').font(F.regular).text(
       `Generated ${formatDate(new Date())}   ·   Receipt #${ev.paymentIntentId ?? ev.internalId}`,
     );
     doc.fillColor('#000000');
@@ -278,14 +308,14 @@ export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
       fieldRow(doc, 'Redeemed by partner user ID:', ev.giftCard.redeemedByPlatformUserId ?? '—');
       fieldRow(doc, 'Redeemed by email:', ev.giftCard.redeemedByEmail ?? '—');
     } else {
-      doc.font('Helvetica').fontSize(9).fillColor('#666666').text('No gift card record found for this transaction.');
+      doc.font(F.regular).fontSize(9).fillColor('#666666').text('No gift card record found for this transaction.');
       doc.fillColor('#000000');
     }
 
     // Capture(s)
     if (ev.captures.length > 0) {
       sectionHeader(doc, 'Partner-Side Credit Capture(s)');
-      doc.font('Helvetica').fontSize(9).text(
+      doc.font(F.regular).fontSize(9).text(
         'Records of the partner platform consuming the credit balance on the ' +
         'cardholder’s behalf to fund a specific pledge.',
       );
@@ -302,7 +332,7 @@ export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
 
     // Footer
     doc.moveDown(1.5);
-    doc.fontSize(8).fillColor('#666666').font('Helvetica-Oblique').text(
+    doc.fontSize(8).fillColor('#666666').font(F.italic).text(
       'This receipt confirms that DivinityCoin processed the digital-credit ' +
       'purchase described above and that the credit was delivered and redeemed ' +
       'as recorded. DivinityCoin sells only digital prepaid credits; physical ' +
@@ -319,21 +349,21 @@ export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
 
 export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string): Promise<Buffer> {
   return pdfBuffer((doc) => {
-    doc.fillColor('#2563eb').fontSize(18).font('Helvetica-Bold').text('Divinity Payments');
-    doc.fillColor('#000000').fontSize(9).font('Helvetica').text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com · legal@divinitycoin.com');
+    doc.fillColor('#2563eb').fontSize(18).font(F.bold).text('Divinity Payments');
+    doc.fillColor('#000000').fontSize(9).font(F.regular).text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com · legal@divinitycoin.com');
     doc.moveDown(2);
 
-    doc.fontSize(14).font('Helvetica-Bold').text('Chargeback Response — Compelling Evidence');
+    doc.fontSize(14).font(F.bold).text('Chargeback Response — Compelling Evidence');
     doc.moveDown(0.5);
 
-    doc.fontSize(10).font('Helvetica');
+    doc.fontSize(10).font(F.regular);
     doc.text(`Re: Disputed transaction ${ev.paymentIntentId ?? ev.internalId}, ${formatMoney(ev.amountCents, ev.currency)}, ${formatDate(ev.createdAt).slice(0, 10)}.`);
     if (vrolCase) doc.text(`VROL Case Number: ${vrolCase}`);
     doc.moveDown(1);
 
-    doc.font('Helvetica-Bold').text('1. What was purchased from DivinityCoin.');
+    doc.font(F.bold).text('1. What was purchased from DivinityCoin.');
     doc.moveDown(0.2);
-    doc.font('Helvetica').text(
+    doc.font(F.regular).text(
       `DivinityCoin (merchant descriptor reflecting the partner platform "DIVCO-${ev.partner?.slug?.toUpperCase() ?? '<PARTNER>'}") is a seller of digital prepaid gift cards / credits. ` +
       `The cardholder did not purchase physical merchandise from DivinityCoin. The product purchased in this transaction was ${formatMoney(ev.amountCents, ev.currency)} in DivinityCoin Credits — a digital prepaid credit balance — generated specifically to fund a pledge the cardholder placed on the partner platform ${ev.partner?.name ?? '<partner>'} (${ev.partner?.slug ?? ''}.com)` +
       (ev.pledgeId ? `, via pledge ID ${ev.pledgeId}` : '') +
@@ -343,10 +373,10 @@ export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string):
     );
     doc.moveDown(0.8);
 
-    doc.font('Helvetica-Bold').text('2. DivinityCoin delivered the digital product in full.');
+    doc.font(F.bold).text('2. DivinityCoin delivered the digital product in full.');
     doc.moveDown(0.2);
     if (ev.giftCard) {
-      doc.font('Helvetica').text(
+      doc.font(F.regular).text(
         `DivinityCoin Credits in the amount of ${formatMoney(ev.amountCents, ev.currency)} were generated on ${formatDate(ev.createdAt)} under gift card record ${ev.giftCard.id} (Code last 4: ****${ev.giftCard.codeLast4 ?? '----'}). ` +
         (ev.giftCard.redeemedAt
           ? `The credits were redeemed in full on ${formatDate(ev.giftCard.redeemedAt)} on the ${ev.giftCard.redeemedOnPlatform ?? ev.partner?.slug + '.com'} partner platform by platform user ${ev.giftCard.redeemedByPlatformUserId ?? ev.platformUserId ?? '<user>'}. `
@@ -358,16 +388,16 @@ export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string):
         { align: 'justify' },
       );
     } else {
-      doc.font('Helvetica').text(
+      doc.font(F.regular).text(
         'Records of credit issuance for this transaction are attached as raw-evidence.json.',
         { align: 'justify' },
       );
     }
     doc.moveDown(0.8);
 
-    doc.font('Helvetica-Bold').text('3. The dispute concerns physical merchandise that is not — and could not be — supplied by DivinityCoin.');
+    doc.font(F.bold).text('3. The dispute concerns physical merchandise that is not — and could not be — supplied by DivinityCoin.');
     doc.moveDown(0.2);
-    doc.font('Helvetica').text(
+    doc.font(F.regular).text(
       'The cardholder’s stated grievance relates to physical merchandise pledged on a third-party crowdfunding partner platform. ' +
       'Physical fulfillment of pledged rewards is the responsibility of the project creator and the crowdfunding platform on which the pledge was placed. ' +
       'DivinityCoin is a gift card issuer and digital-credit seller and does not warehouse, ship, or otherwise fulfill physical merchandise. ' +
@@ -377,17 +407,17 @@ export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string):
     );
     doc.moveDown(0.8);
 
-    doc.font('Helvetica-Bold').text('4. Conclusion.');
+    doc.font(F.bold).text('4. Conclusion.');
     doc.moveDown(0.2);
-    doc.font('Helvetica').text(
+    doc.font(F.regular).text(
       `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably used that product on the partner platform the same business day. ` +
       'No DivinityCoin deliverable was withheld or undelivered. We respectfully request that the chargeback be reversed. DivinityCoin (DVCKS1 LLC) is a digital gift-card / prepaid-credit retailer; card processing is performed by Stripe Inc., our PCI-compliant payment processor.',
       { align: 'justify' },
     );
     doc.moveDown(1);
 
-    doc.font('Helvetica-Bold').text('Attachments included in this evidence bundle:');
-    doc.font('Helvetica').fontSize(9);
+    doc.font(F.bold).text('Attachments included in this evidence bundle:');
+    doc.font(F.regular).fontSize(9);
     doc.list([
       'receipt.pdf — formatted transaction receipt with delivery and redemption timeline',
       'raw-evidence.json — raw transaction record, gift card delivery + redemption record, partner-side credit capture record',
@@ -554,18 +584,18 @@ async function fetchStripeContext(paymentIntentId: string): Promise<StripeContex
 
 export function generateStripeContextPdf(ctx: StripeContextSummary): Promise<Buffer> {
   return pdfBuffer((doc) => {
-    doc.fillColor('#2563eb').fontSize(20).font('Helvetica-Bold').text('Divinity Payments');
-    doc.fillColor('#000000').fontSize(9).font('Helvetica').text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com');
+    doc.fillColor('#2563eb').fontSize(20).font(F.bold).text('Divinity Payments');
+    doc.fillColor('#000000').fontSize(9).font(F.regular).text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com');
     doc.moveDown(0.5);
-    doc.fontSize(16).font('Helvetica-Bold').text('Stripe Payment-Context Sheet');
-    doc.fontSize(9).fillColor('#666666').font('Helvetica').text(
+    doc.fontSize(16).font(F.bold).text('Stripe Payment-Context Sheet');
+    doc.fontSize(9).fillColor('#666666').font(F.regular).text(
       `Generated ${formatDate(new Date())}   ·   Sourced from Stripe API ${ctx.errorMessage ? '(LOOKUP FAILED)' : 'live'}`,
     );
     doc.fillColor('#000000');
 
     if (ctx.errorMessage) {
       doc.moveDown(1);
-      doc.fillColor('#dc2626').fontSize(10).font('Helvetica-Bold').text(`Stripe lookup error: ${ctx.errorMessage}`);
+      doc.fillColor('#dc2626').fontSize(10).font(F.bold).text(`Stripe lookup error: ${ctx.errorMessage}`);
       doc.fillColor('#000000');
     }
 
@@ -588,7 +618,7 @@ export function generateStripeContextPdf(ctx: StripeContextSummary): Promise<Buf
       fieldRow(doc, 'Card country:', ctx.card.country ?? '—');
       fieldRow(doc, 'Network:', ctx.card.network ?? '—');
     } else {
-      doc.font('Helvetica').fontSize(9).fillColor('#666666').text('No card details available from Stripe.');
+      doc.font(F.regular).fontSize(9).fillColor('#666666').text('No card details available from Stripe.');
       doc.fillColor('#000000');
     }
 
@@ -599,7 +629,7 @@ export function generateStripeContextPdf(ctx: StripeContextSummary): Promise<Buf
     fieldRow(doc, 'Stripe receipt URL:', ctx.receiptUrl ?? '—');
 
     doc.moveDown(1.5);
-    doc.fontSize(8).fillColor('#666666').font('Helvetica-Oblique').text(
+    doc.fontSize(8).fillColor('#666666').font(F.italic).text(
       'This sheet summarizes Stripe-side facts about the disputed PaymentIntent for ' +
       'cross-reference by the card issuer. The Stripe-hosted receipt for the ' +
       'cardholder is available at the Stripe receipt URL above; you can also ' +
@@ -675,15 +705,15 @@ and creator, not with DivinityCoin.
 
 export function generateTermsPdf(): Promise<Buffer> {
   return pdfBuffer((doc) => {
-    doc.fillColor('#2563eb').fontSize(20).font('Helvetica-Bold').text('Divinity Payments');
-    doc.fillColor('#000000').fontSize(9).font('Helvetica').text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com/terms');
+    doc.fillColor('#2563eb').fontSize(20).font(F.bold).text('Divinity Payments');
+    doc.fillColor('#000000').fontSize(9).font(F.regular).text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com/terms');
     doc.moveDown(0.5);
-    doc.fontSize(16).font('Helvetica-Bold').text('Terms of Service — chargeback-relevant excerpts');
-    doc.fontSize(9).fillColor('#666666').font('Helvetica').text(`Generated ${formatDate(new Date())} from divinitycoin.com/terms (last updated June 2026)`);
+    doc.fontSize(16).font(F.bold).text('Terms of Service — chargeback-relevant excerpts');
+    doc.fontSize(9).fillColor('#666666').font(F.regular).text(`Generated ${formatDate(new Date())} from divinitycoin.com/terms (last updated June 2026)`);
     doc.fillColor('#000000');
 
     sectionHeader(doc, 'Section 3 — Service Description');
-    doc.font('Helvetica').fontSize(10).text(
+    doc.font(F.regular).fontSize(10).text(
       'DivinityCoin provides a digital credit purchase service. Users can purchase ' +
       'credits that can be redeemed on partner platforms to support creators and ' +
       'content providers. We act as an intermediary between purchasers and partner ' +
@@ -692,8 +722,8 @@ export function generateTermsPdf(): Promise<Buffer> {
       { align: 'justify' },
     );
     doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').text('Nature of Our Product. ', { continued: true });
-    doc.font('Helvetica').text(
+    doc.font(F.bold).text('Nature of Our Product. ', { continued: true });
+    doc.font(F.regular).text(
       'DivinityCoin sells, exclusively, digital prepaid credits. We do not sell, ' +
       'manufacture, ship, deliver, warehouse, or otherwise fulfill any physical ' +
       'merchandise, tangible goods, services, rewards, experiences, or other ' +
@@ -714,7 +744,7 @@ export function generateTermsPdf(): Promise<Buffer> {
     );
 
     sectionHeader(doc, 'Section 6 — Redemption');
-    doc.font('Helvetica').fontSize(10).text(
+    doc.font(F.regular).fontSize(10).text(
       'Credits are redeemed on partner platforms according to their respective ' +
       'terms and conditions. DivinityCoin is not responsible for the services, ' +
       'content, availability, or policies of partner platforms. Once credits are ' +
@@ -723,8 +753,8 @@ export function generateTermsPdf(): Promise<Buffer> {
       { align: 'justify' },
     );
     doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').text('Physical Merchandise, Rewards, and Services. ', { continued: true });
-    doc.font('Helvetica').text(
+    doc.font(F.bold).text('Physical Merchandise, Rewards, and Services. ', { continued: true });
+    doc.font(F.regular).text(
       'Any physical merchandise, tangible goods, services, experiences, rewards, ' +
       'perks, or other non-credit deliverables offered, advertised, pledged, or ' +
       'promised through a partner platform (including but not limited to ' +
@@ -746,7 +776,7 @@ export function generateTermsPdf(): Promise<Buffer> {
     );
 
     doc.moveDown(1);
-    doc.fontSize(8).fillColor('#666666').font('Helvetica-Oblique').text(
+    doc.fontSize(8).fillColor('#666666').font(F.italic).text(
       'Full Terms of Service available at https://divinitycoin.com/terms. ' +
       'DivinityCoin is operated by DVCKS1 LLC, an Indiana limited liability company.',
       { align: 'justify' },
