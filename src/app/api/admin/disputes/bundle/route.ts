@@ -83,12 +83,12 @@ export async function GET(request: NextRequest) {
       logger.warn('Failed to upsert DisputeCase record', { error: logErr, id });
     }
 
-    return new NextResponse(result.zip, {
+    return new NextResponse(result.pdf, {
       status: 200,
       headers: {
-        'Content-Type': 'application/zip',
+        'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${result.filename}"`,
-        'Content-Length': result.zip.length.toString(),
+        'Content-Length': result.pdf.length.toString(),
         'Cache-Control': 'no-store',
       },
     });

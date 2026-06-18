@@ -252,30 +252,33 @@ export default function DisputesPage() {
           </div>
         </div>
 
-        {/* Right: what's in the bundle */}
+        {/* Right: what's in the PDF */}
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-3">What&apos;s in the zip</h3>
+            <h3 className="text-sm font-semibold text-neutral-900 mb-1">What&apos;s in the PDF</h3>
+            <p className="text-xs text-neutral-500 mb-3">
+              One consolidated PDF — most dispute portals only accept a single uploaded file.
+            </p>
             <ul className="text-sm text-neutral-600 space-y-2.5">
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded shrink-0 self-start">PDF</span>
-                <span><strong>receipt.pdf</strong> — formatted, time-stamped receipt with delivery and redemption timeline.</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P1</span>
+                <span><strong>Transaction Receipt</strong> — internal record of credit issuance, delivery, and redemption timeline; partner-side capture.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded shrink-0 self-start">PDF</span>
-                <span><strong>response-letter.pdf</strong> — pre-filled chargeback response (compelling-evidence cover letter).</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P2</span>
+                <span><strong>Stripe Payment Context</strong> — pulled live from Stripe API: card brand, last 4, charge ID, balance transaction, receipt URL.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded shrink-0 self-start">JSON</span>
-                <span><strong>raw-evidence.json</strong> — every queryable field from our DB for that transaction.</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P3</span>
+                <span><strong>Compelling-Evidence Response</strong> — pre-filled chargeback response letter with this transaction&apos;s specifics.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded shrink-0 self-start">TXT</span>
-                <span><strong>terms-snippet.txt</strong> — the chargeback-relevant sections of our Terms of Service.</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P4</span>
+                <span><strong>Terms of Service Excerpts</strong> — sections 3 and 6, what the cardholder agreed to at checkout.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded shrink-0 self-start">MD</span>
-                <span><strong>INSTRUCTIONS.md</strong> — step-by-step submission guide for the Stripe dispute UI.</span>
+                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded shrink-0 self-start">APX</span>
+                <span><strong>Raw Evidence JSON</strong> — every queryable field from our DB plus the Stripe context object, in a code block at the end for field-level verification.</span>
               </li>
             </ul>
           </div>
@@ -285,7 +288,7 @@ export default function DisputesPage() {
             <ol className="space-y-1.5 list-decimal list-inside text-amber-900/90">
               <li>Paste the PI / transaction ID</li>
               <li>Hit generate</li>
-              <li>Open the zip, drag files into the Stripe dispute form per INSTRUCTIONS.md</li>
+              <li>Upload the PDF into the Stripe dispute&apos;s single &quot;evidence&quot; slot</li>
             </ol>
           </div>
         </div>

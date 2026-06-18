@@ -784,58 +784,394 @@ export function generateTermsPdf(): Promise<Buffer> {
   });
 }
 
-// ─── Bundle assembly ─────────────────────────────────────────────
+// ─── Consolidated single PDF ─────────────────────────────────────
+// One PDF containing every section (transaction summary, customer/
+// partner, credit delivery & redemption, partner-side capture, Stripe
+// payment context, chargeback response letter, ToS excerpts, raw
+// evidence JSON as a code-block appendix). Designed for dispute
+// portals that only accept a single uploaded file.
 
-export async function buildEvidenceBundle(
-  idOrPi: string,
+function partTitle(doc: PDFKit.PDFDocument, num: number, title: string) {
+  // Force a new page for each top-level part for clean section breaks.
+  if (num > 1) doc.addPage();
+  doc.moveDown(0.5);
+  doc.fillColor('#2563eb').fontSize(11).font(F.bold).text(`PART ${num}`);
+  doc.fillColor('#000000').fontSize(20).font(F.bold).text(title);
+  doc.moveTo(doc.x, doc.y + 2)
+    .lineTo(doc.x + 495, doc.y + 2)
+    .strokeColor('#2563eb').lineWidth(1).stroke();
+  doc.moveDown(0.8);
+}
+
+export function generateConsolidatedPdf(
+  ev: DisputeEvidenceData,
+  stripeCtx: StripeContextSummary | null,
   vrolCase?: string,
-): Promise<{ zip: Buffer; filename: string; evidence: DisputeEvidenceData } | null> {
-  const evidence = await gatherDisputeEvidence(idOrPi);
-  if (!evidence) return null;
+): Promise<Buffer> {
+  return pdfBuffer((doc) => {
+    // ── Cover page ──────────────────────────────────────────────
+    doc.fillColor('#2563eb').fontSize(28).font(F.bold).text('Divinity Payments', { align: 'center' });
+    doc.fillColor('#000000').fontSize(10).font(F.regular).text(
+      'DVCKS1 LLC dba DivinityCoin · divinitycoin.com · legal@divinitycoin.com',
+      { align: 'center' },
+    );
+    doc.moveDown(4);
+    doc.fontSize(24).font(F.bold).text('Chargeback Evidence Packet', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(11).font(F.regular).fillColor('#666666').text(
+      `Generated ${formatDate(new Date())}`,
+      { align: 'center' },
+    );
+    doc.fillColor('#000000');
 
-  // Pull Stripe-side context in parallel with PDF generation (only if
-  // we actually have a Stripe PaymentIntent id to look up).
-  const stripeCtxPromise = evidence.paymentIntentId
-    ? fetchStripeContext(evidence.paymentIntentId)
-    : Promise.resolve(null);
+    doc.moveDown(3);
+    // Quick-reference box
+    doc.font(F.bold).fontSize(11).text('At a glance');
+    doc.moveDown(0.3);
+    doc.font(F.regular).fontSize(10);
+    fieldRow(doc, 'Disputed transaction:', ev.paymentIntentId ?? ev.internalId);
+    fieldRow(doc, 'Amount:', formatMoney(ev.amountCents, ev.currency));
+    fieldRow(doc, 'Charge date:', formatDate(ev.createdAt).slice(0, 10));
+    fieldRow(doc, 'Cardholder email:', ev.email ?? '—');
+    fieldRow(doc, 'Partner platform:', ev.partner?.name ?? '—');
+    fieldRow(doc, 'Pledge ID:', ev.pledgeId ?? '—');
+    if (vrolCase) fieldRow(doc, 'VROL case number:', vrolCase);
+    fieldRow(doc, 'DC product sold:', 'Digital prepaid credit / gift card');
+    fieldRow(doc, 'Delivered & redeemed?', ev.giftCard?.redeemedAt ? `Yes, on ${formatDate(ev.giftCard.redeemedAt).slice(0, 10)}` : 'See Part 2');
 
-  const [receiptBuf, responseBuf, termsBuf, stripeCtx] = await Promise.all([
-    generateReceiptPdf(evidence),
-    generateResponsePdf(evidence, vrolCase),
-    generateTermsPdf(),
-    stripeCtxPromise,
-  ]);
-  const stripeCtxBuf = stripeCtx ? await generateStripeContextPdf(stripeCtx) : null;
+    doc.moveDown(3);
+    doc.fontSize(9).fillColor('#666666').font(F.italic).text(
+      'This single document consolidates every piece of evidence supporting the validity ' +
+      'of the disputed transaction. Each PART that follows can be cross-referenced ' +
+      'independently. The final Appendix contains the raw database record of the ' +
+      'transaction as machine-readable JSON for field-level verification.',
+      { align: 'justify' },
+    );
+    doc.fillColor('#000000');
 
-  const zip = new JSZip();
-  zip.file('INSTRUCTIONS.md', generateInstructions(evidence, vrolCase));
-  zip.file('receipt.pdf', receiptBuf);
-  zip.file('response-letter.pdf', responseBuf);
-  zip.file('terms-of-service.pdf', termsBuf);
-  if (stripeCtxBuf) zip.file('stripe-payment-context.pdf', stripeCtxBuf);
-  zip.file(
-    'raw-evidence.json',
-    JSON.stringify(
-      { vrolCase: vrolCase ?? null, evidence, stripeContext: stripeCtx },
+    doc.moveDown(2);
+    doc.font(F.bold).fontSize(10).text('Contents');
+    doc.moveDown(0.2);
+    doc.font(F.regular).fontSize(10);
+    const toc = [
+      'PART 1 · Transaction Receipt — DivinityCoin internal record of credit issuance and redemption.',
+      'PART 2 · Stripe Payment Context — Processor-side facts (card brand, last 4, charge id, balance txn).',
+      'PART 3 · Compelling-Evidence Response — Letter setting out why the transaction is valid.',
+      'PART 4 · Terms of Service — Chargeback-relevant excerpts the cardholder agreed to at checkout.',
+      'APPENDIX · Raw Evidence — JSON dump of every queryable field, for field-level verification.',
+    ];
+    toc.forEach((line) => {
+      doc.text(line, { indent: 10 });
+      doc.moveDown(0.15);
+    });
+
+    // ── PART 1: Receipt (transaction summary + delivery + redemption) ──
+    partTitle(doc, 1, 'Transaction Receipt');
+    doc.fontSize(9).fillColor('#666666').font(F.italic).text(
+      'DivinityCoin internal record of credit issuance, delivery, and ' +
+      'redemption for the disputed transaction.',
+    );
+    doc.fillColor('#000000');
+
+    sectionHeader(doc, 'Transaction Summary');
+    fieldRow(doc, 'Payment Intent ID:', ev.paymentIntentId ?? '(legacy: ' + ev.internalId + ')');
+    fieldRow(doc, 'Internal record ID:', ev.internalId);
+    fieldRow(doc, 'Amount:', `${formatMoney(ev.amountCents, ev.currency)} (${ev.amountCents} cents)`);
+    fieldRow(doc, 'Currency:', ev.currency.toUpperCase());
+    fieldRow(doc, 'Status:', ev.status);
+    fieldRow(doc, 'Created:', formatDate(ev.createdAt));
+    fieldRow(doc, 'Completed:', formatDate(ev.completedAt));
+
+    sectionHeader(doc, 'Cardholder / Customer');
+    fieldRow(doc, 'Email:', ev.email ?? '—');
+    fieldRow(doc, 'Platform User ID:', ev.platformUserId ?? '—');
+
+    if (ev.partner || ev.pledgeId) {
+      sectionHeader(doc, 'Partner Platform & Pledge');
+      fieldRow(doc, 'Partner:', ev.partner ? `${ev.partner.name}  (slug: ${ev.partner.slug})` : '—');
+      fieldRow(doc, 'Partner ID:', ev.partner?.id ?? '—');
+      fieldRow(doc, 'Pledge ID:', ev.pledgeId ?? '—');
+      fieldRow(doc, 'Project ID:', ev.projectId ?? '—');
+    }
+
+    sectionHeader(doc, 'Digital Credit Delivery & Redemption');
+    if (ev.giftCard) {
+      fieldRow(doc, 'Gift Card ID:', ev.giftCard.id);
+      fieldRow(doc, 'Code (last 4):', ev.giftCard.codeLast4 ? `****${ev.giftCard.codeLast4}` : '—');
+      fieldRow(doc, 'Amount:', formatMoney(Math.round(ev.giftCard.amount * 100), ev.currency));
+      fieldRow(doc, 'Status:', ev.giftCard.status);
+      fieldRow(doc, 'Purchased by email:', ev.giftCard.purchasedByEmail ?? '—');
+      fieldRow(doc, 'Activated at:', formatDate(ev.giftCard.activatedAt));
+      fieldRow(doc, 'Redeemed at:', formatDate(ev.giftCard.redeemedAt));
+      fieldRow(doc, 'Redeemed on partner platform:', ev.giftCard.redeemedOnPlatform ?? '—');
+      fieldRow(doc, 'Redeemed by partner user ID:', ev.giftCard.redeemedByPlatformUserId ?? '—');
+      fieldRow(doc, 'Redeemed by email:', ev.giftCard.redeemedByEmail ?? '—');
+    } else {
+      doc.font(F.regular).fontSize(9).fillColor('#666666').text('No gift card record found for this transaction.');
+      doc.fillColor('#000000');
+    }
+
+    if (ev.captures.length > 0) {
+      sectionHeader(doc, 'Partner-Side Credit Capture(s)');
+      doc.font(F.regular).fontSize(9).text(
+        'Records of the partner platform consuming the credit balance on the ' +
+        'cardholder’s behalf to fund a specific pledge.',
+      );
+      doc.moveDown(0.3);
+      ev.captures.forEach((c, i) => {
+        if (i > 0) doc.moveDown(0.3);
+        fieldRow(doc, `Capture #${i + 1} ID:`, c.id);
+        fieldRow(doc, '  Amount:', formatMoney(c.amountCents, ev.currency));
+        fieldRow(doc, '  Pledge ID:', c.pledgeId || '—');
+        fieldRow(doc, '  Project ID:', c.projectId || '—');
+        fieldRow(doc, '  Captured at:', formatDate(c.capturedAt));
+      });
+    }
+
+    // ── PART 2: Stripe payment context ──────────────────────────
+    partTitle(doc, 2, 'Stripe Payment Context');
+    doc.fontSize(9).fillColor('#666666').font(F.italic).text(
+      'Processor-side facts pulled live from the Stripe API at bundle ' +
+      'generation. Provides issuer cross-reference data: card brand, last 4, ' +
+      'charge ID, balance transaction, statement descriptor, receipt URL.',
+    );
+    doc.fillColor('#000000');
+
+    if (stripeCtx) {
+      if (stripeCtx.errorMessage) {
+        doc.moveDown(0.5);
+        doc.fillColor('#dc2626').fontSize(10).font(F.bold).text(`Stripe lookup error: ${stripeCtx.errorMessage}`);
+        doc.fillColor('#000000');
+      }
+      sectionHeader(doc, 'PaymentIntent');
+      fieldRow(doc, 'PaymentIntent ID:', stripeCtx.paymentIntentId);
+      fieldRow(doc, 'Status:', stripeCtx.status);
+      fieldRow(doc, 'Amount:', `${formatMoney(stripeCtx.amountCents, stripeCtx.currency)} (${stripeCtx.amountCents} cents)`);
+      fieldRow(doc, 'Currency:', stripeCtx.currency.toUpperCase());
+      fieldRow(doc, 'Created (Stripe):', formatDate(stripeCtx.createdAt));
+      fieldRow(doc, 'Live mode:', stripeCtx.livemode ? 'yes' : 'no (test)');
+      fieldRow(doc, 'Stripe customer ID:', stripeCtx.customerId ?? '—');
+      fieldRow(doc, 'Statement descriptor:', stripeCtx.statementDescriptor ?? '—');
+
+      sectionHeader(doc, 'Card Payment Method');
+      if (stripeCtx.card) {
+        fieldRow(doc, 'Brand:', stripeCtx.card.brand.toUpperCase());
+        fieldRow(doc, 'Last 4:', `****${stripeCtx.card.last4}`);
+        fieldRow(doc, 'Expiry:', `${String(stripeCtx.card.expMonth).padStart(2, '0')}/${stripeCtx.card.expYear}`);
+        fieldRow(doc, 'Funding:', stripeCtx.card.funding ?? '—');
+        fieldRow(doc, 'Card country:', stripeCtx.card.country ?? '—');
+        fieldRow(doc, 'Network:', stripeCtx.card.network ?? '—');
+      } else {
+        doc.font(F.regular).fontSize(9).fillColor('#666666').text('No card details available from Stripe.');
+        doc.fillColor('#000000');
+      }
+
+      sectionHeader(doc, 'Charge & Settlement');
+      fieldRow(doc, 'Charge ID:', stripeCtx.chargeId ?? '—');
+      fieldRow(doc, 'Balance transaction ID:', stripeCtx.balanceTransactionId ?? '—');
+      fieldRow(doc, 'Receipt email:', stripeCtx.receiptEmail ?? '—');
+      fieldRow(doc, 'Stripe receipt URL:', stripeCtx.receiptUrl ?? '—');
+    } else {
+      doc.font(F.regular).fontSize(10).fillColor('#666666').text(
+        'Stripe context not available — no PaymentIntent ID was associated with this transaction.',
+      );
+      doc.fillColor('#000000');
+    }
+
+    // ── PART 3: Compelling-evidence response letter ─────────────
+    partTitle(doc, 3, 'Compelling-Evidence Response');
+
+    doc.fontSize(10).font(F.regular).text(
+      `Re: Disputed transaction ${ev.paymentIntentId ?? ev.internalId}, ${formatMoney(ev.amountCents, ev.currency)}, ${formatDate(ev.createdAt).slice(0, 10)}.`,
+    );
+    if (vrolCase) doc.text(`VROL Case Number: ${vrolCase}`);
+    doc.moveDown(0.8);
+
+    doc.font(F.bold).text('1. What was purchased from DivinityCoin.');
+    doc.moveDown(0.2);
+    doc.font(F.regular).text(
+      `DivinityCoin (merchant descriptor reflecting the partner platform "DIVCO-${ev.partner?.slug?.toUpperCase() ?? '<PARTNER>'}") is a seller of digital prepaid gift cards / credits. ` +
+      `The cardholder did not purchase physical merchandise from DivinityCoin. The product purchased in this transaction was ${formatMoney(ev.amountCents, ev.currency)} in DivinityCoin Credits — a digital prepaid credit balance — generated specifically to fund a pledge the cardholder placed on the partner platform ${ev.partner?.name ?? '<partner>'} (${ev.partner?.slug ?? ''}.com)` +
+      (ev.pledgeId ? `, via pledge ID ${ev.pledgeId}` : '') +
+      (ev.projectId ? ` / project ID ${ev.projectId}` : '') +
+      '.',
+      { align: 'justify' },
+    );
+    doc.moveDown(0.8);
+
+    doc.font(F.bold).text('2. DivinityCoin delivered the digital product in full.');
+    doc.moveDown(0.2);
+    if (ev.giftCard) {
+      doc.font(F.regular).text(
+        `DivinityCoin Credits in the amount of ${formatMoney(ev.amountCents, ev.currency)} were generated on ${formatDate(ev.createdAt)} under gift card record ${ev.giftCard.id} (Code last 4: ****${ev.giftCard.codeLast4 ?? '----'}). ` +
+        (ev.giftCard.redeemedAt
+          ? `The credits were redeemed in full on ${formatDate(ev.giftCard.redeemedAt)} on the ${ev.giftCard.redeemedOnPlatform ?? ev.partner?.slug + '.com'} partner platform by platform user ${ev.giftCard.redeemedByPlatformUserId ?? ev.platformUserId ?? '<user>'}. `
+          : '') +
+        (ev.captures.length > 0
+          ? `The credit balance was then captured by the partner platform (CreditCapture record ${ev.captures[0].id}) on ${formatDate(ev.captures[0].capturedAt)} and applied to pledge ${ev.captures[0].pledgeId} / project ${ev.captures[0].projectId}. `
+          : '') +
+        'From a merchant-of-record perspective, DivinityCoin’s product — the digital prepaid credit / gift card balance — was sold, delivered, redeemed, and consumed without exception, the same business day as the original charge.',
+        { align: 'justify' },
+      );
+    }
+    doc.moveDown(0.8);
+
+    doc.font(F.bold).text('3. The dispute concerns physical merchandise that is not — and could not be — supplied by DivinityCoin.');
+    doc.moveDown(0.2);
+    doc.font(F.regular).text(
+      'The cardholder’s stated grievance relates to physical merchandise pledged on a third-party crowdfunding partner platform. ' +
+      'Physical fulfillment of pledged rewards is the responsibility of the project creator and the crowdfunding platform on which the pledge was placed. ' +
+      'DivinityCoin is a gift card issuer and digital-credit seller and does not warehouse, ship, or otherwise fulfill physical merchandise. ' +
+      'This is set out explicitly in our Terms of Service (sections 3 and 6 — reproduced in Part 4 of this document). ' +
+      'The proper channel for the cardholder’s complaint is the project creator and the partner platform’s backer-protection process, not the digital-credit transaction that DivinityCoin completed.',
+      { align: 'justify' },
+    );
+    doc.moveDown(0.8);
+
+    doc.font(F.bold).text('4. Conclusion.');
+    doc.moveDown(0.2);
+    doc.font(F.regular).text(
+      `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably used that product on the partner platform the same business day. ` +
+      'No DivinityCoin deliverable was withheld or undelivered. We respectfully request that the chargeback be reversed. DivinityCoin (DVCKS1 LLC) is a digital gift-card / prepaid-credit retailer; card processing is performed by Stripe Inc., our PCI-compliant payment processor.',
+      { align: 'justify' },
+    );
+
+    // ── PART 4: Terms of Service excerpts ───────────────────────
+    partTitle(doc, 4, 'Terms of Service — Chargeback-Relevant Excerpts');
+    doc.fontSize(9).fillColor('#666666').font(F.italic).text(
+      'Verbatim from divinitycoin.com/terms (last updated June 2026). These ' +
+      'are the sections the cardholder agreed to at checkout that govern ' +
+      'this transaction.',
+    );
+    doc.fillColor('#000000');
+
+    sectionHeader(doc, 'Section 3 — Service Description');
+    doc.font(F.regular).fontSize(10).text(
+      'DivinityCoin provides a digital credit purchase service. Users can purchase ' +
+      'credits that can be redeemed on partner platforms to support creators and ' +
+      'content providers. We act as an intermediary between purchasers and partner ' +
+      'platforms. The credits purchased through our Service function similarly to ' +
+      'gift cards or stored value cards under applicable Indiana and federal law.',
+      { align: 'justify' },
+    );
+    doc.moveDown(0.5);
+    doc.font(F.bold).text('Nature of Our Product. ', { continued: true });
+    doc.font(F.regular).text(
+      'DivinityCoin sells, exclusively, digital prepaid credits. We do not sell, ' +
+      'manufacture, ship, deliver, warehouse, or otherwise fulfill any physical ' +
+      'merchandise, tangible goods, services, rewards, experiences, or other ' +
+      'deliverables of any kind. Any physical merchandise, rewards, perks, ' +
+      'experiences, or services offered, advertised, pledged, or promised through, ' +
+      'on, or in connection with a partner platform — including but not limited to ' +
+      'crowdfunding rewards, backer perks, retail goods, digital downloads outside ' +
+      'the credit balance itself, subscriptions, or any creator-fulfilled deliverable ' +
+      '— are sold and fulfilled by that partner platform and/or the underlying ' +
+      'project creator, not by DivinityCoin.',
+      { align: 'justify' },
+    );
+
+    sectionHeader(doc, 'Section 6 — Redemption');
+    doc.font(F.regular).fontSize(10).text(
+      'Credits are redeemed on partner platforms according to their respective ' +
+      'terms and conditions. DivinityCoin is not responsible for the services, ' +
+      'content, availability, or policies of partner platforms. Once credits are ' +
+      'redeemed to a partner platform, any disputes regarding the use of those ' +
+      'credits must be resolved with the partner platform directly.',
+      { align: 'justify' },
+    );
+    doc.moveDown(0.5);
+    doc.font(F.bold).text('Physical Merchandise, Rewards, and Services. ', { continued: true });
+    doc.font(F.regular).text(
+      'Any physical merchandise, tangible goods, services, experiences, rewards, ' +
+      'perks, or other non-credit deliverables offered, advertised, pledged, or ' +
+      'promised through a partner platform (including but not limited to ' +
+      'crowdfunding pledges and backer rewards) are sold and fulfilled by the ' +
+      'partner platform and/or the underlying project creator, and not by ' +
+      'DivinityCoin. Any dispute, complaint, claim, or chargeback concerning ' +
+      'the non-delivery, late delivery, partial delivery, condition, quality, ' +
+      'shipping, fulfillment, cancellation, or non-performance of physical ' +
+      'merchandise, rewards, or services associated with a partner-platform ' +
+      'transaction must be pursued against the partner platform and/or the ' +
+      'project creator. The cardholder’s remedy for any such non-delivery is ' +
+      'with the partner platform and creator, not with DivinityCoin.',
+      { align: 'justify' },
+    );
+
+    // ── APPENDIX: Raw evidence JSON as a code block ────────────
+    doc.addPage();
+    doc.moveDown(0.5);
+    doc.fillColor('#2563eb').fontSize(11).font(F.bold).text('APPENDIX');
+    doc.fillColor('#000000').fontSize(20).font(F.bold).text('Raw Evidence (JSON)');
+    doc.moveTo(doc.x, doc.y + 2).lineTo(doc.x + 495, doc.y + 2)
+      .strokeColor('#2563eb').lineWidth(1).stroke();
+    doc.moveDown(0.8);
+    doc.fontSize(9).fillColor('#666666').font(F.italic).text(
+      'Machine-readable dump of every queryable field from our database for ' +
+      'this transaction, plus the live Stripe context object retrieved at ' +
+      'the time of generation. For field-level verification by the issuer.',
+    );
+    doc.fillColor('#000000');
+    doc.moveDown(0.8);
+
+    const raw = JSON.stringify(
+      { vrolCase: vrolCase ?? null, evidence: ev, stripeContext: stripeCtx },
       (key, value) => {
         if (value instanceof Date) return value.toISOString();
         if (typeof value === 'bigint') return value.toString();
         return value;
       },
       2,
-    ),
-  );
+    );
 
-  const buf = await zip.generateAsync({ type: 'nodebuffer' });
+    // Render JSON in a clearly-set-off code-block style. We don't
+    // register a monospaced font (pdfkit's built-in Courier AFM has the
+    // same Next-bundling problem as Helvetica), so we visually mark it
+    // as code with a light gray background and a small font instead.
+    const blockX = doc.x;
+    const blockY = doc.y;
+    const blockW = 500;
+    const lineHeight = 9;
+    const lines = raw.split('\n');
+    const blockH = lines.length * lineHeight + 12;
+    doc.rect(blockX, blockY, blockW, blockH).fillColor('#f5f5f5').fill();
+    doc.fillColor('#000000');
+    doc.font(F.regular).fontSize(7);
+    doc.text(raw, blockX + 6, blockY + 6, {
+      width: blockW - 12,
+      lineGap: 1,
+    });
+  });
+}
 
-  const filename = `dispute-evidence-${(evidence.paymentIntentId ?? evidence.internalId).replace(/[^a-zA-Z0-9_-]/g, '_')}.zip`;
+// ─── Bundle assembly ─────────────────────────────────────────────
+
+export async function buildEvidenceBundle(
+  idOrPi: string,
+  vrolCase?: string,
+): Promise<{ pdf: Buffer; filename: string; evidence: DisputeEvidenceData } | null> {
+  const evidence = await gatherDisputeEvidence(idOrPi);
+  if (!evidence) return null;
+
+  // Pull Stripe-side context (only if we have a PaymentIntent id), then
+  // generate the consolidated single PDF that contains every part —
+  // receipt, Stripe context, response letter, ToS excerpts, and the raw
+  // evidence JSON as a code-block appendix. Most issuer / processor
+  // dispute portals (incl. Stripe's) only accept a single uploaded file,
+  // so we deliver one file with clearly-titled sections rather than a
+  // zip of separate files.
+  const stripeCtx = evidence.paymentIntentId
+    ? await fetchStripeContext(evidence.paymentIntentId)
+    : null;
+  const pdf = await generateConsolidatedPdf(evidence, stripeCtx, vrolCase);
+
+  const filename = `dispute-evidence-${(evidence.paymentIntentId ?? evidence.internalId).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
 
   logger.info('Dispute evidence bundle generated', {
     paymentIntentId: evidence.paymentIntentId,
     internalId: evidence.internalId,
     source: evidence.source,
-    bundleSize: buf.length,
+    bundleSize: pdf.length,
   });
 
-  return { zip: buf, filename, evidence };
+  return { pdf, filename, evidence };
 }
