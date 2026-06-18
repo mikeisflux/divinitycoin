@@ -86,15 +86,14 @@ export async function gatherDisputeEvidence(
       pp.giftCardId
         ? prisma.giftCard.findUnique({ where: { id: pp.giftCardId } })
         : null,
-      prisma.creditCapture.findMany({
-        where: {
-          partnerId: pp.partnerId,
-          platformUserId: pp.platformUserId,
-          amount: pp.amount,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      }),
+      pp.holdId
+        ? prisma.creditCapture.findMany({
+            where: { holdId: pp.holdId },
+            include: { hold: { select: { pledgeId: true, projectId: true } } },
+            orderBy: { capturedAt: 'desc' },
+            take: 5,
+          })
+        : Promise.resolve([]),
     ]);
 
     return {
@@ -128,10 +127,10 @@ export async function gatherDisputeEvidence(
         : null,
       captures: captures.map((c) => ({
         id: c.id,
-        amountCents: c.amount,
-        pledgeId: c.pledgeId ?? '',
-        projectId: c.projectId ?? '',
-        capturedAt: c.createdAt,
+        amountCents: Math.round(Number(c.amount) * 100),
+        pledgeId: ('hold' in c && c.hold) ? c.hold.pledgeId : '',
+        projectId: c.projectId,
+        capturedAt: c.capturedAt,
       })),
     };
   }
