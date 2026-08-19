@@ -562,39 +562,40 @@ GET  /internal?action=captures`}</pre>
 
                   <div className="border-l-4 border-sky-400 bg-sky-50 p-4 rounded mb-4">
                     <p className="font-semibold text-neutral-900 mb-2 text-sm">
-                      Duplicate protection
+                      Retries and duplicate charges
                     </p>
                     <p className="text-neutral-700 text-sm mb-2">
-                      If an intent has already been opened for the same{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">pledgeId</code>{' '}
-                      and{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">amount</code>{' '}
-                      within the last <strong>10 minutes</strong>, that intent is
-                      returned instead of a second one being created, and the
-                      response carries{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">deduplicated: true</code>.
-                      Retrying after a timeout is therefore safe inside that
-                      window — you get the original{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">clientSecret</code>{' '}
-                      back rather than a duplicate charge.
+                      This endpoint does <strong>not</strong> deduplicate on its
+                      own. Every call opens a new PaymentIntent, because a single
+                      pledge legitimately carries more than one charge — a base
+                      pledge and an add-on upcharge minutes apart, often at the
+                      same amount. Collapsing those automatically would hand the
+                      backer the add-on for free.
                     </p>
                     <p className="text-neutral-700 text-sm mb-2">
-                      The match includes the amount, so a pledge modification —
-                      the same{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">pledgeId</code>{' '}
-                      at a new amount — is correctly treated as a new charge.
-                      Upcharges (<code className="font-mono text-xs bg-white px-1 rounded">type: &quot;upcharge&quot;</code>)
-                      are exempt entirely, since they are additional charges
-                      against a pledge that already has one.
+                      So if you retry after a timeout and don&apos;t know whether
+                      the first call went through, pass an{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">idempotencyKey</code>{' '}
+                      — any stable string you generate per intended charge, reused
+                      across retries of <em>that</em> charge:
+                    </p>
+                    <div className="bg-white p-3 rounded mb-2 overflow-x-auto">
+                      <pre className="text-xs">{`{ "pledgeId": "pledge_abc", "amount": 1000,
+  "idempotencyKey": "pledge_abc-base" }`}</pre>
+                    </div>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      Repeat the key and you get the original PaymentIntent back
+                      instead of a second charge, for 24 hours. Use a{' '}
+                      <em>different</em> key for a genuinely different charge on
+                      the same pledge — an add-on, an upcharge — or omit it
+                      entirely, which behaves exactly as this endpoint always has.
                     </p>
                     <p className="text-neutral-700 text-sm">
-                      Past 10 minutes the window closes and a repeat call{' '}
-                      <strong>will</strong> create a second intent. Use{' '}
+                      Reusing a key with different parameters is rejected by the
+                      processor rather than silently charging, so a mistake
+                      surfaces as an error. Past 24 hours the key expires; use{' '}
                       <code className="font-mono text-xs bg-white px-1 rounded">action=lookup-payment</code>{' '}
-                      to check before retrying. If we cannot reach the processor
-                      to verify an existing intent we return{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">503</code>{' '}
-                      rather than risk charging twice — retry the call.
+                      to check before retrying.
                     </p>
                   </div>
 
@@ -610,8 +611,11 @@ GET  /internal?action=captures`}</pre>
   "projectId": string,             // Required. Project ID
   "statement_descriptor": string,  // Optional. Max 22 chars (suffix on card statement)
   "type": "upcharge",              // Optional. Marks this as a pledge-modification charge
-  "originalPaymentId": string      // Optional. Required when type="upcharge"; the
+  "originalPaymentId": string,     // Optional. Required when type="upcharge"; the
                                    //   paymentIntentId of the original pledge payment
+  "idempotencyKey": string         // Optional. 1-64 chars [A-Za-z0-9._:-]. Repeat it to
+                                   //   retry a charge safely; use a distinct value for a
+                                   //   genuinely separate charge on the same pledge.
 }`}</pre>
                   </div>
 
@@ -622,8 +626,7 @@ GET  /internal?action=captures`}</pre>
   "clientSecret": "pi_3Abc..._secret_xyz",
   "paymentIntentId": "pi_3Abc...",
   "publishableKey": "pk_live_...",
-  "amount": 2500,
-  "deduplicated": true    // Only present when an existing intent was returned
+  "amount": 2500
 }`}</pre>
                   </div>
                 </CardContent>

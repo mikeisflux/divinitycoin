@@ -675,15 +675,6 @@ async function handleCapture(body: { pledgeId: string }, ipAddress: string) {
  * Returns client_secret for Stripe Elements and publishable key
  * Supports type: "upcharge" for pledge modification additional charges
  */
-/**
- * How long after opening a PaymentIntent a second create-payment-intent call
- * for the same partner + pledge + amount is treated as a duplicate rather than
- * a new charge. Long enough to cover a partner retrying after a timeout and a
- * backer double-tapping Pay; short enough that a deliberate second purchase of
- * the same item later in the day still goes through.
- */
-const DUPLICATE_INTENT_WINDOW_MS = 10 * 60 * 1000;
-
 async function handleCreatePaymentIntent(
   body: {
     amount: number;
@@ -697,6 +688,7 @@ async function handleCreatePaymentIntent(
     statement_descriptor?: string;
     type?: string;
     originalPaymentId?: string;
+    idempotencyKey?: string;
     billingAddress?: {
       line1?: string;
       postal_code?: string;
@@ -709,6 +701,7 @@ async function handleCreatePaymentIntent(
   const {
     amount, currency = 'usd', platformUserId, email, pledgeId, projectId,
     statement_descriptor, type, originalPaymentId, name, phone, billingAddress,
+    idempotencyKey,
   } = body;
 
   // Validate required fields
@@ -724,6 +717,15 @@ async function handleCreatePaymentIntent(
       { error: 'Amount must be positive' },
       { status: 400 }
     );
+  }
+
+  if (idempotencyKey !== undefined) {
+    if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,64}$/.test(idempotencyKey)) {
+      return NextResponse.json(
+        { error: 'idempotencyKey must be 1-64 chars of [A-Za-z0-9._:-]' },
+        { status: 400 },
+      );
+    }
   }
 
   const isUpcharge = type === 'upcharge';
@@ -761,84 +763,6 @@ async function handleCreatePaymentIntent(
   try {
     const stripe = await getStripeClient();
     const stripeConfig = await getStripeConfig();
-
-    // Duplicate-charge guard. Unlike the saved-card path, this endpoint sends
-    // no Stripe idempotency key, so a partner retrying after a timeout — or a
-    // backer double-tapping Pay — opens a second PaymentIntent and the card is
-    // charged twice. That is exactly how pledge cmpm2qnri00mwh36vkmga6zgj was
-    // billed $10.00 twice, three minutes apart.
-    //
-    // A Stripe idempotency key is the wrong instrument here: pledge
-    // modifications legitimately reuse a pledgeId at a different amount, and
-    // Stripe caches a key's result for 24 hours, so a genuine second checkout
-    // a day later would replay a stale intent. Instead, if we already opened
-    // an intent for the same partner + pledge + amount inside a short window,
-    // hand that one back rather than opening another.
-    //
-    // Deliberately not applied to upcharges: an upcharge is an *additional*
-    // charge against a pledge that already has one, so a same-amount upcharge
-    // must not collapse into the original.
-    if (!isUpcharge) {
-      const recent = await prisma.pendingPartnerPayment.findFirst({
-        where: {
-          partnerId,
-          pledgeId,
-          amount,
-          status: 'PENDING',
-          createdAt: { gte: new Date(Date.now() - DUPLICATE_INTENT_WINDOW_MS) },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (recent) {
-        let existing: Awaited<ReturnType<typeof stripe.paymentIntents.retrieve>>;
-        try {
-          existing = await stripe.paymentIntents.retrieve(recent.paymentIntentId);
-        } catch (err) {
-          // We can't tell whether the intent already opened for this pledge
-          // was paid. Opening a second one is precisely how the double charge
-          // happened, so refuse and let the caller retry rather than guess.
-          logger.error('Duplicate guard could not reach Stripe', {
-            error: err,
-            paymentIntentId: recent.paymentIntentId,
-            partnerId,
-            pledgeId,
-          });
-          return NextResponse.json(
-            {
-              error:
-                'Could not verify an existing payment for this pledge. Retry shortly.',
-            },
-            { status: 503 },
-          );
-        }
-
-        // A canceled intent is dead and was never captured, so a fresh one is
-        // safe. Every other state is returned as-is: still payable (including
-        // after a decline, where the same intent is meant to be retried),
-        // processing, or already succeeded behind a lagging webhook.
-        if (existing.status !== 'canceled') {
-          logger.info('Returning existing payment intent for duplicate request', {
-            paymentIntentId: existing.id,
-            stripeStatus: existing.status,
-            partnerId,
-            pledgeId,
-            amount,
-            ageMs: Date.now() - recent.createdAt.getTime(),
-          });
-
-          return NextResponse.json({
-            success: true,
-            clientSecret: existing.client_secret,
-            paymentIntentId: existing.id,
-            publishableKey: stripeConfig.publishableKey,
-            amount,
-            deduplicated: true,
-            ...(prefilter.softFlags.length > 0 ? { soft_flags: prefilter.softFlags } : {}),
-          });
-        }
-      }
-    }
 
     // Find or create DC user for this platformUserId.
     // Use upsert so two concurrent requests can't both pass a "not found"
@@ -900,21 +824,40 @@ async function handleCreatePaymentIntent(
       intentMetadata.originalPaymentId = originalPaymentId;
     }
 
-    // Create Stripe PaymentIntent with metadata for webhook processing
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
-      customer: stripeCustomerId,
-      metadata: intentMetadata,
-      statement_descriptor_suffix: statement_descriptor?.substring(0, 22), // Max 22 chars; suffix required for card payments
-      automatic_payment_methods: {
-        enabled: true,
+    // Opt-in idempotency. This endpoint deliberately does NOT deduplicate on
+    // its own: a pledge legitimately carries several distinct charges — a base
+    // pledge and an add-on upcharge minutes apart, at the same amount — and
+    // any implicit same-pledge-same-amount rule would silently collapse the
+    // second one, handing the backer the add-on for free. Only the caller
+    // knows whether a second call is a retry or a new purchase, so only the
+    // caller can say so, by repeating the key it used the first time.
+    //
+    // Omitted, behaviour is byte-identical to before. Supplied, Stripe returns
+    // the original PaymentIntent instead of opening another; it rejects reuse
+    // of a key with different parameters, so a mistake surfaces as an error
+    // rather than a surprise charge.
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount,
+        currency,
+        customer: stripeCustomerId,
+        metadata: intentMetadata,
+        statement_descriptor_suffix: statement_descriptor?.substring(0, 22), // Max 22 chars; suffix required for card payments
+        automatic_payment_methods: {
+          enabled: true,
+        },
       },
-    });
+      idempotencyKey
+        ? { idempotencyKey: `create-pi-${partnerId}-${pledgeId}-${idempotencyKey}` }
+        : undefined,
+    );
 
-    // Store pending payment mapping
-    await prisma.pendingPartnerPayment.create({
-      data: {
+    // Store pending payment mapping. Upsert rather than create: when Stripe
+    // replays an intent for a repeated idempotencyKey we already hold the row,
+    // and paymentIntentId is unique, so a create would throw.
+    await prisma.pendingPartnerPayment.upsert({
+      where: { paymentIntentId: paymentIntent.id },
+      create: {
         paymentIntentId: paymentIntent.id,
         partnerId,
         platformUserId,
@@ -925,6 +868,7 @@ async function handleCreatePaymentIntent(
         email,
         status: 'PENDING',
       },
+      update: {},
     });
 
     logger.info('Partner payment intent created', {
@@ -1589,8 +1533,9 @@ async function handleChargeSavedPaymentMethod(
       { idempotencyKey: stripeIdempotencyKey },
     );
 
-    await prisma.pendingPartnerPayment.create({
-      data: {
+    await prisma.pendingPartnerPayment.upsert({
+      where: { paymentIntentId: paymentIntent.id },
+      create: {
         paymentIntentId: paymentIntent.id,
         partnerId,
         platformUserId,
@@ -1601,6 +1546,10 @@ async function handleChargeSavedPaymentMethod(
         email: dcUser.email,
         status: paymentIntent.status === 'succeeded' ? 'COMPLETED' : 'PENDING',
       },
+      // Stripe replays the original intent when the derived key repeats, so
+      // the row can already exist; paymentIntentId is unique and a create
+      // would throw on an otherwise successful retry.
+      update: {},
     });
 
     logger.info('Saved payment method charged', {
