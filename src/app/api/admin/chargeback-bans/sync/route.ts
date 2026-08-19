@@ -49,13 +49,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await syncBanFeed({ partnerId: partner.id, feedUrl, feedToken });
+    // An empty feed snapshot soft-deletes every active signal for the
+    // partner, so the cron refuses it. An admin can opt in here when the
+    // partner really has cleared their ban list.
+    const allowEmptySnapshot = body?.allowEmptySnapshot === true;
+
+    const result = await syncBanFeed({
+      partnerId: partner.id,
+      feedUrl,
+      feedToken,
+      allowEmptySnapshot,
+    });
     await logAdminAction(
       admin.id,
       'CHARGEBACK_BAN_FEED_SYNC',
       'partner',
       partner.id,
-      { ok: result.ok, total: result.signalsTotal },
+      { ok: result.ok, total: result.signalsTotal, allowEmptySnapshot },
       getClientIP(request),
       getUserAgent(request),
     );

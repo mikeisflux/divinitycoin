@@ -60,38 +60,160 @@ export interface SyncResult {
  * Pull the live feed and merge it into our local cache for `partnerId`.
  * Caller provides feed URL + bearer token (loaded from getConfig).
  */
-export async function syncBanFeed(args: {
-  partnerId: string;
-  feedUrl: string;
-  feedToken: string;
-}): Promise<SyncResult> {
-  const { partnerId, feedUrl, feedToken } = args;
-  const run = await prisma.chargebackBanFeedSync.create({
-    data: { partnerId },
-  });
+/**
+ * Per-attempt budget. The cron runs every 5 minutes, so we can afford to
+ * wait longer than a user-facing request would — a feed that takes 12
+ * seconds is slow, not broken, and timing it out costs us the whole cycle.
+ */
+const FEED_TIMEOUT_MS = 15_000;
 
+/** Attempts per sync, including the first. Backoff between them below. */
+const FEED_MAX_ATTEMPTS = 3;
+const FEED_RETRY_DELAY_MS = [1_000, 3_000];
+
+/** Errors worth retrying: the far end was unreachable, slow, or transiently
+ *  broken. A 4xx or an HTML body is a configuration fault — retrying just
+ *  repeats it, so those fail fast. */
+class TransientFeedError extends Error {}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * One fetch attempt. Throws TransientFeedError for anything a retry might
+ * fix, and a plain Error for faults that need a human.
+ */
+async function fetchFeedOnce(feedUrl: string, feedToken: string): Promise<FeedResponse> {
+  let res: Response;
   try {
-    const res = await fetch(feedUrl, {
+    res = await fetch(feedUrl, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${feedToken}`,
         Accept: 'application/json',
       },
-      // Standard 10-second budget — the feed runs every 5 minutes so
-      // a slow response shouldn't block forever.
-      signal: AbortSignal.timeout(10_000),
+      // Do NOT follow redirects. A feed URL that 302s to a login or
+      // marketing page yields a 200 with an HTML body, which used to
+      // surface as an unreadable `Unexpected token '<'` JSON parse error.
+      // Failing on the redirect names the actual problem instead.
+      redirect: 'manual',
+      signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
     });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new TransientFeedError(`GET ${feedUrl} failed: ${msg}`);
+  }
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`Feed responded ${res.status}: ${errText.slice(0, 200)}`);
+  if (res.status >= 300 && res.status < 400) {
+    throw new Error(
+      `Feed redirected (${res.status}) to ${res.headers.get('location') ?? 'unknown'} — ` +
+        `${feedUrl} is probably not the API endpoint, or the token was rejected ` +
+        `and the far end bounced us to a login page`,
+    );
+  }
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    const detail = `Feed ${feedUrl} responded ${res.status}: ${errText.slice(0, 200)}`;
+    // 5xx and 429 are the far end having a bad moment; 4xx is ours to fix.
+    if (res.status >= 500 || res.status === 429) throw new TransientFeedError(detail);
+    throw new Error(detail);
+  }
+
+  // Check the content type before parsing. A 200 carrying HTML means we
+  // reached a web page rather than the API, and the JSON parse error alone
+  // ("Unexpected token '<'") says nothing about which URL or what came back.
+  const contentType = res.headers.get('content-type') ?? '';
+  const raw = await res.text();
+  if (!contentType.includes('json')) {
+    throw new Error(
+      `Feed ${feedUrl} returned content-type "${contentType || 'none'}" ` +
+        `instead of JSON. First 200 bytes: ${raw.slice(0, 200).replace(/\s+/g, ' ')}`,
+    );
+  }
+
+  let body: FeedResponse;
+  try {
+    body = JSON.parse(raw) as FeedResponse;
+  } catch {
+    throw new Error(
+      `Feed ${feedUrl} returned unparseable JSON. ` +
+        `First 200 bytes: ${raw.slice(0, 200).replace(/\s+/g, ' ')}`,
+    );
+  }
+
+  if (!body || !Array.isArray(body.signals)) {
+    throw new Error(`Feed ${feedUrl} response missing signals[]`);
+  }
+
+  return body;
+}
+
+/**
+ * Fetch with a bounded retry. A single blip used to cost the entire 5-minute
+ * cycle; the ban cache then sat stale until the next tick.
+ */
+async function fetchFeedSnapshot(
+  feedUrl: string,
+  feedToken: string,
+  partnerId: string,
+): Promise<FeedResponse> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= FEED_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetchFeedOnce(feedUrl, feedToken);
+    } catch (err) {
+      lastError = err;
+      if (!(err instanceof TransientFeedError) || attempt === FEED_MAX_ATTEMPTS) throw err;
+      logger.warn('Chargeback ban feed attempt failed, retrying', {
+        partnerId,
+        feedUrl,
+        attempt,
+        of: FEED_MAX_ATTEMPTS,
+        error: err.message,
+      });
+      await sleep(FEED_RETRY_DELAY_MS[attempt - 1] ?? 3_000);
     }
-    const body = (await res.json()) as FeedResponse;
-    if (!body || !Array.isArray(body.signals)) {
-      throw new Error('Feed response missing signals[]');
-    }
+  }
+  throw lastError;
+}
+
+export async function syncBanFeed(args: {
+  partnerId: string;
+  feedUrl: string;
+  feedToken: string;
+  /**
+   * Permit a snapshot that removes every active signal. Off for the cron:
+   * a partner endpoint that breaks into returning `{"signals": []}` would
+   * otherwise silently soft-delete the whole local ban cache, and we would
+   * log it as a successful sync. An admin running a manual sync can opt in
+   * when the partner really has unbanned everyone.
+   */
+  allowEmptySnapshot?: boolean;
+}): Promise<SyncResult> {
+  const { partnerId, feedUrl, feedToken, allowEmptySnapshot = false } = args;
+  const run = await prisma.chargebackBanFeedSync.create({
+    data: { partnerId },
+  });
+
+  try {
+    const body = await fetchFeedSnapshot(feedUrl, feedToken, partnerId);
 
     const feedTimestamp = body.updated_at ? new Date(body.updated_at) : new Date();
+
+    // Wipe guard. An empty feed is only meaningful if we hold nothing, or
+    // the caller explicitly accepted the removal.
+    if (body.signals.length === 0 && !allowEmptySnapshot) {
+      const activeLocal = await prisma.chargebackBanSignal.count({
+        where: { partnerId, removedAt: null },
+      });
+      if (activeLocal > 0) {
+        throw new Error(
+          `Feed ${feedUrl} returned an empty snapshot while ${activeLocal} signal(s) ` +
+            `are active locally. Refusing to soft-delete the whole ban cache — ` +
+            `re-run the admin sync with allowEmptySnapshot if this is genuine`,
+        );
+      }
+    }
 
     const result = await mergeFeedSnapshot(partnerId, body.signals);
 
@@ -123,7 +245,9 @@ export async function syncBanFeed(args: {
       where: { id: run.id },
       data: { finishedAt: new Date(), ok: false, errorMessage: msg },
     });
-    logger.error('Chargeback ban feed sync failed', { partnerId, error: msg });
+    // feedUrl included deliberately: without it you cannot tell which
+    // partner's endpoint is misconfigured from the log alone.
+    logger.error('Chargeback ban feed sync failed', { partnerId, feedUrl, error: msg });
     return {
       ok: false,
       feedTimestamp: null,
