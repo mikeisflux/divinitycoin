@@ -157,6 +157,9 @@ export async function POST(request: NextRequest) {
       case 'verify-payment':
         return handleVerifyPayment(body, partnerId!);
 
+      case 'lookup-payment':
+        return handleLookupPaymentByPledge(body, partnerId!);
+
       case 'create-setup-intent':
         return handleCreateSetupIntent(body, partnerId!);
 
@@ -1348,6 +1351,7 @@ async function handleChargeSavedPaymentMethod(
     projectId: string;
     statement_descriptor?: string;
     description?: string;
+    idempotencyKey?: string;
   },
   partnerId: string,
   ipAddress: string,
@@ -1361,6 +1365,7 @@ async function handleChargeSavedPaymentMethod(
     projectId,
     statement_descriptor,
     description,
+    idempotencyKey,
   } = body;
 
   if (!platformUserId || !paymentMethodId || !amount || !pledgeId || !projectId) {
@@ -1375,6 +1380,22 @@ async function handleChargeSavedPaymentMethod(
       { error: 'Amount must be positive' },
       { status: 400 },
     );
+  }
+
+  // Optional explicit retry key. Without it the Stripe idempotency key is
+  // derived from pledgeId alone (unchanged legacy behaviour), which means
+  // Stripe replays the cached result — including a card decline — for 24
+  // hours. A partner retrying a declined charge inside that window never
+  // reaches the card. Passing a distinct idempotencyKey per attempt (e.g.
+  // "attempt-2") forces a genuine new authorization while keeping pledgeId
+  // clean for reconciliation and webhook payloads.
+  if (idempotencyKey !== undefined) {
+    if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,64}$/.test(idempotencyKey)) {
+      return NextResponse.json(
+        { error: 'idempotencyKey must be 1-64 chars of [A-Za-z0-9._:-]' },
+        { status: 400 },
+      );
+    }
   }
 
   // Hoisted so the catch block can still persist a tracking record when the
@@ -1457,8 +1478,15 @@ async function handleChargeSavedPaymentMethod(
       offSession: 'true',
     };
 
-    // Idempotency: pledgeId is the natural unique key per charge attempt.
-    // A retry from the partner returns the same PI instead of double-charging.
+    // Idempotency: pledgeId is the natural unique key per charge attempt, so
+    // a blind retry after a timeout returns the original PI instead of
+    // double-charging. Stripe caches that result — success OR decline — for
+    // 24 hours, so an explicit idempotencyKey is required to force a real
+    // retry of a declined card inside the window. See the developer docs.
+    const stripeIdempotencyKey = idempotencyKey
+      ? `charge-saved-${pledgeId}-${idempotencyKey}`
+      : `charge-saved-${pledgeId}`;
+
     const paymentIntent = await stripe.paymentIntents.create(
       {
         amount,
@@ -1471,7 +1499,7 @@ async function handleChargeSavedPaymentMethod(
         metadata: intentMetadata,
         statement_descriptor_suffix: statement_descriptor?.substring(0, 22),
       },
-      { idempotencyKey: `charge-saved-${pledgeId}` },
+      { idempotencyKey: stripeIdempotencyKey },
     );
 
     await prisma.pendingPartnerPayment.create({
@@ -1658,6 +1686,135 @@ async function handleVerifyPayment(
     return NextResponse.json(
       { error: 'Failed to verify payment' },
       { status: 500 }
+    );
+  }
+}
+
+/**
+ * Map a Stripe PaymentIntent status to the simplified status the partner
+ * API exposes. Mirrors the switch inside handleVerifyPayment — kept
+ * separate rather than refactoring that hot path.
+ */
+function mapStripeStatus(stripeStatus: string): string {
+  switch (stripeStatus) {
+    case 'succeeded':
+      return 'succeeded';
+    case 'processing':
+      return 'pending';
+    case 'requires_payment_method':
+    case 'requires_confirmation':
+    case 'requires_action':
+      return 'pending';
+    case 'canceled':
+      return 'failed';
+    default:
+      return stripeStatus;
+  }
+}
+
+/**
+ * Look up every charge attempt recorded against a pledgeId.
+ *
+ * Exists so a partner whose request timed out can ask "did this pledge
+ * actually get charged?" instead of retrying blind. Each attempt is
+ * reconciled against Stripe (the source of truth) so a missed webhook
+ * can't make a settled charge look unpaid.
+ */
+async function handleLookupPaymentByPledge(
+  body: { pledgeId?: string },
+  partnerId: string,
+) {
+  const pledgeId = body.pledgeId?.trim();
+
+  if (!pledgeId) {
+    return NextResponse.json(
+      { error: 'pledgeId is required' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    // Partner-scoped: 'internal' may read any partner's records, everyone
+    // else only ever sees their own.
+    const records = await prisma.pendingPartnerPayment.findMany({
+      where: {
+        pledgeId,
+        ...(partnerId === 'internal' ? {} : { partnerId }),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    if (records.length === 0) {
+      return NextResponse.json({
+        success: true,
+        pledgeId,
+        attempts: [],
+        hasSuccessfulCharge: false,
+      });
+    }
+
+    const stripe = await getStripeClient();
+
+    const attempts = await Promise.all(
+      records.map(async (record) => {
+        // Reconcile against Stripe. If the lookup fails we still return the
+        // local row rather than failing the whole request — a partial answer
+        // is more useful than none when the caller is deciding whether to
+        // retry a charge.
+        let liveStatus: string | null = null;
+        let stripeError: string | null = null;
+        try {
+          const pi = await stripe.paymentIntents.retrieve(record.paymentIntentId);
+          liveStatus = mapStripeStatus(pi.status);
+        } catch (err) {
+          stripeError = err instanceof Error ? err.message : 'Stripe lookup failed';
+        }
+
+        return {
+          paymentIntentId: record.paymentIntentId,
+          status: liveStatus,
+          dcStatus: record.status,
+          amount: record.amount,
+          currency: record.currency,
+          projectId: record.projectId,
+          platformUserId: record.platformUserId,
+          holdId: record.holdId,
+          giftCardId: record.giftCardId,
+          refundId: record.refundId,
+          refundedAt: record.refundedAt?.toISOString() ?? null,
+          createdAt: record.createdAt.toISOString(),
+          completedAt: record.completedAt?.toISOString() ?? null,
+          ...(stripeError ? { stripeLookupError: stripeError } : {}),
+        };
+      }),
+    );
+
+    // "Was this card actually charged?" — the question a caller recovering
+    // from a timeout needs answered. Fall back to our own record when the
+    // Stripe lookup failed: reporting false for a charge that did settle is
+    // exactly what causes a double charge, so a stale local COMPLETED beats
+    // a null. REFUNDED counts too — the card was captured, then returned.
+    const settled = (a: { status: string | null; dcStatus: string }) =>
+      a.status === 'succeeded' || a.dcStatus === 'COMPLETED' || a.dcStatus === 'REFUNDED';
+
+    // False if any attempt could not be reconciled against Stripe. When
+    // this is false, treat hasSuccessfulCharge: false as "unknown", not as
+    // "safe to charge".
+    const reconciled = attempts.every((a) => a.status !== null);
+
+    return NextResponse.json({
+      success: true,
+      pledgeId,
+      attempts,
+      hasSuccessfulCharge: attempts.some(settled),
+      reconciled,
+    });
+  } catch (error) {
+    logger.error('Failed to look up payment by pledge', { error, pledgeId, partnerId });
+    return NextResponse.json(
+      { error: 'Failed to look up payment' },
+      { status: 500 },
     );
   }
 }

@@ -917,6 +917,68 @@ GET  /internal?action=captures`}</pre>
                 </CardContent>
               </Card>
 
+              {/* Lookup Payment by pledge */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    /internal?action=lookup-payment
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Find every charge attempt recorded against a{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">pledgeId</code>.
+                    Use this when a request timed out and you don&apos;t know
+                    whether the card was captured — check here rather than
+                    retrying blind. Each attempt is reconciled against the live
+                    processor status, so a missed webhook can&apos;t make a
+                    settled charge look unpaid.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "pledgeId": string  // Required. The pledge/charge ID to look up
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
+                  <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
+                    <pre className="text-sm">{`{
+  "success": true,
+  "pledgeId": "pledge_abc",
+  "hasSuccessfulCharge": true,   // decisive: safe to branch on before retrying
+  "attempts": [
+    {
+      "paymentIntentId": "pi_3Abc...",
+      "status": "succeeded",      // live processor status: succeeded | pending | failed
+      "dcStatus": "COMPLETED",    // DC's own record status
+      "amount": 2500,
+      "currency": "usd",
+      "projectId": "proj_xyz",
+      "platformUserId": "user_123",
+      "holdId": null,
+      "giftCardId": "gc_abc",
+      "refundId": null,
+      "refundedAt": null,
+      "createdAt": "2026-08-19T14:02:11.000Z",
+      "completedAt": "2026-08-19T14:02:13.000Z"
+    }
+  ]
+}`}</pre>
+                  </div>
+                  <p className="text-neutral-600 mt-4 text-sm">
+                    Returns the 10 most recent attempts, newest first. An empty{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">attempts</code>{' '}
+                    array with{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">hasSuccessfulCharge: false</code>{' '}
+                    means no charge was ever recorded for that pledge — safe to
+                    submit one.
+                  </p>
+                </CardContent>
+              </Card>
+
               {/* Saved-card / off-session flow */}
               <h3 className="text-2xl font-bold text-neutral-900 mt-12 mb-2">Saved Cards & Off-Session Charges</h3>
               <p className="text-neutral-600 mb-6">
@@ -1098,6 +1160,44 @@ GET  /internal?action=captures`}</pre>
                     — retrying the same call returns the same charge.
                   </p>
 
+                  <div className="border-l-4 border-amber-400 bg-amber-50 p-4 rounded mb-4">
+                    <p className="font-semibold text-neutral-900 mb-2 text-sm">
+                      Retrying a declined charge
+                    </p>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      Idempotency is enforced by Stripe, which caches the result
+                      of the first call against a given key for{' '}
+                      <strong>24 hours</strong> — and that cache includes
+                      failures. A card decline is stored just like a success, so
+                      repeating the identical call inside the window replays the
+                      cached <code className="font-mono text-xs bg-white px-1 rounded">402</code>{' '}
+                      <em>without contacting the bank again</em>.
+                    </p>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      To genuinely re-attempt a declined card, pass a distinct{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">idempotencyKey</code>{' '}
+                      per attempt (e.g.{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">&quot;attempt-2&quot;</code>).
+                      Do <strong>not</strong> mutate{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">pledgeId</code>{' '}
+                      to force a new key — it is stored on the payment record and
+                      echoed in webhooks, so changing it breaks your
+                      reconciliation.
+                    </p>
+                    <p className="text-neutral-700 text-sm">
+                      Conversely, after a timeout where you don&apos;t know
+                      whether the card was captured, retry with the{' '}
+                      <em>same</em> parameters and no{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">idempotencyKey</code>{' '}
+                      — within 24 hours you are guaranteed the original
+                      PaymentIntent rather than a second charge. Past 24 hours
+                      the key expires and a retry <strong>will</strong> charge
+                      again; use{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">action=lookup-payment</code>{' '}
+                      to check first.
+                    </p>
+                  </div>
+
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
@@ -1108,7 +1208,11 @@ GET  /internal?action=captures`}</pre>
   "pledgeId": string,              // Required. Your pledge/charge ID (idempotency key)
   "projectId": string,             // Required. Project / auction ID
   "description": string,           // Optional. Charge description (e.g. "Auction win: Item X")
-  "statement_descriptor": string   // Optional. Max 22 chars (suffix on card statement)
+  "statement_descriptor": string,  // Optional. Max 22 chars (suffix on card statement)
+  "idempotencyKey": string         // Optional. 1-64 chars [A-Za-z0-9._:-]. Distinguishes
+                                   // retry attempts for the same pledgeId. Omit to reuse
+                                   // the cached result; set (e.g. "attempt-2") to force a
+                                   // genuine new authorization after a decline.
 }`}</pre>
                   </div>
 
