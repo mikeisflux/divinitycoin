@@ -675,6 +675,15 @@ async function handleCapture(body: { pledgeId: string }, ipAddress: string) {
  * Returns client_secret for Stripe Elements and publishable key
  * Supports type: "upcharge" for pledge modification additional charges
  */
+/**
+ * How long after opening a PaymentIntent a second create-payment-intent call
+ * for the same partner + pledge + amount is treated as a duplicate rather than
+ * a new charge. Long enough to cover a partner retrying after a timeout and a
+ * backer double-tapping Pay; short enough that a deliberate second purchase of
+ * the same item later in the day still goes through.
+ */
+const DUPLICATE_INTENT_WINDOW_MS = 10 * 60 * 1000;
+
 async function handleCreatePaymentIntent(
   body: {
     amount: number;
@@ -752,6 +761,84 @@ async function handleCreatePaymentIntent(
   try {
     const stripe = await getStripeClient();
     const stripeConfig = await getStripeConfig();
+
+    // Duplicate-charge guard. Unlike the saved-card path, this endpoint sends
+    // no Stripe idempotency key, so a partner retrying after a timeout — or a
+    // backer double-tapping Pay — opens a second PaymentIntent and the card is
+    // charged twice. That is exactly how pledge cmpm2qnri00mwh36vkmga6zgj was
+    // billed $10.00 twice, three minutes apart.
+    //
+    // A Stripe idempotency key is the wrong instrument here: pledge
+    // modifications legitimately reuse a pledgeId at a different amount, and
+    // Stripe caches a key's result for 24 hours, so a genuine second checkout
+    // a day later would replay a stale intent. Instead, if we already opened
+    // an intent for the same partner + pledge + amount inside a short window,
+    // hand that one back rather than opening another.
+    //
+    // Deliberately not applied to upcharges: an upcharge is an *additional*
+    // charge against a pledge that already has one, so a same-amount upcharge
+    // must not collapse into the original.
+    if (!isUpcharge) {
+      const recent = await prisma.pendingPartnerPayment.findFirst({
+        where: {
+          partnerId,
+          pledgeId,
+          amount,
+          status: 'PENDING',
+          createdAt: { gte: new Date(Date.now() - DUPLICATE_INTENT_WINDOW_MS) },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (recent) {
+        let existing: Awaited<ReturnType<typeof stripe.paymentIntents.retrieve>>;
+        try {
+          existing = await stripe.paymentIntents.retrieve(recent.paymentIntentId);
+        } catch (err) {
+          // We can't tell whether the intent already opened for this pledge
+          // was paid. Opening a second one is precisely how the double charge
+          // happened, so refuse and let the caller retry rather than guess.
+          logger.error('Duplicate guard could not reach Stripe', {
+            error: err,
+            paymentIntentId: recent.paymentIntentId,
+            partnerId,
+            pledgeId,
+          });
+          return NextResponse.json(
+            {
+              error:
+                'Could not verify an existing payment for this pledge. Retry shortly.',
+            },
+            { status: 503 },
+          );
+        }
+
+        // A canceled intent is dead and was never captured, so a fresh one is
+        // safe. Every other state is returned as-is: still payable (including
+        // after a decline, where the same intent is meant to be retried),
+        // processing, or already succeeded behind a lagging webhook.
+        if (existing.status !== 'canceled') {
+          logger.info('Returning existing payment intent for duplicate request', {
+            paymentIntentId: existing.id,
+            stripeStatus: existing.status,
+            partnerId,
+            pledgeId,
+            amount,
+            ageMs: Date.now() - recent.createdAt.getTime(),
+          });
+
+          return NextResponse.json({
+            success: true,
+            clientSecret: existing.client_secret,
+            paymentIntentId: existing.id,
+            publishableKey: stripeConfig.publishableKey,
+            amount,
+            deduplicated: true,
+            ...(prefilter.softFlags.length > 0 ? { soft_flags: prefilter.softFlags } : {}),
+          });
+        }
+      }
+    }
 
     // Find or create DC user for this platformUserId.
     // Use upsert so two concurrent requests can't both pass a "not found"

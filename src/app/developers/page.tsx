@@ -560,6 +560,44 @@ GET  /internal?action=captures`}</pre>
                     credit holds, so there is no setup-intent flow.
                   </p>
 
+                  <div className="border-l-4 border-sky-400 bg-sky-50 p-4 rounded mb-4">
+                    <p className="font-semibold text-neutral-900 mb-2 text-sm">
+                      Duplicate protection
+                    </p>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      If an intent has already been opened for the same{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">pledgeId</code>{' '}
+                      and{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">amount</code>{' '}
+                      within the last <strong>10 minutes</strong>, that intent is
+                      returned instead of a second one being created, and the
+                      response carries{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">deduplicated: true</code>.
+                      Retrying after a timeout is therefore safe inside that
+                      window — you get the original{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">clientSecret</code>{' '}
+                      back rather than a duplicate charge.
+                    </p>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      The match includes the amount, so a pledge modification —
+                      the same{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">pledgeId</code>{' '}
+                      at a new amount — is correctly treated as a new charge.
+                      Upcharges (<code className="font-mono text-xs bg-white px-1 rounded">type: &quot;upcharge&quot;</code>)
+                      are exempt entirely, since they are additional charges
+                      against a pledge that already has one.
+                    </p>
+                    <p className="text-neutral-700 text-sm">
+                      Past 10 minutes the window closes and a repeat call{' '}
+                      <strong>will</strong> create a second intent. Use{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">action=lookup-payment</code>{' '}
+                      to check before retrying. If we cannot reach the processor
+                      to verify an existing intent we return{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">503</code>{' '}
+                      rather than risk charging twice — retry the call.
+                    </p>
+                  </div>
+
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`{
@@ -584,7 +622,8 @@ GET  /internal?action=captures`}</pre>
   "clientSecret": "pi_3Abc..._secret_xyz",
   "paymentIntentId": "pi_3Abc...",
   "publishableKey": "pk_live_...",
-  "amount": 2500
+  "amount": 2500,
+  "deduplicated": true    // Only present when an existing intent was returned
 }`}</pre>
                   </div>
                 </CardContent>
