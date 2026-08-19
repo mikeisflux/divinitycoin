@@ -27,16 +27,21 @@ export async function POST(request: NextRequest) {
     const admin = await getAdminFromRequest();
     const cookieStore = await cookies();
 
+    // Drop the cookie before any awaited cleanup — a failure below must
+    // never leave the admin stuck inside the impersonation session.
+    cookieStore.delete('partner_impersonation_session');
+
     if (impersonation) {
-      await clearImpersonationSession(impersonation.user.partnerId);
+      const { partnerId, partnerName } = impersonation.partnerUser;
+      await clearImpersonationSession(partnerId);
 
       if (admin) {
         await logAdminAction(
           admin.id,
           'IMPERSONATE_PARTNER_STOP',
           'partner',
-          impersonation.user.partnerId,
-          { partnerName: impersonation.user.partnerName },
+          partnerId,
+          { partnerName },
           getClientIp(request),
           request.headers.get('user-agent') || 'unknown',
         );
@@ -44,16 +49,14 @@ export async function POST(request: NextRequest) {
 
       logger.info('Admin stopped partner impersonation', {
         adminId: admin?.id ?? impersonation.adminId,
-        partnerId: impersonation.user.partnerId,
+        partnerId,
       });
     }
-
-    cookieStore.delete('partner_impersonation_session');
 
     // Send the admin back to the partner detail in /admin if we know
     // which partner; otherwise to the partners list.
     const target = impersonation
-      ? new URL(`/admin/partners/${impersonation.user.partnerId}`, request.url)
+      ? new URL(`/admin/partners/${impersonation.partnerUser.partnerId}`, request.url)
       : new URL('/admin/partners', request.url);
     return NextResponse.redirect(target);
   } catch (error) {

@@ -28,14 +28,18 @@ export async function POST(request: NextRequest) {
     // doesn't get kicked when an admin happens to be debugging as them.
     const impersonation = await getImpersonationFromRequest();
     if (impersonation) {
-      await clearImpersonationSession(impersonation.user.partnerId);
+      const { partnerId } = impersonation.partnerUser;
+      // Clear the cookie first. If clearImpersonationSession throws, the
+      // admin must still drop out of impersonation rather than being left
+      // inside it by a failed cleanup.
       cookieStore.delete('partner_impersonation_session');
+      await clearImpersonationSession(partnerId);
       logger.info('Partner "Sign Out" ended admin impersonation', {
-        partnerId: impersonation.user.partnerId,
+        partnerId,
         adminId: impersonation.adminId,
       });
       return NextResponse.redirect(
-        new URL(`/admin/partners/${impersonation.user.partnerId}`, request.url),
+        new URL(`/admin/partners/${partnerId}`, request.url),
       );
     }
 
