@@ -22,13 +22,40 @@ that broken value into pm2's process env, and Prisma fails with
 *"the URL must start with the protocol postgresql://"* on every DB call until pm2
 is fully reset (`pm2 delete` + `pm2 start` + `pm2 save`).
 
-**Instead, always source from `.env`:**
+**Instead, always source from `.env`** — inline the substitution directly into
+the argument, with no intermediate variable:
 
 ```bash
-# Ad-hoc DB query — never persists in the shell:
-DBURL=$(grep '^DATABASE_URL=' .env | sed 's/^DATABASE_URL=//' | tr -d '"') \
-  psql "$DBURL" -c "SELECT 1;"
+# Ad-hoc DB query — nothing persists in the shell:
+psql "$(grep '^DATABASE_URL=' .env | sed 's/^DATABASE_URL=//' | tr -d '"')" \
+  -c "SELECT 1;"
 ```
+
+**Do NOT use the var-prefix form** — it silently does the wrong thing:
+
+```bash
+DBURL=$(grep '^DATABASE_URL=' .env | ...) psql "$DBURL" -c "SELECT 1;"   # BROKEN
+```
+
+The shell expands `"$DBURL"` *before* applying the assignment, so psql receives
+whatever `DBURL` held previously — usually empty. An empty conninfo makes psql
+fall back to peer auth as the current user, producing the confusing
+*`FATAL: role "root" does not exist`* rather than an obvious failure. It only
+appears to work when `DBURL` happens to already be set from an earlier command,
+which is why this survived unnoticed. (A var prefix does work for a command that
+reads the value from its *environment*, e.g. `PGPASSWORD=... psql`; it does not
+work when you need to interpolate the value into an argument.)
+
+If you genuinely need it as a shell variable across several commands, assign it
+on its own line first — just remember it does then persist for the session:
+
+```bash
+DBURL=$(grep '^DATABASE_URL=' .env | sed 's/^DATABASE_URL=//' | tr -d '"')
+psql "$DBURL" -c "SELECT 1;"
+```
+
+Note that a shell variable does **not** survive a reboot or a new SSH session,
+so re-run the assignment after reconnecting.
 
 Or, when truly needing it in the user's shell, look up the actual value from
 the local `.env` and paste the resolved string, NOT a placeholder.
