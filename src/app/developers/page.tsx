@@ -1316,6 +1316,71 @@ GET  /internal?action=captures`}</pre>
                 </CardContent>
               </Card>
 
+              {/* Payment failed webhook */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-amber-100 text-amber-800 text-xs font-mono rounded mr-2">WEBHOOK</span>
+                    payment.failed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Fired when a charge does not go through — declined, expired
+                    card, insufficient funds, a failed 3DS challenge. No money
+                    moved and the pledge is unpaid.
+                  </p>
+
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`// event: "payment.failed"
+{
+  "paymentIntentId": "pi_3Abc...",
+  "amount": 2500,
+  "platformUserId": "user_xyz",
+  "pledgeId": "pledge_xyz",
+  "projectId": "proj_xyz",
+  "type": "initial" | "upcharge",
+  "error": "Your card was declined.",
+  "code": "card_declined",             // null if the processor gave none
+  "declineCode": "insufficient_funds", // null if the processor gave none
+  "status": "requires_payment_method"
+}`}</pre>
+                  </div>
+
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    If you use{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">charge-saved-payment-method</code>,
+                    an off-session decline already reaches you synchronously as a{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">402</code>.
+                    This webhook is a deliberate second signal: the synchronous
+                    response is lost if your request times out or your process
+                    dies mid-call, which is precisely when you most need to know
+                    the pledge went unpaid.
+                  </p>
+
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    <strong>Retrying a decline.</strong> Do not repeat the identical
+                    call — within 24 hours the processor replays its cached result,
+                    including the failure, without contacting the bank. Pass a
+                    distinct{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">idempotencyKey</code>{' '}
+                    per attempt to force a genuine new authorization.
+                  </p>
+
+                  <p className="text-neutral-600 text-sm">
+                    The same event name is also used when a charge succeeded but
+                    DC&apos;s own post-processing failed. The two are distinguishable:
+                    a real decline carries{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">code</code>{' '}
+                    and usually{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">declineCode</code>,
+                    and its{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">status</code>{' '}
+                    is a non-terminal PaymentIntent state.
+                  </p>
+                </CardContent>
+              </Card>
+
               {/* Dispute webhook */}
               <Card>
                 <CardHeader>

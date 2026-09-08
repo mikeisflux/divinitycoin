@@ -80,6 +80,10 @@ export async function POST(request: NextRequest) {
         await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent);
         break;
 
+      case 'payment_intent.payment_failed':
+        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
+        break;
+
       case 'checkout.session.completed':
         await handleSuccessfulPayment(event.data.object as Stripe.Checkout.Session);
         break;
@@ -796,4 +800,82 @@ async function handleDisputeCreated(dispute: Stripe.Dispute) {
       error,
     });
   }
+}
+
+/**
+ * The card actually failed — declined, expired, insufficient funds, a failed
+ * 3DS challenge.
+ *
+ * Distinct from the existing payment.failed that fires from the catch block in
+ * handlePartnerPaymentSucceeded: that one means the charge went through and
+ * *our* post-processing broke. This one means no money moved. Same event name,
+ * because it is the same thing from the partner's side — the pledge did not get
+ * paid — and the decline fields say which.
+ *
+ * Off-session declines on charge-saved-payment-method already surface
+ * synchronously as a 402, so for those partners this is a second, redundant
+ * signal. That is deliberate: the synchronous response is lost if their request
+ * times out or their process dies mid-call, which is exactly when they most
+ * need to know.
+ */
+async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
+  if (
+    paymentIntent.metadata?.type !== 'partner_payment' &&
+    paymentIntent.metadata?.type !== 'partner_upcharge'
+  ) {
+    return;
+  }
+
+  const partnerId = paymentIntent.metadata.partnerId;
+  const platformUserId = paymentIntent.metadata.platformUserId;
+  const pledgeId = paymentIntent.metadata.pledgeId;
+  const projectId = paymentIntent.metadata.projectId;
+
+  if (!partnerId) {
+    logger.warn('PaymentIntent.payment_failed with no partnerId metadata', {
+      paymentIntentId: paymentIntent.id,
+    });
+    return;
+  }
+
+  const lastError = paymentIntent.last_payment_error;
+
+  // Only PENDING moves to FAILED. A PaymentIntent can be declined and then
+  // succeed on a later attempt with a different card, so a late-arriving
+  // failure event must never clobber a COMPLETED record — updateMany with the
+  // status in the filter makes that a no-op rather than a race.
+  await prisma.pendingPartnerPayment.updateMany({
+    where: { paymentIntentId: paymentIntent.id, status: 'PENDING' },
+    data: { status: 'FAILED' },
+  });
+
+  const partner = await prisma.partner.findUnique({
+    where: { id: partnerId },
+    select: { webhookUrl: true, webhookSecret: true },
+  });
+  if (!partner?.webhookUrl || !partner?.webhookSecret) return;
+
+  const isUpcharge = paymentIntent.metadata?.type === 'partner_upcharge';
+
+  await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'payment.failed', {
+    paymentIntentId: paymentIntent.id,
+    amount: paymentIntent.amount,
+    platformUserId,
+    pledgeId,
+    projectId,
+    type: isUpcharge ? 'upcharge' : 'initial',
+    error: lastError?.message ?? 'The payment could not be completed.',
+    code: lastError?.code ?? null,
+    declineCode: lastError?.decline_code ?? null,
+    status: paymentIntent.status,
+  });
+
+  logger.info('Partner payment.failed delivered', {
+    paymentIntentId: paymentIntent.id,
+    partnerId,
+    platformUserId,
+    pledgeId,
+    code: lastError?.code ?? null,
+    declineCode: lastError?.decline_code ?? null,
+  });
 }
