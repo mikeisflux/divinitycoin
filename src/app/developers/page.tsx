@@ -1316,6 +1316,71 @@ GET  /internal?action=captures`}</pre>
                 </CardContent>
               </Card>
 
+              {/* Dispute webhook */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <span className="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs font-mono rounded mr-2">WEBHOOK</span>
+                    dispute.created
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4">
+                    Fired when a cardholder disputes a charge. Act on this
+                    immediately: a disputed pledge that stays in your fulfillment
+                    queue means goods get packed and shipped for money that is
+                    already being clawed back. Pull the order, release its reward
+                    slot, and adjust the campaign total.
+                  </p>
+
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`// event: "dispute.created"
+{
+  "disputeId": "du_1AbC...",
+  "stripePaymentIntentId": "pi_3Abc...",
+  "chargeId": "ch_3Abc...",
+  "pledgeId": "pledge_xyz",
+  "projectId": "proj_xyz",
+  "platformUserId": "user_xyz",
+  "paymentId": "cm...",              // DC's own payment record id
+  "amount": 2800,                    // cents, the disputed amount
+  "currency": "usd",
+  "reason": "fraudulent",            // Stripe's reason, verbatim
+  "status": "warning_needs_response",
+  "evidenceDueBy": "2026-09-17T23:59:00Z"   // null if Stripe gave no deadline
+}`}</pre>
+                  </div>
+
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    A dispute is raised against a <em>charge</em>, not an order, so
+                    the authoritative key is{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">stripePaymentIntentId</code>.{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">pledgeId</code>{' '}
+                    is resolved from DC&apos;s payment record and included whenever
+                    we hold one, which is every partner charge.
+                  </p>
+
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    <strong>Retries.</strong> Delivery is retried up to three times
+                    with backoff on any non-2xx or network failure, so your handler
+                    must be idempotent — a redelivery must not decrement a campaign
+                    total or release a reward slot twice. Return{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">2xx</code>{' '}
+                    once you have accepted the event, including when no order
+                    matches; a non-2xx means we try again.
+                  </p>
+
+                  <p className="text-neutral-600 text-sm">
+                    Same envelope, <code className="font-mono text-xs bg-neutral-100 px-1 rounded">X-Webhook-Signature</code>{' '}
+                    header and HMAC scheme as every other partner webhook. Only
+                    disputes on your own charges are sent. If you have set an
+                    explicit event allowlist in your partner settings, add{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">dispute.created</code>{' '}
+                    to it — an empty allowlist continues to receive everything.
+                  </p>
+                </CardContent>
+              </Card>
+
               {/* Health Check */}
               <Card>
                 <CardHeader>

@@ -11,6 +11,7 @@ import { logger } from '@/lib/logger';
 import { Prisma } from '@prisma/client';
 import { placeHold } from '@/lib/credits/holds';
 import { sendWebhook } from '@/lib/partner/webhook';
+import { notifyPartnerOfDispute } from '@/lib/partner/dispute-webhook';
 
 // Uses headers() / raw body; never pre-render during build.
 export const dynamic = 'force-dynamic';
@@ -89,6 +90,13 @@ export async function POST(request: NextRequest) {
 
       case 'charge.refunded':
         await handleRefund(event.data.object as Stripe.Charge);
+        break;
+
+      // A cardholder disputed a charge. Told to the partner immediately so the
+      // order leaves fulfillment before anything ships. Requires
+      // charge.dispute.created to be enabled on the Stripe endpoint.
+      case 'charge.dispute.created':
+        await handleDisputeCreated(event.data.object as Stripe.Dispute);
         break;
 
       default:
@@ -767,4 +775,25 @@ async function handlePaymentIntentRequiresAction(paymentIntent: Stripe.PaymentIn
     platformUserId,
     nextActionType: paymentIntent.next_action?.type ?? null,
   });
+}
+
+/**
+ * Relay a new dispute to the partner whose charge it was raised against.
+ *
+ * Deliberately swallows its own failures: the notifier already retries and
+ * logs, and letting an exception escape would fail the whole Stripe webhook.
+ * Stripe would then redeliver the event, but our StripeWebhookEvent
+ * idempotency guard has already recorded event.id, so the retry would be
+ * dropped as a duplicate and every other side effect of this event would be
+ * lost with it.
+ */
+async function handleDisputeCreated(dispute: Stripe.Dispute) {
+  try {
+    await notifyPartnerOfDispute(dispute);
+  } catch (error) {
+    logger.error('Unexpected failure handling charge.dispute.created', {
+      disputeId: dispute.id,
+      error,
+    });
+  }
 }
