@@ -302,6 +302,7 @@ enum TransactionStatus {
   COMPLETED
   FAILED
   REFUNDED
+  CANCELLED // Cancelled before completion by an admin
 }
 
 // ============================================

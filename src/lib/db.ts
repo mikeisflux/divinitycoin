@@ -9,13 +9,10 @@ const globalForPrisma = globalThis as unknown as {
 
 // In production, use event-based logging to filter out connection reset errors
 // These are normal when the database restarts and Prisma auto-reconnects
-const prismaClientOptions = process.env.NODE_ENV === 'development'
-  ? { log: ['query', 'error', 'warn'] as const }
-  : {
-      log: [
-        { level: 'error', emit: 'event' } as const,
-      ]
-    };
+const prismaClientOptions: ConstructorParameters<typeof PrismaClient>[0] =
+  process.env.NODE_ENV === 'development'
+    ? { log: ['query', 'error', 'warn'] }
+    : { log: [{ level: 'error', emit: 'event' }] };
 
 const client = new PrismaClient(prismaClientOptions);
 

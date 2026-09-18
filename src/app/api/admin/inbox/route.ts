@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     const messageId = `<${crypto.randomUUID()}@divinitycoin.com>`;
 
     // Handle reply threading
-    let threadId = crypto.randomUUID();
+    let threadId: string = crypto.randomUUID();
     let inReplyTo: string | null = null;
 
     if (replyToEmailId) {

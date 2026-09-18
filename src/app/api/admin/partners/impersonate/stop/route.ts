@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     cookieStore.delete('partner_impersonation_session');
 
     if (impersonation) {
-      const { partnerId, partnerName } = impersonation.partnerUser;
+      const { partnerId, partnerName } = impersonation.user;
       await clearImpersonationSession(partnerId);
 
       if (admin) {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Send the admin back to the partner detail in /admin if we know
     // which partner; otherwise to the partners list.
     const target = impersonation
-      ? new URL(`/admin/partners/${impersonation.partnerUser.partnerId}`, request.url)
+      ? new URL(`/admin/partners/${impersonation.user.partnerId}`, request.url)
       : new URL('/admin/partners', request.url);
     return NextResponse.redirect(target);
   } catch (error) {

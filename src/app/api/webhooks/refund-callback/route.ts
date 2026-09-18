@@ -133,11 +133,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Missing refundId' }, { status: 400 });
       }
 
+      // RefundRequest stores transactionId as a plain column rather than a
+      // relation, so there is nothing to include; the transaction is fetched
+      // separately where it is needed.
       const refundRequest = await prisma.refundRequest.findUnique({
         where: { id: refundId },
-        include: {
-          // We need transaction info to process Stripe refund
-        },
       });
 
       if (!refundRequest) {

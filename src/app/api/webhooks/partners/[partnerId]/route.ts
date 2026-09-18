@@ -210,13 +210,13 @@ export async function POST(request: NextRequest, props: { params: Promise<{ part
           const codeHash = crypto.createHash('sha256').update(cardCode.toUpperCase()).digest('hex');
           giftCard = await prisma.giftCard.findFirst({
             where: { codeHash },
-            include: { transaction: true },
+            include: { transactions: true },
           });
         } else if (transactionId) {
           // Find by transaction ID
           const transaction = await prisma.transaction.findUnique({
             where: { id: transactionId },
-            include: { giftCard: { include: { transaction: true } } },
+            include: { giftCard: { include: { transactions: true } } },
           });
           giftCard = transaction?.giftCard;
         }
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ part
         }
 
         // Check if already refunded
-        if (giftCard.status === 'REFUNDED') {
+        if (giftCard.status === 'REVOKED') {
           return NextResponse.json({
             success: true,
             message: 'Card already marked as refunded',
@@ -238,32 +238,51 @@ export async function POST(request: NextRequest, props: { params: Promise<{ part
           });
         }
 
-        // Update gift card status to REFUNDED
+        const partnerRefundNote = {
+          partnerId: partner.id,
+          partnerName: partner.name,
+          partnerTransactionId,
+          reason: reason || 'Refunded by partner',
+          refundedAt: new Date().toISOString(),
+        };
+
+        // GiftCard.metadata is a text column, not JSON, so the previous
+        // object spread silently produced an empty object and then wrote a
+        // non-string into it. Parse, merge, re-serialise.
+        let giftCardMetadata: Record<string, unknown> = {};
+        if (giftCard.metadata) {
+          try {
+            const parsed = JSON.parse(giftCard.metadata);
+            if (parsed && typeof parsed === 'object') giftCardMetadata = parsed;
+          } catch {
+            // Not JSON — keep it rather than lose it.
+            giftCardMetadata = { previous: giftCard.metadata };
+          }
+        }
+
         await prisma.giftCard.update({
           where: { id: giftCard.id },
           data: {
-            status: 'REFUNDED',
-            metadata: {
-              ...(typeof giftCard.metadata === 'object' ? giftCard.metadata : {}),
-              partnerRefund: {
-                partnerId: partner.id,
-                partnerName: partner.name,
-                partnerTransactionId,
-                reason: reason || 'Refunded by partner',
-                refundedAt: new Date().toISOString(),
-              },
-            },
+            status: 'REVOKED',
+            metadata: JSON.stringify({
+              ...giftCardMetadata,
+              partnerRefund: partnerRefundNote,
+            }),
           },
         });
 
-        // Update associated transaction status if exists
-        if (giftCard.transaction) {
+        // Update associated transaction status if exists. The relation is a
+        // list; a gift card sold through a single transaction has exactly one.
+        const linkedTransaction = giftCard.transactions?.[0];
+        if (linkedTransaction) {
           await prisma.transaction.update({
-            where: { id: giftCard.transaction.id },
+            where: { id: linkedTransaction.id },
             data: {
               status: 'REFUNDED',
               metadata: {
-                ...(typeof giftCard.transaction.metadata === 'object' ? giftCard.transaction.metadata : {}),
+                ...(linkedTransaction.metadata && typeof linkedTransaction.metadata === 'object'
+                  ? (linkedTransaction.metadata as Record<string, unknown>)
+                  : {}),
                 partnerRefund: {
                   partnerId: partner.id,
                   partnerName: partner.name,

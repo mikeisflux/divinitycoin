@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     // doesn't get kicked when an admin happens to be debugging as them.
     const impersonation = await getImpersonationFromRequest();
     if (impersonation) {
-      const { partnerId } = impersonation.partnerUser;
+      const { partnerId } = impersonation.user;
       // Clear the cookie first. If clearImpersonationSession throws, the
       // admin must still drop out of impersonation rather than being left
       // inside it by a failed cleanup.

@@ -34,7 +34,9 @@ function getClientIp(request: NextRequest): string {
   if (xff) return xff.split(',')[0]?.trim() || '';
   const xri = request.headers.get('x-real-ip');
   if (xri) return xri.trim();
-  return request.ip || '';
+  // NextRequest.ip no longer exists; behind nginx the headers above are
+  // authoritative anyway, and an empty string is the existing no-IP signal.
+  return '';
 }
 
 /**

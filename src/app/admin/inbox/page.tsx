@@ -62,9 +62,13 @@ async function getMailboxesAndEmails() {
   return {
     mailboxes: mailboxes.map((m) => ({
       ...m,
+      createdAt: m.createdAt.toISOString(),
       unreadCount: m._count.emails,
     })),
-    emails,
+    emails: emails.map((e) => ({
+      ...e,
+      receivedAt: e.receivedAt.toISOString(),
+    })),
     folderCounts: counts,
     needsMigration,
     oldEmailCount: emailLogCount,

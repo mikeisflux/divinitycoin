@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/admin/middleware';
 import { prisma } from '@/lib/db';
+import { PartnerPaymentStatus } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'FINANCE', 'SUPPORT']);
@@ -71,14 +72,16 @@ export async function GET(request: NextRequest) {
       source === 'legacy'
         ? Promise.resolve([])
         : prisma.pendingPartnerPayment.findMany({
-            where: status ? { status } : {},
+            where: status ? { status: status as PartnerPaymentStatus } : {},
             skip,
             take: Math.ceil(limit / 2),
             orderBy: { createdAt: 'desc' },
           }),
       source === 'legacy'
         ? Promise.resolve(0)
-        : prisma.pendingPartnerPayment.count({ where: status ? { status } : {} }),
+        : prisma.pendingPartnerPayment.count({
+            where: status ? { status: status as PartnerPaymentStatus } : {},
+          }),
     ]);
 
     const combinedTotal = total + (typeof ppTotal === 'number' ? ppTotal : 0);

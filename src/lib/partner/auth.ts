@@ -2,6 +2,7 @@
 // Partner authentication utilities
 
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
@@ -113,7 +114,7 @@ export async function getPartnerFromRequest(): Promise<PartnerUser | null> {
  * which partner to clear and return to.
  */
 export async function getImpersonationFromRequest(): Promise<{
-  partnerUser: PartnerUser;
+  user: PartnerUser;
   adminId: string;
   expiresAt: Date;
 } | null> {
@@ -229,7 +230,7 @@ export async function clearImpersonationSession(partnerId: string): Promise<void
 
   await prisma.partner.update({
     where: { id: partnerId },
-    data: { settings },
+    data: { settings: settings as Prisma.InputJsonValue },
   });
 }
 
@@ -294,7 +295,7 @@ export async function logoutPartner(partnerId: string): Promise<void> {
 
     await prisma.partner.update({
       where: { id: partnerId },
-      data: { settings },
+      data: { settings: settings as Prisma.InputJsonValue },
     });
   }
 }
@@ -311,7 +312,7 @@ export async function setPartnerPassword(partnerId: string, password: string): P
 
   await prisma.partner.update({
     where: { id: partnerId },
-    data: { settings },
+    data: { settings: settings as Prisma.InputJsonValue },
   });
 }
 

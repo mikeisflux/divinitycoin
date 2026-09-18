@@ -130,7 +130,7 @@ export const logger = {
 
     console.error('[ERROR]', message, {
       error: sanitizedError,
-      ...(sanitizedContext && { context: sanitizedContext }),
+      ...(sanitizedContext ? { context: sanitizedContext } : {}),
       timestamp: new Date().toISOString(),
     });
   },

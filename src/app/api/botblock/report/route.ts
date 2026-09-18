@@ -18,8 +18,10 @@ const INTERNAL_SECRET = process.env.INTERNAL_API_KEY;
 function isLoopback(request: NextRequest): boolean {
   const xff = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   const xri = request.headers.get('x-real-ip')?.trim();
-  const remote = request.ip;
-  const candidates = [xff, xri, remote].filter(Boolean);
+  // NextRequest.ip no longer exists. Behind nginx the forwarded headers are
+  // the only real source; with neither present this is a same-process fetch,
+  // which the empty-candidates branch below already treats as loopback.
+  const candidates = [xff, xri].filter(Boolean);
   if (candidates.length === 0) return true; // no proxy = same-process fetch
   return candidates.every(ip => ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1');
 }

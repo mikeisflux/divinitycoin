@@ -439,7 +439,7 @@ export default function BuyPage() {
               )}
 
               <div className="flex flex-col gap-3">
-                <Button onClick={() => { setStep('select'); setSuccessData(null); }} variant={partnerRedirectUrl ? 'outline' : 'default'}>
+                <Button onClick={() => { setStep('select'); setSuccessData(null); }} variant={partnerRedirectUrl ? 'outline' : 'primary'}>
                   Buy More Credits
                 </Button>
                 <Link href="/account" className="text-primary-600 hover:underline text-sm">

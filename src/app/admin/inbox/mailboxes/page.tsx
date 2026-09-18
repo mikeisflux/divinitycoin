@@ -22,6 +22,7 @@ async function getMailboxes() {
 
   return mailboxes.map((m) => ({
     ...m,
+    createdAt: m.createdAt.toISOString(),
     emailCount: m._count.emails,
   }));
 }
