@@ -65,6 +65,21 @@ export interface DisputeEvidenceData {
     projectId: string;
     capturedAt: Date;
   }>;
+  /**
+   * Refund history. Decisive for the "credit not processed" reason code,
+   * which alleges a merchant agreed to refund and then failed to issue it:
+   * an empty list is affirmative proof no refund was ever asked for, so
+   * there was nothing to agree to and nothing to process.
+   */
+  refundRequests: Array<{
+    id: string;
+    createdAt: Date;
+    status: string;
+    amountCents: number;
+    reason: string | null;
+    processedAt: Date | null;
+  }>;
+  refundIssued: { refundId: string | null; refundedAt: Date | null } | null;
 }
 
 // ─── Evidence lookup ──────────────────────────────────────────────
@@ -113,6 +128,15 @@ export async function gatherDisputeEvidence(
         : Promise.resolve([]),
     ]);
 
+    // Matched on the cardholder's address rather than this transaction alone:
+    // the claim is that a refund was promised and withheld, and a request
+    // filed against any of their orders would still be relevant to that.
+    const refundRequests = await prisma.refundRequest.findMany({
+      where: pp.email ? { email: pp.email } : { transactionId: pp.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
     return {
       source: 'partner',
       paymentIntentId: pp.paymentIntentId,
@@ -149,6 +173,17 @@ export async function gatherDisputeEvidence(
         projectId: c.projectId,
         capturedAt: c.capturedAt,
       })),
+      refundRequests: refundRequests.map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt,
+        status: r.status,
+        amountCents: Math.round(Number(r.amount) * 100),
+        reason: r.reason,
+        processedAt: r.processedAt,
+      })),
+      refundIssued: pp.refundId || pp.refundedAt
+        ? { refundId: pp.refundId, refundedAt: pp.refundedAt }
+        : null,
     };
   }
 
@@ -165,6 +200,12 @@ export async function gatherDisputeEvidence(
   }
 
   if (tx) {
+    const txEmail = tx.guestEmail ?? tx.user?.email ?? null;
+    const refundRequests = await prisma.refundRequest.findMany({
+      where: txEmail ? { email: txEmail } : { transactionId: tx.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
     return {
       source: 'legacy',
       paymentIntentId: tx.stripePaymentIntentId,
@@ -195,6 +236,15 @@ export async function gatherDisputeEvidence(
           }
         : null,
       captures: [],
+      refundRequests: refundRequests.map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt,
+        status: r.status,
+        amountCents: Math.round(Number(r.amount) * 100),
+        reason: r.reason,
+        processedAt: r.processedAt,
+      })),
+      refundIssued: null,
     };
   }
 
@@ -293,6 +343,51 @@ function pdfBuffer(build: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
 }
 
 // ─── Receipt PDF ──────────────────────────────────────────────────
+
+/**
+ * The paragraph that actually answers a "credit not processed" claim.
+ *
+ * That reason code alleges a merchant agreed to refund and then failed to
+ * issue it. The decisive fact is therefore not delivery but the absence of
+ * any request: no request means no agreement, and no agreement means nothing
+ * was left unprocessed. Built from the record rather than boilerplate so the
+ * assertion is backed by what the database actually holds.
+ */
+function refundHistoryParagraph(ev: DisputeEvidenceData): string {
+  const redeemed = ev.giftCard?.redeemedAt
+    ? `The credits were in any event redeemed in full on ${formatDate(ev.giftCard.redeemedAt)}, leaving no unredeemed balance capable of being credited. `
+    : '';
+
+  if (ev.refundRequests.length === 0 && !ev.refundIssued) {
+    return (
+      'DivinityCoin operates a published refund process at divinitycoin.com/refunds through which a cardholder may request a refund of unredeemed credits. ' +
+      'No refund request was received from this cardholder at any time — not for this transaction, and not for any other transaction on their account. ' +
+      'Our records contain no refund request, no refund authorisation, and no commitment of any kind, written or otherwise, to issue a credit. ' +
+      'The reason code asserted in this dispute alleges that a merchant agreed to issue a refund and then failed to process it. ' +
+      'No such agreement was ever sought by the cardholder or given by DivinityCoin, and so there was nothing outstanding to process. ' +
+      redeemed
+    );
+  }
+
+  const lines = ev.refundRequests
+    .map(
+      (r) =>
+        `${formatDate(r.createdAt)} — ${formatMoney(r.amountCents, ev.currency)}, status ${r.status}` +
+        (r.processedAt ? `, processed ${formatDate(r.processedAt)}` : '') +
+        (r.reason ? ` (stated reason: ${r.reason})` : ''),
+    )
+    .join('; ');
+
+  return (
+    `DivinityCoin's records show the following refund activity on this cardholder's account: ${lines}. ` +
+    (ev.refundIssued?.refundedAt
+      ? `A refund was issued on ${formatDate(ev.refundIssued.refundedAt)}` +
+        (ev.refundIssued.refundId ? ` under refund reference ${ev.refundIssued.refundId}` : '') +
+        '. '
+      : 'No refund was authorised or issued on this transaction. ') +
+    redeemed
+  );
+}
 
 export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
   return pdfBuffer((doc) => {
@@ -432,19 +527,24 @@ export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string):
     }
     doc.moveDown(0.8);
 
-    doc.font(F.bold).text('3. The dispute concerns physical merchandise that is not — and could not be — supplied by DivinityCoin.');
+    doc.font(F.bold).text('3. No refund was requested, and no refund was ever promised.');
+    doc.moveDown(0.2);
+    doc.font(F.regular).text(refundHistoryParagraph(ev), { align: 'justify' });
+    doc.moveDown(0.8);
+
+    doc.font(F.bold).text('4. DivinityCoin does not sell or fulfil physical merchandise.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
-      'The cardholder’s stated grievance relates to physical merchandise pledged on a third-party crowdfunding partner platform. ' +
-      'Physical fulfillment of pledged rewards is the responsibility of the project creator and the crowdfunding platform on which the pledge was placed. ' +
-      'DivinityCoin is a gift card issuer and digital-credit seller and does not warehouse, ship, or otherwise fulfill physical merchandise. ' +
-      'This is set out explicitly in our Terms of Service (sections 3 and 6) — DivinityCoin sells only digital prepaid credits, and physical merchandise, rewards, or services associated with a partner-platform transaction are sold and fulfilled by the partner platform and/or the underlying project creator. ' +
-      'The proper channel for the cardholder’s complaint is the project creator and the partner platform’s backer-protection process, not the digital-credit transaction that DivinityCoin completed.',
+      'To the extent the cardholder’s grievance concerns physical merchandise, DivinityCoin neither sold nor undertook to deliver any. ' +
+      'DivinityCoin is a gift card issuer and digital-credit seller; it does not warehouse, ship, or otherwise fulfil physical goods of any kind. ' +
+      'Its sole deliverable in this transaction was the digital prepaid credit balance described above, which was delivered and redeemed in full. ' +
+      'This is set out in our Terms of Service (sections 3 and 6), which the cardholder accepted at checkout: DivinityCoin sells only digital prepaid credits, and any merchandise, rewards, or services subsequently obtained by redeeming those credits are sold and fulfilled by the seller of those goods, not by DivinityCoin. ' +
+      'A complaint about merchandise is therefore properly directed to the seller of that merchandise, and not to the digital-credit transaction that DivinityCoin completed and the cardholder redeemed in full.',
       { align: 'justify' },
     );
     doc.moveDown(0.8);
 
-    doc.font(F.bold).text('4. Conclusion.');
+    doc.font(F.bold).text('5. Conclusion.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
       `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably redeemed that product in full the same business day. ` +
@@ -1052,19 +1152,24 @@ export function generateConsolidatedPdf(
     }
     doc.moveDown(0.8);
 
-    doc.font(F.bold).text('3. The dispute concerns physical merchandise that is not — and could not be — supplied by DivinityCoin.');
+    doc.font(F.bold).text('3. No refund was requested, and no refund was ever promised.');
+    doc.moveDown(0.2);
+    doc.font(F.regular).text(refundHistoryParagraph(ev), { align: 'justify' });
+    doc.moveDown(0.8);
+
+    doc.font(F.bold).text('4. DivinityCoin does not sell or fulfil physical merchandise.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
-      'The cardholder’s stated grievance relates to physical merchandise pledged on a third-party crowdfunding partner platform. ' +
-      'Physical fulfillment of pledged rewards is the responsibility of the project creator and the crowdfunding platform on which the pledge was placed. ' +
-      'DivinityCoin is a gift card issuer and digital-credit seller and does not warehouse, ship, or otherwise fulfill physical merchandise. ' +
-      'This is set out explicitly in our Terms of Service (sections 3 and 6 — reproduced in Part 4 of this document). ' +
-      'The proper channel for the cardholder’s complaint is the project creator and the partner platform’s backer-protection process, not the digital-credit transaction that DivinityCoin completed.',
+      'To the extent the cardholder’s grievance concerns physical merchandise, DivinityCoin neither sold nor undertook to deliver any. ' +
+      'DivinityCoin is a gift card issuer and digital-credit seller; it does not warehouse, ship, or otherwise fulfil physical goods of any kind. ' +
+      'Its sole deliverable in this transaction was the digital prepaid credit balance described above, which was delivered and redeemed in full. ' +
+      'This is set out in our Terms of Service (sections 3 and 6 — reproduced in Part 4 of this document), which the cardholder accepted at checkout: DivinityCoin sells only digital prepaid credits, and any merchandise, rewards, or services subsequently obtained by redeeming those credits are sold and fulfilled by the seller of those goods, not by DivinityCoin. ' +
+      'A complaint about merchandise is therefore properly directed to the seller of that merchandise, and not to the digital-credit transaction that DivinityCoin completed and the cardholder redeemed in full.',
       { align: 'justify' },
     );
     doc.moveDown(0.8);
 
-    doc.font(F.bold).text('4. Conclusion.');
+    doc.font(F.bold).text('5. Conclusion.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
       `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably redeemed that product in full the same business day. ` +
