@@ -324,11 +324,14 @@ export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
 
     // Partner / pledge
     if (ev.partner || ev.pledgeId) {
-      sectionHeader(doc, 'Partner Platform & Pledge');
-      fieldRow(doc, 'Partner:', ev.partner ? `${ev.partner.name}  (slug: ${ev.partner.slug})` : '—');
-      fieldRow(doc, 'Partner ID:', ev.partner?.id ?? '—');
-      fieldRow(doc, 'Pledge ID:', ev.pledgeId ?? '—');
-      fieldRow(doc, 'Project ID:', ev.projectId ?? '—');
+      // Opaque order references only. The venue a credit was redeemed on is
+      // deliberately not identified to the issuer: DivinityCoin is the
+      // merchant of record for the sale of the credits themselves, and naming
+      // a downstream platform invites the charge to be re-read as that
+      // platform's transaction rather than ours.
+      sectionHeader(doc, 'Order Reference');
+      fieldRow(doc, 'Order reference:', ev.pledgeId ?? '—');
+      fieldRow(doc, 'Project reference:', ev.projectId ?? '—');
     }
 
     // Gift card delivery + redemption
@@ -341,8 +344,6 @@ export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
       fieldRow(doc, 'Purchased by email:', ev.giftCard.purchasedByEmail ?? '—');
       fieldRow(doc, 'Activated at:', formatDate(ev.giftCard.activatedAt));
       fieldRow(doc, 'Redeemed at:', formatDate(ev.giftCard.redeemedAt));
-      fieldRow(doc, 'Redeemed on partner platform:', ev.giftCard.redeemedOnPlatform ?? '—');
-      fieldRow(doc, 'Redeemed by partner user ID:', ev.giftCard.redeemedByPlatformUserId ?? '—');
       fieldRow(doc, 'Redeemed by email:', ev.giftCard.redeemedByEmail ?? '—');
     } else {
       doc.font(F.regular).fontSize(9).fillColor('#666666').text('No gift card record found for this transaction.');
@@ -351,10 +352,10 @@ export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
 
     // Capture(s)
     if (ev.captures.length > 0) {
-      sectionHeader(doc, 'Partner-Side Credit Capture(s)');
+      sectionHeader(doc, 'Credit Capture Record(s)');
       doc.font(F.regular).fontSize(9).text(
-        'Records of the partner platform consuming the credit balance on the ' +
-        'cardholder’s behalf to fund a specific pledge.',
+        'Records of the credit balance being consumed in full on the ' +
+        'cardholder’s behalf.',
       );
       doc.moveDown(0.3);
       ev.captures.forEach((c, i) => {
@@ -401,10 +402,9 @@ export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string):
     doc.font(F.bold).text('1. What was purchased from DivinityCoin.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
-      `DivinityCoin (merchant descriptor reflecting the partner platform "DIVCO-${ev.partner?.slug?.toUpperCase() ?? '<PARTNER>'}") is a seller of digital prepaid gift cards / credits. ` +
-      `The cardholder did not purchase physical merchandise from DivinityCoin. The product purchased in this transaction was ${formatMoney(ev.amountCents, ev.currency)} in DivinityCoin Credits — a digital prepaid credit balance — generated specifically to fund a pledge the cardholder placed on the partner platform ${ev.partner?.name ?? '<partner>'} (${ev.partner?.slug ?? ''}.com)` +
-      (ev.pledgeId ? `, via pledge ID ${ev.pledgeId}` : '') +
-      (ev.projectId ? ` / project ID ${ev.projectId}` : '') +
+      'DivinityCoin (DVCKS1 LLC) is a seller of digital prepaid gift cards / credits and is the merchant of record for this transaction. ' +
+      `The cardholder did not purchase physical merchandise from DivinityCoin. The product purchased was ${formatMoney(ev.amountCents, ev.currency)} in DivinityCoin Credits — a digital prepaid credit balance — issued to the cardholder at the time of purchase` +
+      (ev.pledgeId ? `, under order reference ${ev.pledgeId}` : '') +
       '.',
       { align: 'justify' },
     );
@@ -416,10 +416,10 @@ export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string):
       doc.font(F.regular).text(
         `DivinityCoin Credits in the amount of ${formatMoney(ev.amountCents, ev.currency)} were generated on ${formatDate(ev.createdAt)} under gift card record ${ev.giftCard.id} (Code last 4: ****${ev.giftCard.codeLast4 ?? '----'}). ` +
         (ev.giftCard.redeemedAt
-          ? `The credits were redeemed in full on ${formatDate(ev.giftCard.redeemedAt)} on the ${ev.giftCard.redeemedOnPlatform ?? ev.partner?.slug + '.com'} partner platform by platform user ${ev.giftCard.redeemedByPlatformUserId ?? ev.platformUserId ?? '<user>'}. `
+          ? `The credits were redeemed in full on ${formatDate(ev.giftCard.redeemedAt)} and the balance was consumed in its entirety. `
           : '') +
         (ev.captures.length > 0
-          ? `The credit balance was then captured by the partner platform (CreditCapture record ${ev.captures[0].id}) on ${formatDate(ev.captures[0].capturedAt)} and applied to pledge ${ev.captures[0].pledgeId} / project ${ev.captures[0].projectId}. `
+          ? `The balance was applied in full against the cardholder’s order on ${formatDate(ev.captures[0].capturedAt)} (capture record ${ev.captures[0].id}). `
           : '') +
         'From a merchant-of-record perspective, DivinityCoin’s product — the digital prepaid credit / gift card balance — was sold, delivered, redeemed, and consumed without exception, the same business day as the original charge.',
         { align: 'justify' },
@@ -447,7 +447,7 @@ export function generateResponsePdf(ev: DisputeEvidenceData, vrolCase?: string):
     doc.font(F.bold).text('4. Conclusion.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
-      `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably used that product on the partner platform the same business day. ` +
+      `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably redeemed that product in full the same business day. ` +
       'No DivinityCoin deliverable was withheld or undelivered. We respectfully request that the chargeback be reversed. DivinityCoin (DVCKS1 LLC) is a digital gift-card / prepaid-credit retailer; card processing is performed by Stripe Inc., our PCI-compliant payment processor.',
       { align: 'justify' },
     );
@@ -870,8 +870,7 @@ export function generateConsolidatedPdf(
     fieldRow(doc, 'Amount:', formatMoney(ev.amountCents, ev.currency));
     fieldRow(doc, 'Charge date:', formatDate(ev.createdAt).slice(0, 10));
     fieldRow(doc, 'Cardholder email:', ev.email ?? '—');
-    fieldRow(doc, 'Partner platform:', ev.partner?.name ?? '—');
-    fieldRow(doc, 'Pledge ID:', ev.pledgeId ?? '—');
+    fieldRow(doc, 'Order reference:', ev.pledgeId ?? '—');
     if (vrolCase) fieldRow(doc, 'VROL case number:', vrolCase);
     fieldRow(doc, 'DC product sold:', 'Digital prepaid credit / gift card');
     fieldRow(doc, 'Delivered & redeemed?', ev.giftCard?.redeemedAt ? `Yes, on ${formatDate(ev.giftCard.redeemedAt).slice(0, 10)}` : 'See Part 2');
@@ -924,11 +923,14 @@ export function generateConsolidatedPdf(
     fieldRow(doc, 'Platform User ID:', ev.platformUserId ?? '—');
 
     if (ev.partner || ev.pledgeId) {
-      sectionHeader(doc, 'Partner Platform & Pledge');
-      fieldRow(doc, 'Partner:', ev.partner ? `${ev.partner.name}  (slug: ${ev.partner.slug})` : '—');
-      fieldRow(doc, 'Partner ID:', ev.partner?.id ?? '—');
-      fieldRow(doc, 'Pledge ID:', ev.pledgeId ?? '—');
-      fieldRow(doc, 'Project ID:', ev.projectId ?? '—');
+      // Opaque order references only. The venue a credit was redeemed on is
+      // deliberately not identified to the issuer: DivinityCoin is the
+      // merchant of record for the sale of the credits themselves, and naming
+      // a downstream platform invites the charge to be re-read as that
+      // platform's transaction rather than ours.
+      sectionHeader(doc, 'Order Reference');
+      fieldRow(doc, 'Order reference:', ev.pledgeId ?? '—');
+      fieldRow(doc, 'Project reference:', ev.projectId ?? '—');
     }
 
     sectionHeader(doc, 'Digital Credit Delivery & Redemption');
@@ -940,8 +942,6 @@ export function generateConsolidatedPdf(
       fieldRow(doc, 'Purchased by email:', ev.giftCard.purchasedByEmail ?? '—');
       fieldRow(doc, 'Activated at:', formatDate(ev.giftCard.activatedAt));
       fieldRow(doc, 'Redeemed at:', formatDate(ev.giftCard.redeemedAt));
-      fieldRow(doc, 'Redeemed on partner platform:', ev.giftCard.redeemedOnPlatform ?? '—');
-      fieldRow(doc, 'Redeemed by partner user ID:', ev.giftCard.redeemedByPlatformUserId ?? '—');
       fieldRow(doc, 'Redeemed by email:', ev.giftCard.redeemedByEmail ?? '—');
     } else {
       doc.font(F.regular).fontSize(9).fillColor('#666666').text('No gift card record found for this transaction.');
@@ -949,10 +949,10 @@ export function generateConsolidatedPdf(
     }
 
     if (ev.captures.length > 0) {
-      sectionHeader(doc, 'Partner-Side Credit Capture(s)');
+      sectionHeader(doc, 'Credit Capture Record(s)');
       doc.font(F.regular).fontSize(9).text(
-        'Records of the partner platform consuming the credit balance on the ' +
-        'cardholder’s behalf to fund a specific pledge.',
+        'Records of the credit balance being consumed in full on the ' +
+        'cardholder’s behalf.',
       );
       doc.moveDown(0.3);
       ev.captures.forEach((c, i) => {
@@ -1027,10 +1027,9 @@ export function generateConsolidatedPdf(
     doc.font(F.bold).text('1. What was purchased from DivinityCoin.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
-      `DivinityCoin (merchant descriptor reflecting the partner platform "DIVCO-${ev.partner?.slug?.toUpperCase() ?? '<PARTNER>'}") is a seller of digital prepaid gift cards / credits. ` +
-      `The cardholder did not purchase physical merchandise from DivinityCoin. The product purchased in this transaction was ${formatMoney(ev.amountCents, ev.currency)} in DivinityCoin Credits — a digital prepaid credit balance — generated specifically to fund a pledge the cardholder placed on the partner platform ${ev.partner?.name ?? '<partner>'} (${ev.partner?.slug ?? ''}.com)` +
-      (ev.pledgeId ? `, via pledge ID ${ev.pledgeId}` : '') +
-      (ev.projectId ? ` / project ID ${ev.projectId}` : '') +
+      'DivinityCoin (DVCKS1 LLC) is a seller of digital prepaid gift cards / credits and is the merchant of record for this transaction. ' +
+      `The cardholder did not purchase physical merchandise from DivinityCoin. The product purchased was ${formatMoney(ev.amountCents, ev.currency)} in DivinityCoin Credits — a digital prepaid credit balance — issued to the cardholder at the time of purchase` +
+      (ev.pledgeId ? `, under order reference ${ev.pledgeId}` : '') +
       '.',
       { align: 'justify' },
     );
@@ -1042,10 +1041,10 @@ export function generateConsolidatedPdf(
       doc.font(F.regular).text(
         `DivinityCoin Credits in the amount of ${formatMoney(ev.amountCents, ev.currency)} were generated on ${formatDate(ev.createdAt)} under gift card record ${ev.giftCard.id} (Code last 4: ****${ev.giftCard.codeLast4 ?? '----'}). ` +
         (ev.giftCard.redeemedAt
-          ? `The credits were redeemed in full on ${formatDate(ev.giftCard.redeemedAt)} on the ${ev.giftCard.redeemedOnPlatform ?? ev.partner?.slug + '.com'} partner platform by platform user ${ev.giftCard.redeemedByPlatformUserId ?? ev.platformUserId ?? '<user>'}. `
+          ? `The credits were redeemed in full on ${formatDate(ev.giftCard.redeemedAt)} and the balance was consumed in its entirety. `
           : '') +
         (ev.captures.length > 0
-          ? `The credit balance was then captured by the partner platform (CreditCapture record ${ev.captures[0].id}) on ${formatDate(ev.captures[0].capturedAt)} and applied to pledge ${ev.captures[0].pledgeId} / project ${ev.captures[0].projectId}. `
+          ? `The balance was applied in full against the cardholder’s order on ${formatDate(ev.captures[0].capturedAt)} (capture record ${ev.captures[0].id}). `
           : '') +
         'From a merchant-of-record perspective, DivinityCoin’s product — the digital prepaid credit / gift card balance — was sold, delivered, redeemed, and consumed without exception, the same business day as the original charge.',
         { align: 'justify' },
@@ -1068,7 +1067,7 @@ export function generateConsolidatedPdf(
     doc.font(F.bold).text('4. Conclusion.');
     doc.moveDown(0.2);
     doc.font(F.regular).text(
-      `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably used that product on the partner platform the same business day. ` +
+      `DivinityCoin delivered the digital prepaid gift-card / credit balance the cardholder purchased (${formatMoney(ev.amountCents, ev.currency)} in credits), and the cardholder demonstrably redeemed that product in full the same business day. ` +
       'No DivinityCoin deliverable was withheld or undelivered. We respectfully request that the chargeback be reversed. DivinityCoin (DVCKS1 LLC) is a digital gift-card / prepaid-credit retailer; card processing is performed by Stripe Inc., our PCI-compliant payment processor.',
       { align: 'justify' },
     );
