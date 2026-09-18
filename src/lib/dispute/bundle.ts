@@ -799,7 +799,7 @@ fulfill any physical merchandise, tangible goods, services, rewards,
 experiences, or other deliverables of any kind. Any physical merchandise,
 rewards, perks, experiences, or services offered, advertised, pledged, or
 promised through, on, or in connection with a partner platform — including
-but not limited to crowdfunding rewards, backer perks, retail goods, digital
+but not limited to rewards, perks, retail goods, digital
 downloads outside the credit balance itself, subscriptions, or any
 creator-fulfilled deliverable — are sold and fulfilled by that partner
 platform and/or the underlying project creator, not by DivinityCoin.
@@ -821,8 +821,7 @@ resolved with the partner platform directly.
 Physical Merchandise, Rewards, and Services. Any physical merchandise,
 tangible goods, services, experiences, rewards, perks, or other non-credit
 deliverables offered, advertised, pledged, or promised through a partner
-platform (including but not limited to crowdfunding pledges and backer
-rewards) are sold and fulfilled by the partner platform and/or the
+platform (including but not limited to pledges and rewards) are sold and fulfilled by the partner platform and/or the
 underlying project creator, and not by DivinityCoin. DivinityCoin's only
 obligation in any transaction is the delivery and successful redemption of
 the digital credit balance. Any dispute, complaint, claim, or chargeback
@@ -846,7 +845,7 @@ export function generateTermsPdf(): Promise<Buffer> {
     doc.fillColor('#000000').fontSize(9).font(F.regular).text('DVCKS1 LLC dba DivinityCoin · divinitycoin.com/terms');
     doc.moveDown(0.5);
     doc.fontSize(16).font(F.bold).text('Terms of Service — chargeback-relevant excerpts');
-    doc.fontSize(9).fillColor('#666666').font(F.regular).text(`Generated ${formatDate(new Date())} from divinitycoin.com/terms (last updated June 2026)`);
+    doc.fontSize(9).fillColor('#666666').font(F.regular).text(`Generated ${formatDate(new Date())} from divinitycoin.com/terms (last updated September 2026)`);
     doc.fillColor('#000000');
 
     sectionHeader(doc, 'Section 3 — Service Description');
@@ -867,7 +866,7 @@ export function generateTermsPdf(): Promise<Buffer> {
       'deliverables of any kind. Any physical merchandise, rewards, perks, ' +
       'experiences, or services offered, advertised, pledged, or promised through, ' +
       'on, or in connection with a partner platform — including but not limited to ' +
-      'crowdfunding rewards, backer perks, retail goods, digital downloads outside ' +
+      'rewards, perks, retail goods, digital downloads outside ' +
       'the credit balance itself, subscriptions, or any creator-fulfilled deliverable ' +
       '— are sold and fulfilled by that partner platform and/or the underlying ' +
       'project creator, not by DivinityCoin. DivinityCoin’s product, and ' +
@@ -895,7 +894,7 @@ export function generateTermsPdf(): Promise<Buffer> {
       'Any physical merchandise, tangible goods, services, experiences, rewards, ' +
       'perks, or other non-credit deliverables offered, advertised, pledged, or ' +
       'promised through a partner platform (including but not limited to ' +
-      'crowdfunding pledges and backer rewards) are sold and fulfilled by the ' +
+      'pledges and rewards) are sold and fulfilled by the ' +
       'partner platform and/or the underlying project creator, and not by ' +
       'DivinityCoin. DivinityCoin’s only obligation in any transaction is the ' +
       'delivery and successful redemption of the digital credit balance. Any ' +
@@ -1180,9 +1179,9 @@ export function generateConsolidatedPdf(
     // ── PART 4: Terms of Service excerpts ───────────────────────
     partTitle(doc, 4, 'Terms of Service — Chargeback-Relevant Excerpts');
     doc.fontSize(9).fillColor('#666666').font(F.italic).text(
-      'Verbatim from divinitycoin.com/terms (last updated June 2026). These ' +
-      'are the sections the cardholder agreed to at checkout that govern ' +
-      'this transaction.',
+      'Verbatim from divinitycoin.com/terms (last updated September 2026). ' +
+      'These are the sections governing this transaction, which the cardholder ' +
+      'accepted at checkout.',
     );
     doc.fillColor('#000000');
 
@@ -1204,7 +1203,7 @@ export function generateConsolidatedPdf(
       'deliverables of any kind. Any physical merchandise, rewards, perks, ' +
       'experiences, or services offered, advertised, pledged, or promised through, ' +
       'on, or in connection with a partner platform — including but not limited to ' +
-      'crowdfunding rewards, backer perks, retail goods, digital downloads outside ' +
+      'rewards, perks, retail goods, digital downloads outside ' +
       'the credit balance itself, subscriptions, or any creator-fulfilled deliverable ' +
       '— are sold and fulfilled by that partner platform and/or the underlying ' +
       'project creator, not by DivinityCoin.',
@@ -1226,7 +1225,7 @@ export function generateConsolidatedPdf(
       'Any physical merchandise, tangible goods, services, experiences, rewards, ' +
       'perks, or other non-credit deliverables offered, advertised, pledged, or ' +
       'promised through a partner platform (including but not limited to ' +
-      'crowdfunding pledges and backer rewards) are sold and fulfilled by the ' +
+      'pledges and rewards) are sold and fulfilled by the ' +
       'partner platform and/or the underlying project creator, and not by ' +
       'DivinityCoin. Any dispute, complaint, claim, or chargeback concerning ' +
       'the non-delivery, late delivery, partial delivery, condition, quality, ' +

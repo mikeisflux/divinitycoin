@@ -7,7 +7,7 @@ export default function TermsPage() {
         <h1 className="text-4xl font-bold text-neutral-900 mb-4">
           Terms of Service
         </h1>
-        <p className="text-neutral-500 mb-12">Last Updated: June 2026</p>
+        <p className="text-neutral-500 mb-12">Last Updated: September 2026</p>
 
         <div className="prose prose-neutral max-w-none">
           <h2>1. Agreement to Terms</h2>
@@ -52,8 +52,8 @@ export default function TermsPage() {
             services, rewards, experiences, or other deliverables of any kind. Any
             physical merchandise, rewards, perks, experiences, or services offered,
             advertised, pledged, or promised through, on, or in connection with a
-            partner platform — including but not limited to crowdfunding rewards,
-            backer perks, retail goods, digital downloads outside the credit
+            partner platform — including but not limited to rewards, perks,
+            retail goods, digital downloads outside the credit
             balance itself, subscriptions, or any creator-fulfilled deliverable —
             are sold and fulfilled by that partner platform and/or the underlying
             project creator, not by DivinityCoin. DivinityCoin&apos;s product, and
@@ -107,7 +107,7 @@ export default function TermsPage() {
             physical merchandise, tangible goods, services, experiences, rewards,
             perks, or other non-credit deliverables offered, advertised, pledged,
             or promised through a partner platform (including but not limited to
-            crowdfunding pledges and backer rewards) are sold and fulfilled by the
+            pledges and rewards) are sold and fulfilled by the
             partner platform and/or the underlying project creator, and not by
             DivinityCoin. DivinityCoin&apos;s only obligation in any transaction is
             the delivery and successful redemption of the digital credit balance.
