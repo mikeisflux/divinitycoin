@@ -844,10 +844,58 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   // succeed on a later attempt with a different card, so a late-arriving
   // failure event must never clobber a COMPLETED record — updateMany with the
   // status in the filter makes that a no-op rather than a race.
-  await prisma.pendingPartnerPayment.updateMany({
+  const updated = await prisma.pendingPartnerPayment.updateMany({
     where: { paymentIntentId: paymentIntent.id, status: 'PENDING' },
     data: { status: 'FAILED' },
   });
+
+  // Zero rows updated means either the record is already in a terminal state —
+  // nothing to do — or it does not exist yet. The latter is a real race on the
+  // synchronous decline path: charge-saved-payment-method writes its tracking
+  // row inside the request, and Stripe can deliver payment_intent.payment_failed
+  // before that write lands. Without this, the status write is simply lost and a
+  // definitively failed charge sits as PENDING forever.
+  if (updated.count === 0) {
+    const existing = await prisma.pendingPartnerPayment.findUnique({
+      where: { paymentIntentId: paymentIntent.id },
+      select: { id: true },
+    });
+
+    if (!existing && platformUserId && pledgeId && projectId) {
+      const email = paymentIntent.metadata?.email;
+      if (email) {
+        await prisma.pendingPartnerPayment
+          .create({
+            data: {
+              paymentIntentId: paymentIntent.id,
+              partnerId,
+              platformUserId,
+              pledgeId,
+              projectId,
+              amount: paymentIntent.amount,
+              currency: paymentIntent.currency,
+              email,
+              status: 'FAILED',
+            },
+          })
+          .catch(async () => {
+            // Lost the race the other way — the request path inserted first.
+            // Re-apply the transition it would have missed.
+            await prisma.pendingPartnerPayment
+              .updateMany({
+                where: { paymentIntentId: paymentIntent.id, status: 'PENDING' },
+                data: { status: 'FAILED' },
+              })
+              .catch(() => { /* best-effort */ });
+          });
+      } else {
+        logger.warn('payment_failed for an unrecorded intent with no email in metadata', {
+          paymentIntentId: paymentIntent.id,
+          partnerId,
+        });
+      }
+    }
+  }
 
   const partner = await prisma.partner.findUnique({
     where: { id: partnerId },

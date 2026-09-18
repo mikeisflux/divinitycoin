@@ -1,5 +1,6 @@
-// middleware.ts
-// Next.js middleware for security headers, CORS, and bot/rate detection.
+// proxy.ts
+// Next.js proxy (formerly the `middleware` file convention, renamed in
+// Next.js 16) for security headers, CORS, and bot/rate detection.
 
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -72,7 +73,7 @@ function reportToFirewall(
   });
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin') || '';
   const host = request.headers.get('host') || '';
