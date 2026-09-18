@@ -343,6 +343,66 @@ GET  /internal?action=captures`}</pre>
             <h2 className="text-3xl font-bold text-neutral-900 mb-8">API Reference</h2>
 
             <div className="space-y-6">
+              {/* What's new */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>What&apos;s new — September 2026</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-neutral-600 mb-4 text-sm">
+                    Everything below is additive — no existing request or response
+                    shape changed, so nothing breaks if you deploy none of it. Two
+                    items are worth a look anyway, because they change <em>when</em>{' '}
+                    you receive an event you already handle.
+                  </p>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-neutral-200 text-left">
+                          <th className="py-2 pr-4 font-semibold text-neutral-900">Change</th>
+                          <th className="py-2 font-semibold text-neutral-900">Action required</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-neutral-600">
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4"><code className="font-mono text-xs">dispute.created</code> — new webhook</td>
+                          <td className="py-2"><strong className="text-neutral-900">Yes</strong> — add it to your event allowlist if you use one, handle it, and make the handler idempotent</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4"><code className="font-mono text-xs">payment.failed</code> now fires on real card declines</td>
+                          <td className="py-2"><strong className="text-neutral-900">Check</strong> — you will receive this in cases that previously produced nothing</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4"><code className="font-mono text-xs">idempotencyKey</code> on <code className="font-mono text-xs">charge-saved-payment-method</code></td>
+                          <td className="py-2">Recommended — without it, a retry inside 24 hours replays a cached decline without reaching the bank</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4"><code className="font-mono text-xs">idempotencyKey</code> on <code className="font-mono text-xs">create-payment-intent</code></td>
+                          <td className="py-2">Optional — needed only to make a timeout retry safe</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4"><code className="font-mono text-xs">lookup-payment</code> — new action</td>
+                          <td className="py-2">Optional — check before retrying blind</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 pr-4">Partner-initiated refunds fixed</td>
+                          <td className="py-2">None — retire any workaround. A refunded card reports <code className="font-mono text-xs">REVOKED</code></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p className="text-neutral-600 mt-4 text-sm">
+                    A <code className="font-mono text-xs bg-neutral-100 px-1 rounded">deduplicated</code>{' '}
+                    field appeared briefly on{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">create-payment-intent</code>{' '}
+                    responses during August and has been withdrawn in favour of the
+                    explicit key above. If you branched on it, remove that branch.
+                  </p>
+                </CardContent>
+              </Card>
+
               {/* Validate/Redeem */}
               <Card>
                 <CardHeader>
