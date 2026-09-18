@@ -9,10 +9,8 @@ import { prisma } from '@/lib/db';
 import { hashApiKey, encrypt } from '@/lib/encryption';
 import crypto from 'crypto';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {
@@ -57,10 +55,8 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {

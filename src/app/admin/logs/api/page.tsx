@@ -51,11 +51,12 @@ function ActionBadge({ action }: { action: string }) {
   );
 }
 
-export default async function ApiLogsPage({
-  searchParams,
-}: {
-  searchParams: { page?: string };
-}) {
+export default async function ApiLogsPage(
+  props: {
+    searchParams: Promise<{ page?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const admin = await getAdminFromRequest();
 
   if (!admin) {

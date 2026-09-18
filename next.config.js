@@ -12,6 +12,14 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/admin/disputes/bundle': ['./node_modules/pdfkit/js/data/**/*'],
   },
+  // pdfkit and its fontkit dependency must not be bundled. fontkit's ESM
+  // build imports `applyDecoratedDescriptor` from @swc/helpers, an export
+  // that no longer exists under the bundler Next 16 uses, so bundling it
+  // fails the build outright. Both are Node-only libraries used solely by
+  // the server-side dispute-evidence route, so leaving them to be required
+  // from node_modules at runtime is both correct and what the file-tracing
+  // include above already assumes.
+  serverExternalPackages: ['pdfkit', 'fontkit'],
   // Note: Next.js 14.0 doesn't support `experimental.serverActions.allowedOrigins`.
   // Same-origin enforcement is handled at nginx: the proxy sets
   // `Origin: $scheme://$host` so the framework's origin-vs-host check passes.

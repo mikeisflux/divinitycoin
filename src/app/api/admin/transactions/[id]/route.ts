@@ -12,10 +12,8 @@ import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
 import { sendTransactionReceiptEmail } from '@/lib/email/sendTransactionReceipt';
 import { Prisma } from '@prisma/client';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'FINANCE', 'SUPPORT']);
 
   if (!authorized) {
@@ -42,10 +40,8 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'FINANCE']);
 
   if (!authorized) {
@@ -151,7 +147,7 @@ export async function POST(
 
         return NextResponse.json({ success: true, refundId: refund.id });
       } catch (stripeError: any) {
-        logger.apiError('Stripe refund error:', error);
+        logger.apiError('Stripe refund error:', stripeError);
         return NextResponse.json({
           error: stripeError.message || 'Failed to process refund with Stripe'
         }, { status: 500 });

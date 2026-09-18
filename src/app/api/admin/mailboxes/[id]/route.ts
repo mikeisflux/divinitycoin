@@ -7,10 +7,8 @@ import { requireRole } from '@/lib/admin/middleware';
 import { logger } from '@/lib/logger';
 
 // GET - Get single mailbox
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
   if (!authorized) return response;
 
@@ -53,10 +51,8 @@ export async function GET(
 }
 
 // PUT - Update mailbox
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
   if (!authorized) return response;
 
@@ -103,10 +99,8 @@ export async function PUT(
 }
 
 // DELETE - Delete mailbox
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
   if (!authorized) return response;
 

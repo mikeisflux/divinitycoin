@@ -62,11 +62,12 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default async function EmailLogsPage({
-  searchParams,
-}: {
-  searchParams: { page?: string; status?: string };
-}) {
+export default async function EmailLogsPage(
+  props: {
+    searchParams: Promise<{ page?: string; status?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const admin = await getAdminFromRequest();
 
   if (!admin) {

@@ -54,11 +54,12 @@ function Field({ label, value, mono = false }: { label: string; value: React.Rea
   );
 }
 
-export default async function CheckoutSessionDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function CheckoutSessionDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const admin = await getAdminFromRequest();
   if (!admin) redirect('/admin/login');
 

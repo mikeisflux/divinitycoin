@@ -6,10 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/admin/middleware';
 import { prisma } from '@/lib/db';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
 
   if (!authorized) {

@@ -9,10 +9,8 @@ import { prisma } from '@/lib/db';
 import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
 import { generateGiftCardCode, hashCode, getCodeLast4 } from '@/lib/giftcard/generate';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {

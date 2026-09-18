@@ -8,10 +8,8 @@ import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
 
 // Ban user
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {
@@ -76,10 +74,8 @@ export async function POST(
 }
 
 // Unban user
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {

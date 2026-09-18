@@ -78,11 +78,12 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-export default async function PaymentsPage({
-  searchParams,
-}: {
-  searchParams: { page?: string };
-}) {
+export default async function PaymentsPage(
+  props: {
+    searchParams: Promise<{ page?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const admin = await getAdminFromRequest();
 
   if (!admin) {

@@ -25,7 +25,8 @@ async function getAdmin(id: string) {
   });
 }
 
-export default async function EditAdminPage({ params }: { params: { id: string } }) {
+export default async function EditAdminPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const currentAdmin = await getAdminFromRequest();
 
   if (!currentAdmin) {

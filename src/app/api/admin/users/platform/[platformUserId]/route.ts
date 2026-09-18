@@ -8,8 +8,9 @@ import { logger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { platformUserId: string } }
+  props: { params: Promise<{ platformUserId: string }> }
 ) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
 
   if (!authorized) {

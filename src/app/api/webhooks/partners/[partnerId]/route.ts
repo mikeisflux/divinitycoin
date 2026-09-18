@@ -42,10 +42,8 @@ function verifySignature(payload: string, signature: string, secret: string): bo
   );
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { partnerId: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ partnerId: string }> }) {
+  const params = await props.params;
   try {
     // Get partner
     const partner = await prisma.partner.findUnique({
@@ -310,10 +308,8 @@ export async function POST(
 }
 
 // Health check for webhook endpoint
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { partnerId: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ partnerId: string }> }) {
+  const params = await props.params;
   try {
     const partner = await prisma.partner.findUnique({
       where: { id: params.partnerId },

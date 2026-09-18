@@ -8,10 +8,8 @@ import { prisma } from '@/lib/db';
 import { getConfig } from '@/lib/config';
 import crypto from 'crypto';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const admin = await getAdminFromRequest();
 

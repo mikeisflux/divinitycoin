@@ -7,10 +7,8 @@ import { requireRole } from '@/lib/admin/middleware';
 import { logger } from '@/lib/logger';
 
 // GET - Get single email
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
   if (!authorized) return response;
 
@@ -70,10 +68,8 @@ export async function GET(
 }
 
 // PUT - Update email (mark as read, star, move to folder, etc.)
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
   if (!authorized) return response;
 
@@ -148,10 +144,8 @@ export async function PUT(
 }
 
 // DELETE - Move to trash or permanently delete
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
   if (!authorized) return response;
 

@@ -6,10 +6,8 @@ import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { apiRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     // SECURITY: Rate limiting to prevent enumeration attacks
     const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

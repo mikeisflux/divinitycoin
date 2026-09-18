@@ -21,10 +21,8 @@ function getClientIp(req: NextRequest): string {
   );
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // SUPER_ADMIN and ADMIN only — SUPPORT can view partner pages in /admin
   // but shouldn't be able to act AS a partner.
   const { authorized, response, admin } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);

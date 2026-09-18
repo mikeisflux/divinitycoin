@@ -87,11 +87,12 @@ function ActionBadge({ action }: { action: string }) {
   );
 }
 
-export default async function SecurityLogsPage({
-  searchParams,
-}: {
-  searchParams: { page?: string };
-}) {
+export default async function SecurityLogsPage(
+  props: {
+    searchParams: Promise<{ page?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const admin = await getAdminFromRequest();
 
   if (!admin) {

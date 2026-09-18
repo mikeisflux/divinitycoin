@@ -171,11 +171,12 @@ function formatAmount(amountCents: number, currency: string): string {
   }).format(amountCents / 100);
 }
 
-export default async function HostedCheckoutPage({
-  params,
-}: {
-  params: { sessionToken: string };
-}) {
+export default async function HostedCheckoutPage(
+  props: {
+    params: Promise<{ sessionToken: string }>;
+  }
+) {
+  const params = await props.params;
   const data = await loadSession(params.sessionToken);
   if (!data) notFound();
 

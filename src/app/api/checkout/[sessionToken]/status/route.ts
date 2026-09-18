@@ -21,10 +21,8 @@ function appendSessionId(url: string, sessionToken: string): string {
   }
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { sessionToken: string } },
-) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ sessionToken: string }> }) {
+  const params = await props.params;
   try {
     const session = await prisma.checkoutSession.findUnique({
       where: { sessionToken: params.sessionToken },

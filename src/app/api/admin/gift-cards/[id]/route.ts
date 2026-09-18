@@ -7,10 +7,8 @@ import { requireRole, getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN', 'SUPPORT']);
 
   if (!authorized) {
@@ -38,10 +36,8 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {
@@ -134,10 +130,8 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN']);
 
   if (!authorized) {

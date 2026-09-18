@@ -8,10 +8,8 @@ import { logAdminAction } from '@/lib/admin/auth';
 import { prisma } from '@/lib/db';
 import { sendTestWebhook } from '@/lib/partner/webhook';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { authorized, admin, response } = await requireRole(request, ['SUPER_ADMIN', 'ADMIN']);
 
   if (!authorized) {

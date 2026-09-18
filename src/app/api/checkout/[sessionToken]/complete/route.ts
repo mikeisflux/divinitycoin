@@ -20,10 +20,8 @@ function appendSessionId(url: string, sessionToken: string): string {
   }
 }
 
-export async function POST(
-  _req: NextRequest,
-  { params }: { params: { sessionToken: string } },
-) {
+export async function POST(_req: NextRequest, props: { params: Promise<{ sessionToken: string }> }) {
+  const params = await props.params;
   const { sessionToken } = params;
 
   try {

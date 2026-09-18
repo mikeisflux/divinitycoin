@@ -7,10 +7,8 @@ import { sendGiftCardEmail } from '@/lib/email/sendGiftCard';
 import { logger } from '@/lib/logger';
 import { apiRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id } = params;
 

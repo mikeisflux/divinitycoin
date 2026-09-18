@@ -61,10 +61,11 @@ function ActionBadge({ action }: { action: string }) {
 }
 
 interface Props {
-  searchParams: { page?: string };
+  searchParams: Promise<{ page?: string }>;
 }
 
-export default async function AuditLogsPage({ searchParams }: Props) {
+export default async function AuditLogsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const admin = await getAdminFromRequest();
 
   if (!admin) {
