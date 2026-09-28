@@ -1,140 +1,161 @@
 #!/bin/bash
-# deploy.sh
-# Zero-downtime deployment script for DivinityCoin
-# Usage: ./scripts/deploy.sh [branch]
+# deploy.sh — pull, build and restart DivinityCoin.
+#
+# Usage:
+#   ./scripts/deploy.sh                  # deploy the branch already checked out
+#   ./scripts/deploy.sh <branch>         # deploy a specific branch
+#   ./scripts/deploy.sh --no-pull        # rebuild and restart what is on disk
+#
+# The sequence here is section 3 of .claude/CLAUDE.md plus what the September
+# 2026 outages taught. Read the comments before "simplifying" any of it.
 
-set -e
+set -euo pipefail
 
-echo "Starting deployment..."
-
-# Variables - detect current directory or use default
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 APP_NAME="divinitycoin"
-BRANCH="${1:-main}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Change to app directory
 cd "$APP_DIR"
-log_info "Working directory: $APP_DIR"
-log_info "Target branch: $BRANCH"
 
-# Step 1: Pull latest changes
-log_info "Fetching latest changes..."
-git fetch origin "$BRANCH"
-
-LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse "origin/$BRANCH")
-
-if [ "$LOCAL" = "$REMOTE" ]; then
-    log_warn "Already up to date with origin/$BRANCH"
-    read -p "Rebuild anyway? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Deployment cancelled."
-        exit 0
-    fi
-else
-    log_info "Pulling changes..."
-    git pull origin "$BRANCH"
-fi
-
-# Step 2: Install dependencies
-log_info "Installing dependencies..."
-npm ci --prefer-offline 2>/dev/null || npm install
-
-# Step 3: Generate Prisma client
-log_info "Generating Prisma client..."
-npx prisma generate
-
-# Step 4: Run database migrations
-log_info "Running database migrations..."
-npx prisma migrate deploy || log_warn "No pending migrations"
-
-# Step 5: Build application (while current version stays live)
-log_info "Building Next.js application..."
-BUILD_START=$(date +%s)
-npm run build
-BUILD_END=$(date +%s)
-log_info "Build completed in $((BUILD_END - BUILD_START)) seconds"
-
-# Step 6: Hot reload with PM2 (zero-downtime)
-log_info "Performing zero-downtime reload..."
-
-if pm2 list 2>/dev/null | grep -q "$APP_NAME"; then
-    # Use reload for graceful zero-downtime restart
-    # PM2 will start new instances before killing old ones
-    pm2 reload "$APP_NAME" --update-env
-    log_info "Application reloaded (zero downtime)"
-else
-    log_warn "Application not found in PM2. Starting fresh..."
-    if [ -f "ecosystem.config.js" ]; then
-        pm2 start ecosystem.config.js --env production
-    else
-        pm2 start npm --name "$APP_NAME" -- start
-    fi
-fi
-
-# Step 7: Reload nginx (if accessible)
-if command -v nginx &> /dev/null; then
-    log_info "Testing nginx configuration..."
-    if sudo nginx -t 2>/dev/null; then
-        sudo nginx -s reload
-        log_info "Nginx reloaded"
-    elif nginx -t 2>/dev/null; then
-        nginx -s reload
-        log_info "Nginx reloaded"
-    else
-        log_warn "Nginx config test failed, skipping reload"
-    fi
-fi
-
-# Step 8: Save PM2 state
-pm2 save 2>/dev/null || true
-
-# Step 9: Health check
-log_info "Running health check..."
-sleep 3
-
-MAX_RETRIES=5
-RETRY_COUNT=0
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health 2>/dev/null || echo "000")
-    if [ "$HTTP_STATUS" = "200" ]; then
-        log_info "Health check passed!"
-        break
-    fi
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    log_warn "Health check attempt $RETRY_COUNT/$MAX_RETRIES (status: $HTTP_STATUS)"
-    sleep 2
+# Never default to main. main holds two files; deploying it would wipe the
+# site. The safe default is whatever is already checked out.
+PULL=1
+BRANCH=""
+for arg in "$@"; do
+    case "$arg" in
+        --no-pull) PULL=0 ;;
+        -*)        echo "Unknown option: $arg" >&2; exit 2 ;;
+        *)         BRANCH="$arg" ;;
+    esac
 done
+[ -n "$BRANCH" ] || BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
-if [ "$HTTP_STATUS" != "200" ]; then
-    log_error "Health check failed after $MAX_RETRIES attempts"
-    log_warn "Check logs with: pm2 logs $APP_NAME"
+if [ "$BRANCH" = "HEAD" ]; then
+    echo "[ERROR] Detached HEAD. Check out a branch or pass one explicitly." >&2
     exit 1
 fi
 
-# Step 10: Show status
-echo ""
-pm2 status "$APP_NAME"
-echo ""
-log_info "Deployment completed successfully!"
-log_info "Monitor logs: pm2 logs $APP_NAME"
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+log()  { echo -e "${GREEN}[INFO]${NC}  $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC}  $1"; }
+err()  { echo -e "${RED}[ERROR]${NC} $1"; }
+
+log "Directory : $APP_DIR"
+log "Branch    : $BRANCH"
+
+# Belt and braces: a DATABASE_URL inherited from the shell can be snapshotted
+# into pm2's env by --update-env and outlive this deploy. .env on disk is the
+# only source we want. (CLAUDE.md section 1.)
+unset DATABASE_URL
+
+BEFORE="$(git rev-parse --short HEAD)"
+
+if [ "$PULL" -eq 1 ]; then
+    log "Fetching origin/$BRANCH..."
+    for attempt in 1 2 3 4; do
+        if git fetch origin "$BRANCH"; then break; fi
+        warn "Fetch failed (attempt $attempt). Retrying..."
+        sleep $((2 ** attempt))
+    done
+    git checkout "$BRANCH"
+    git pull origin "$BRANCH"
+else
+    warn "--no-pull: rebuilding what is already on disk"
+fi
+
+AFTER="$(git rev-parse --short HEAD)"
+if [ "$BEFORE" = "$AFTER" ]; then
+    log "No new commits ($AFTER) — rebuilding anyway"
+else
+    log "Updated $BEFORE -> $AFTER"
+    git --no-pager log --oneline "$BEFORE..$AFTER" | sed 's/^/         /'
+fi
+
+log "Installing dependencies..."
+npm install --legacy-peer-deps
+
+log "Generating Prisma client..."
+npx prisma generate
+
+# This project has no committed migrations; schema changes ship via db push.
+# `prisma migrate deploy` would be a silent no-op here.
+log "Syncing database schema..."
+npx prisma db push --skip-generate
+
+# Stop BEFORE building. `next build` deletes and rewrites .next in place, so a
+# running process spends the whole build crashing into a half-written
+# directory — that is the 502-plus-climbing-restart-count pattern from
+# September. A short planned outage beats a long crash loop.
+log "Stopping $APP_NAME for the build..."
+pm2 stop "$APP_NAME" 2>/dev/null || warn "$APP_NAME was not running"
+
+log "Building..."
+BUILD_START=$(date +%s)
+if ! npm run build; then
+    err "Build failed. The app is stopped and .next is incomplete."
+    err "Fix the build and re-run, or restore the previous release:"
+    err "  git checkout $BEFORE && npm run build && pm2 start $APP_NAME"
+    exit 1
+fi
+log "Built in $(( $(date +%s) - BUILD_START ))s"
+
+# pm2 start, never reload or restart: a rolling restart can leave an old
+# instance serving HTML that references chunk hashes the new .next no longer
+# has, which renders as a styleless, broken-looking site. (CLAUDE.md section 3.)
+if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+    log "Starting $APP_NAME..."
+    pm2 start "$APP_NAME" --update-env
+elif [ -f ecosystem.config.js ]; then
+    warn "$APP_NAME not registered with pm2 — creating from ecosystem.config.js"
+    pm2 start ecosystem.config.js --env production
+else
+    warn "$APP_NAME not registered with pm2 — creating"
+    pm2 start npm --name "$APP_NAME" -- start
+fi
+
+# `pm2 update` and some upgrades drop the saved process list; without this the
+# app does not come back after a reboot.
+pm2 save >/dev/null 2>&1 || warn "pm2 save failed"
+
+log "Waiting for the app to accept requests..."
+STATUS="000"
+for attempt in $(seq 1 10); do
+    STATUS="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health || echo 000)"
+    # Deliberately an if, not `[ ... ] && break`: under `set -e` a failing test
+    # as the last command in the loop body would exit the whole script.
+    if [ "$STATUS" = "200" ]; then break; fi
+    sleep 2
+done
+
+if [ "$STATUS" != "200" ]; then
+    err "Local health check failed (last status: $STATUS)"
+    err "  pm2 logs $APP_NAME --lines 40 --nostream"
+    exit 1
+fi
+log "Local health check passed"
+
+# Separates "the app is down" from "nginx is holding a dead upstream".
+PUBLIC="$(curl -s -o /dev/null -w '%{http_code}' https://divinitycoin.com/ || echo 000)"
+if [ "$PUBLIC" = "200" ]; then
+    log "Public site returning 200"
+else
+    warn "Public site returned $PUBLIC while localhost is healthy."
+    warn "Usually a stale nginx upstream: systemctl reload nginx"
+fi
+
+# The proxy carries security headers, bot blocking and the hosted-checkout
+# frame policy. If it silently stops running, every page still returns 200,
+# so it needs its own assertion.
+PROXY="$(curl -s -o /dev/null -w '%{http_code}' -X POST https://divinitycoin.com/some-page || echo 000)"
+if [ "$PROXY" = "400" ]; then
+    log "Proxy active (origin-less POST rejected)"
+else
+    warn "Proxy check returned $PROXY, expected 400."
+    warn "Security headers and bot blocking may not be running. Investigate before walking away."
+fi
+
+echo
+pm2 status "$APP_NAME" || true
+echo
+log "Deployed $AFTER on $BRANCH"
+log "Logs: pm2 logs $APP_NAME"
