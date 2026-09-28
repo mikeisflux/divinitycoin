@@ -30,6 +30,29 @@ const RATE_LIMIT_EXEMPT_PREFIXES = [
   '/internal',
 ];
 
+/**
+ * Documentation and integration surfaces that must never escalate to a block.
+ *
+ * A suspicion flag here does not just return a 4xx — after SUSPICIOUS_LIMIT
+ * signals it reports the IP to BotBlock, which installs an iptables DROP.
+ * That is a kernel-level ban on the developer's whole office, applied while
+ * they were reading our API documentation or retrying a wrong URL, and
+ * nothing in the resulting silence tells them why.
+ *
+ * Reading the docs is not an attack. These paths are exempt from rate limiting
+ * and can never raise a suspicion signal. Every other protection — security
+ * headers, CORS, the sensitive-path 404 — still applies to them, and every
+ * other path is unaffected.
+ */
+const NEVER_FLAG_PREFIXES = [
+  '/developers',
+  '/partners/documentation',
+  '/partners/login',
+  '/partners/setup',
+  '/become-a-partner',
+  '/api/internal',
+];
+
 function getClientIp(request: NextRequest): string {
   const xff = request.headers.get('x-forwarded-for');
   if (xff) return xff.split(',')[0]?.trim() || '';
@@ -79,8 +102,11 @@ export function proxy(request: NextRequest) {
   const host = request.headers.get('host') || '';
   const ip = getClientIp(request);
 
+  const isDocsSurface = NEVER_FLAG_PREFIXES.some(p => pathname.startsWith(p));
+
   // ---- Rate limit / abuse detection ----
-  const rateLimitable = !RATE_LIMIT_EXEMPT_PREFIXES.some(p => pathname.startsWith(p));
+  const rateLimitable =
+    !isDocsSurface && !RATE_LIMIT_EXEMPT_PREFIXES.some(p => pathname.startsWith(p));
   if (rateLimitable && !isWhitelisted(ip)) {
     const count = recordRequest(ip);
     if (count >= HARD_LIMIT) {
@@ -102,6 +128,8 @@ export function proxy(request: NextRequest) {
   // has accumulated enough bad requests in the sliding window.
   const flagSuspicious = (reason: string) => {
     if (isWhitelisted(ip)) return;
+    // Never let a documentation or onboarding path put someone in the firewall.
+    if (isDocsSurface) return;
     const hits = recordSuspicious(ip);
     if (hits >= SUSPICIOUS_LIMIT) {
       reportToFirewall(request, ip, `suspicious: ${reason} (${hits} hits)`);
