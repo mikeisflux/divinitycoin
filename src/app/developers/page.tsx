@@ -291,8 +291,36 @@ Response:
               <Card>
                 <CardContent className="p-6">
                   <h3 className="font-semibold text-lg mb-4">Base URL</h3>
-                  <div className="bg-neutral-100 p-4 rounded-lg mb-6">
-                    <code className="text-primary-600 font-mono">https://divinitycoin.com</code>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4">
+                    <code className="text-primary-600 font-mono">https://divinitycoin.com/internal</code>
+                  </div>
+
+                  <div className="border-l-4 border-red-400 bg-red-50 p-4 rounded mb-6">
+                    <p className="font-semibold text-neutral-900 mb-2 text-sm">
+                      The path is <code className="font-mono text-xs bg-white px-1 rounded">/internal</code>, not{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">/api/internal</code>
+                    </p>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      Every other route on this host is under{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">/api/</code>, so the
+                      partner API looks like it should be too. It isn&apos;t.{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">/api/internal/…</code>{' '}
+                      is rejected by our edge before the application sees it, which produces an HTML{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">403</code> rather than a
+                      JSON error — easy to mistake for a rejected key or a blocked IP.
+                    </p>
+                    <div className="bg-white p-3 rounded overflow-x-auto">
+                      <pre className="text-xs">{`✓  https://divinitycoin.com/internal?action=validate
+✗  https://divinitycoin.com/api/internal/validate
+✗  https://divinitycoin.com/api/internal?action=validate`}</pre>
+                    </div>
+                    <p className="text-neutral-700 text-sm mt-2">
+                      An HTML 403 means the path is wrong. A real authentication
+                      failure is always JSON:{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">
+                        {'{"error":"Invalid or expired API key"}'}
+                      </code>.
+                    </p>
                   </div>
 
                   <h3 className="font-semibold text-lg mb-4">Authentication</h3>

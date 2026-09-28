@@ -10,6 +10,7 @@ import { SettlementStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { hashApiKey } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
+import { invalidActionBody } from '@/lib/partner/internal-actions';
 import { getStripeClient } from '@/lib/stripe';
 import { getStripeConfig, getConfig } from '@/lib/config';
 import { fireCheckoutWebhookIfNeeded } from '@/lib/checkout/webhook';
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action' },
+          invalidActionBody('POST', action, new URL(request.url).origin),
           { status: 400 }
         );
     }
@@ -276,7 +277,7 @@ export async function GET(request: NextRequest) {
 
     default:
       return NextResponse.json(
-        { error: 'Invalid action' },
+        invalidActionBody('GET', action, url.origin),
         { status: 400 }
       );
   }
