@@ -401,6 +401,68 @@ function refundHistoryParagraph(ev: DisputeEvidenceData): string {
   );
 }
 
+/**
+ * Reason codes where the cardholder denies making the purchase at all.
+ * These need an authorisation argument; a refund history answers a question
+ * nobody asked.
+ */
+const NON_AUTHORISATION_REASONS = new Set(['fraudulent', 'unrecognized']);
+
+function isNonAuthorisationClaim(ctx: StripeContextSummary | null): boolean {
+  return !!ctx?.dispute && NON_AUTHORISATION_REASONS.has(ctx.dispute.reason);
+}
+
+/**
+ * The paragraph that answers "I did not authorise this".
+ *
+ * Address and security-code verification carry it: neither value can be
+ * derived from a card number, so a pass means the purchaser knew the postcode
+ * registered to the card and had the card itself to hand. Stated from the
+ * processor's own recorded results rather than asserted.
+ */
+function authorisationParagraph(ev: DisputeEvidenceData, ctx: StripeContextSummary | null): string {
+  const card = ctx?.card ?? null;
+  const checks: string[] = [];
+  if (card?.cvcCheck === 'pass') {
+    checks.push('the card security code printed on the physical card was supplied and verified');
+  }
+  if (card?.zipCheck === 'pass') {
+    checks.push('the billing postcode registered to the card was supplied and verified');
+  }
+  if (card?.line1Check === 'pass') {
+    checks.push('the billing street address registered to the card was supplied and verified');
+  }
+
+  const verification = checks.length > 0
+    ? `At authorisation, ${checks.join(', and ')}. Neither the security code nor the billing address can be derived from a card number alone; supplying them indicates possession of the card and knowledge of the account it belongs to. `
+    : '';
+
+  const cardLine = card
+    ? `The charge was made on a ${card.brand} card ending ${card.last4}` +
+      (card.country ? ` issued in ${card.country}` : '') +
+      (card.fingerprint ? `, card fingerprint ${card.fingerprint}` : '') +
+      '. '
+    : '';
+
+  const identity = ev.giftCard
+    ? `The credits purchased were issued to the account holder's own email address${ev.email ? ` (${ev.email})` : ''} under credit record ${ev.giftCard.id}` +
+      (ev.giftCard.codeLast4 ? ` (code ending ${ev.giftCard.codeLast4})` : '') +
+      (ev.giftCard.redeemedAt
+        ? `, and were redeemed in full by that same account on ${formatDate(ev.giftCard.redeemedAt)}. `
+        : '. ')
+    : '';
+
+  const origin = ev.customerIpAddress
+    ? `The purchase was made from IP address ${ev.customerIpAddress}. `
+    : '';
+
+  return (
+    'The cardholder states that this purchase was not authorised. The verification results recorded at authorisation do not support that. ' +
+    cardLine + verification + origin + identity +
+    'No refund was requested at any point, and the product was delivered and consumed in full.'
+  );
+}
+
 export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
   return pdfBuffer((doc) => {
     // Header
@@ -673,6 +735,22 @@ interface StripeContextSummary {
     funding: string | null;
     country: string | null;
     network: string | null;
+    /**
+     * Address and security-code verification. These decide a
+     * non-authorisation claim: neither value can be derived from the card
+     * number, so a pass means the purchaser knew the billing postcode and
+     * held the physical card.
+     */
+    cvcCheck: string | null;
+    zipCheck: string | null;
+    line1Check: string | null;
+    fingerprint: string | null;
+  } | null;
+  /** The reason the cardholder actually gave, so the letter can answer it. */
+  dispute: {
+    id: string;
+    reason: string;
+    status: string;
   } | null;
   createdAt: Date;
   errorMessage?: string;
@@ -688,6 +766,19 @@ async function fetchStripeContext(paymentIntentId: string): Promise<StripeContex
     const charge: any = pi.latest_charge;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pmd: any = charge?.payment_method_details ?? null;
+
+    // The reason code decides which argument the letter should lead with.
+    // Best-effort: a missing dispute just means the kit was pulled before one
+    // was filed, which is a normal way to use it.
+    let disputeSummary: StripeContextSummary['dispute'] = null;
+    try {
+      const disputes = await stripe.disputes.list({ payment_intent: pi.id, limit: 1 });
+      const d = disputes.data[0];
+      if (d) disputeSummary = { id: d.id, reason: d.reason, status: d.status };
+    } catch {
+      // Leave null — the letter falls back to its default framing.
+    }
+
     return {
       paymentIntentId: pi.id,
       status: pi.status,
@@ -713,7 +804,12 @@ async function fetchStripeContext(paymentIntentId: string): Promise<StripeContex
         funding: pmd.card.funding ?? null,
         country: pmd.card.country ?? null,
         network: pmd.card.network ?? null,
+        cvcCheck: pmd.card.checks?.cvc_check ?? null,
+        zipCheck: pmd.card.checks?.address_postal_code_check ?? null,
+        line1Check: pmd.card.checks?.address_line1_check ?? null,
+        fingerprint: pmd.card.fingerprint ?? null,
       } : null,
+      dispute: disputeSummary,
       createdAt: new Date((pi.created ?? Math.floor(Date.now() / 1000)) * 1000),
     };
   } catch (error) {
@@ -734,6 +830,7 @@ async function fetchStripeContext(paymentIntentId: string): Promise<StripeContex
       receiptEmail: null,
       statementDescriptor: null,
       card: null,
+      dispute: null,
       createdAt: new Date(),
       errorMessage: error instanceof Error ? error.message : 'Lookup failed',
     };
@@ -1181,22 +1278,37 @@ export function generateConsolidatedPdf(
     }
     doc.moveDown(0.8);
 
-    doc.font(F.bold).text('3. No refund was requested, and no refund was ever promised.');
-    doc.moveDown(0.2);
-    doc.font(F.regular).text(refundHistoryParagraph(ev), { align: 'justify' });
-    doc.moveDown(0.8);
+    // The cardholder's stated reason decides which argument leads. A
+    // non-authorisation claim needs the verification results; answering it
+    // with a refund history reads as evasion.
+    if (isNonAuthorisationClaim(stripeCtx)) {
+      doc.font(F.bold).text('3. The cardholder authorised this transaction.');
+      doc.moveDown(0.2);
+      doc.font(F.regular).text(authorisationParagraph(ev, stripeCtx), { align: 'justify' });
+      doc.moveDown(0.8);
 
-    doc.font(F.bold).text('4. DivinityCoin does not sell or fulfil physical merchandise.');
-    doc.moveDown(0.2);
-    doc.font(F.regular).text(
-      'To the extent the cardholder’s grievance concerns physical merchandise, DivinityCoin neither sold nor undertook to deliver any. ' +
-      'DivinityCoin is a gift card issuer and digital-credit seller; it does not warehouse, ship, or otherwise fulfil physical goods of any kind. ' +
-      'Its sole deliverable in this transaction was the digital prepaid credit balance described above, which was delivered and redeemed in full. ' +
-      'This is set out in our Terms of Service (sections 3 and 6 — reproduced in Part 4 of this document), which the cardholder accepted at checkout: DivinityCoin sells only digital prepaid credits, and any merchandise, rewards, or services subsequently obtained by redeeming those credits are sold and fulfilled by the seller of those goods, not by DivinityCoin. ' +
-      'A complaint about merchandise is therefore properly directed to the seller of that merchandise, and not to the digital-credit transaction that DivinityCoin completed and the cardholder redeemed in full.',
-      { align: 'justify' },
-    );
-    doc.moveDown(0.8);
+      doc.font(F.bold).text('4. No refund was requested.');
+      doc.moveDown(0.2);
+      doc.font(F.regular).text(refundHistoryParagraph(ev), { align: 'justify' });
+      doc.moveDown(0.8);
+    } else {
+      doc.font(F.bold).text('3. No refund was requested, and no refund was ever promised.');
+      doc.moveDown(0.2);
+      doc.font(F.regular).text(refundHistoryParagraph(ev), { align: 'justify' });
+      doc.moveDown(0.8);
+
+      doc.font(F.bold).text('4. DivinityCoin does not sell or fulfil physical merchandise.');
+      doc.moveDown(0.2);
+      doc.font(F.regular).text(
+        'To the extent the cardholder’s grievance concerns physical merchandise, DivinityCoin neither sold nor undertook to deliver any. ' +
+        'DivinityCoin is a gift card issuer and digital-credit seller; it does not warehouse, ship, or otherwise fulfil physical goods of any kind. ' +
+        'Its sole deliverable in this transaction was the digital prepaid credit balance described above, which was delivered and redeemed in full. ' +
+        'This is set out in our Terms of Service (sections 3 and 6 — reproduced in Part 4 of this document), which the cardholder accepted at checkout: DivinityCoin sells only digital prepaid credits, and any merchandise, rewards, or services subsequently obtained by redeeming those credits are sold and fulfilled by the seller of those goods, not by DivinityCoin. ' +
+        'A complaint about merchandise is therefore properly directed to the seller of that merchandise, and not to the digital-credit transaction that DivinityCoin completed and the cardholder redeemed in full.',
+        { align: 'justify' },
+      );
+      doc.moveDown(0.8);
+    }
 
     doc.font(F.bold).text('5. Conclusion.');
     doc.moveDown(0.2);
