@@ -80,6 +80,14 @@ export interface DisputeEvidenceData {
     processedAt: Date | null;
   }>;
   refundIssued: { refundId: string | null; refundedAt: Date | null } | null;
+  /**
+   * The cardholder's own IP and browser, as reported by the partner at
+   * checkout. Deliberately not the IP we observed: on a server-to-server call
+   * that is the partner's datacenter, and presenting it as the purchaser's
+   * would be false. Null for charges made before partners began sending it.
+   */
+  customerIpAddress: string | null;
+  customerUserAgent: string | null;
 }
 
 // ─── Evidence lookup ──────────────────────────────────────────────
@@ -184,6 +192,8 @@ export async function gatherDisputeEvidence(
       refundIssued: pp.refundId || pp.refundedAt
         ? { refundId: pp.refundId, refundedAt: pp.refundedAt }
         : null,
+      customerIpAddress: pp.customerIpAddress,
+      customerUserAgent: pp.customerUserAgent,
     };
   }
 
@@ -245,6 +255,8 @@ export async function gatherDisputeEvidence(
         processedAt: r.processedAt,
       })),
       refundIssued: null,
+      customerIpAddress: null,
+      customerUserAgent: null,
     };
   }
 
@@ -427,6 +439,15 @@ export function generateReceiptPdf(ev: DisputeEvidenceData): Promise<Buffer> {
       sectionHeader(doc, 'Order Reference');
       fieldRow(doc, 'Order reference:', ev.pledgeId ?? '—');
       fieldRow(doc, 'Project reference:', ev.projectId ?? '—');
+    }
+
+    // Only rendered when we actually hold it. An absent origin block is
+    // better than a row reading "—", which invites the question of why a
+    // merchant does not know where its own sale came from.
+    if (ev.customerIpAddress || ev.customerUserAgent) {
+      sectionHeader(doc, 'Purchase Origin');
+      if (ev.customerIpAddress) fieldRow(doc, 'Purchaser IP address:', ev.customerIpAddress);
+      if (ev.customerUserAgent) fieldRow(doc, 'Purchaser browser:', ev.customerUserAgent);
     }
 
     // Gift card delivery + redemption
@@ -1030,6 +1051,15 @@ export function generateConsolidatedPdf(
       sectionHeader(doc, 'Order Reference');
       fieldRow(doc, 'Order reference:', ev.pledgeId ?? '—');
       fieldRow(doc, 'Project reference:', ev.projectId ?? '—');
+    }
+
+    // Only rendered when we actually hold it. An absent origin block is
+    // better than a row reading "—", which invites the question of why a
+    // merchant does not know where its own sale came from.
+    if (ev.customerIpAddress || ev.customerUserAgent) {
+      sectionHeader(doc, 'Purchase Origin');
+      if (ev.customerIpAddress) fieldRow(doc, 'Purchaser IP address:', ev.customerIpAddress);
+      if (ev.customerUserAgent) fieldRow(doc, 'Purchaser browser:', ev.customerUserAgent);
     }
 
     sectionHeader(doc, 'Digital Credit Delivery & Redemption');

@@ -1113,6 +1113,17 @@ model PendingPartnerPayment {
   refundId   String?
   refundedAt DateTime?
 
+  // Purchase origin, kept for chargeback evidence and ban matching.
+  //
+  // customerIpAddress / customerUserAgent are the END USER's, supplied by the
+  // partner from their own checkout request. requestIpAddress is whoever
+  // called us — on a server-to-server partner call that is the partner's
+  // datacenter, which is why it must never be presented as the purchaser's
+  // IP in a dispute response.
+  customerIpAddress String?
+  customerUserAgent String?
+  requestIpAddress  String?
+
   // Webhook delivery tracking
   webhookSent   Boolean   @default(false)
   webhookSentAt DateTime?
@@ -1125,6 +1136,7 @@ model PendingPartnerPayment {
   @@index([partnerId])
   @@index([platformUserId])
   @@index([pledgeId])
+  @@index([customerIpAddress])
   @@index([status])
 }
 

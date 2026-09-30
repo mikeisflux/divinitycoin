@@ -701,10 +701,38 @@ GET  /internal?action=captures`}</pre>
   "type": "upcharge",              // Optional. Marks this as a pledge-modification charge
   "originalPaymentId": string,     // Optional. Required when type="upcharge"; the
                                    //   paymentIntentId of the original pledge payment
-  "idempotencyKey": string         // Optional. 1-64 chars [A-Za-z0-9._:-]. Repeat it to
+  "idempotencyKey": string,        // Optional. 1-64 chars [A-Za-z0-9._:-]. Repeat it to
                                    //   retry a charge safely; use a distinct value for a
                                    //   genuinely separate charge on the same pledge.
+  "customerIpAddress": string,     // Optional but strongly recommended. The END USER's IP,
+                                   //   from your checkout request. See below.
+  "customerUserAgent": string      // Optional. The end user's User-Agent, same source.
 }`}</pre>
+                  </div>
+
+                  <div className="border-l-4 border-emerald-400 bg-emerald-50 p-4 rounded mb-4">
+                    <p className="font-semibold text-neutral-900 mb-2 text-sm">
+                      Please send <code className="font-mono text-xs bg-white px-1 rounded">customerIpAddress</code>
+                    </p>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      This call reaches us server-to-server, so the only IP we can observe is
+                      your server&apos;s. That makes it worthless as fraud evidence, and it is
+                      the same value for every one of your backers. The end user&apos;s real IP
+                      is something only you can see.
+                    </p>
+                    <p className="text-neutral-700 text-sm mb-2">
+                      It matters when a cardholder claims they never authorised a purchase. With
+                      the purchase IP we can show the charge came from the buyer&apos;s own
+                      network; without it, a fraud dispute is close to unwinnable and the loss
+                      lands on the campaign. It also makes our chargeback-ban matching work
+                      properly, so a banned backer cannot simply return under a new email.
+                    </p>
+                    <p className="text-neutral-700 text-sm">
+                      Send whatever your framework reports as the client IP — the first entry of{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded">X-Forwarded-For</code>{' '}
+                      in most setups. We record it as reported and never treat it as verified.
+                      Omit it and nothing breaks.
+                    </p>
                   </div>
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>

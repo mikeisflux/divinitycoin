@@ -101,6 +101,26 @@ async function validateInternalRequest(request: NextRequest): Promise<AuthResult
 /**
  * Get client IP address
  */
+/**
+ * Normalise the end-user origin fields a partner may send.
+ *
+ * These describe the cardholder's browser, not ours. On a server-to-server
+ * call the IP we observe is the partner's datacenter, which is useless as
+ * fraud evidence and actively misleading if presented as the purchaser's —
+ * so the only trustworthy source is the partner forwarding what they saw.
+ */
+function normaliseCustomerOrigin(body: { customerIpAddress?: unknown; customerUserAgent?: unknown }) {
+  const rawIp = typeof body.customerIpAddress === 'string' ? body.customerIpAddress.trim() : '';
+  const rawUa = typeof body.customerUserAgent === 'string' ? body.customerUserAgent.trim() : '';
+  return {
+    // 45 chars covers the longest IPv6 form. Not validated beyond a length
+    // and charset sanity check: we record what the partner reports rather
+    // than asserting it is correct.
+    customerIpAddress: /^[0-9a-fA-F:.]{3,45}$/.test(rawIp) ? rawIp : null,
+    customerUserAgent: rawUa ? rawUa.slice(0, 512) : null,
+  };
+}
+
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
          request.headers.get('x-real-ip') ||
@@ -690,6 +710,8 @@ async function handleCreatePaymentIntent(
     type?: string;
     originalPaymentId?: string;
     idempotencyKey?: string;
+    customerIpAddress?: string;
+    customerUserAgent?: string;
     billingAddress?: {
       line1?: string;
       postal_code?: string;
@@ -730,6 +752,7 @@ async function handleCreatePaymentIntent(
   }
 
   const isUpcharge = type === 'upcharge';
+  const origin = normaliseCustomerOrigin(body);
 
   // Chargeback ban prefilter — runs at every create-payment-intent so a
   // banned user can't slip through under a new email by re-using their
@@ -746,7 +769,11 @@ async function handleCreatePaymentIntent(
       phone: phone ?? null,
       billingName: name ?? null,
       billingAddress: billingAddress ?? null,
-      ipAddress,
+      // The partner-supplied end-user IP when present. Falling back to the
+      // observed IP keeps direct/browser flows working, but on a
+      // server-to-server call that is the partner's datacenter — the same
+      // value for every backer — so it is a near-worthless signal there.
+      ipAddress: origin.customerIpAddress ?? ipAddress,
     },
     amountCents: amount,
     currency,
@@ -868,6 +895,9 @@ async function handleCreatePaymentIntent(
         currency,
         email,
         status: 'PENDING',
+        customerIpAddress: origin.customerIpAddress,
+        customerUserAgent: origin.customerUserAgent,
+        requestIpAddress: ipAddress || null,
       },
       update: {},
     });
@@ -1384,6 +1414,8 @@ async function handleChargeSavedPaymentMethod(
     statement_descriptor?: string;
     description?: string;
     idempotencyKey?: string;
+    customerIpAddress?: string;
+    customerUserAgent?: string;
   },
   partnerId: string,
   ipAddress: string,
@@ -1429,6 +1461,8 @@ async function handleChargeSavedPaymentMethod(
       );
     }
   }
+
+  const origin = normaliseCustomerOrigin(body);
 
   // Hoisted so the catch block can still persist a tracking record when the
   // off-session charge throws (decline / 3DS-required).
@@ -1546,6 +1580,9 @@ async function handleChargeSavedPaymentMethod(
         currency,
         email: dcUser.email,
         status: paymentIntent.status === 'succeeded' ? 'COMPLETED' : 'PENDING',
+        customerIpAddress: origin.customerIpAddress,
+        customerUserAgent: origin.customerUserAgent,
+        requestIpAddress: ipAddress || null,
       },
       // Stripe replays the original intent when the derived key repeats, so
       // the row can already exist; paymentIntentId is unique and a create
@@ -1606,6 +1643,9 @@ async function handleChargeSavedPaymentMethod(
               currency,
               email: dcUser.email,
               status: 'PENDING',
+              customerIpAddress: origin.customerIpAddress,
+              customerUserAgent: origin.customerUserAgent,
+              requestIpAddress: ipAddress || null,
             },
             update: {},
           })
