@@ -600,13 +600,29 @@ async function handlePartnerPaymentSucceeded(paymentIntent: Stripe.PaymentIntent
       });
     }
 
-    // 6. Update pending payment with final status
+    // 6. Update pending payment with final status.
+    //
+    // On the hosted-checkout flow the backer's own browser reaches us, so the
+    // session row may hold their real IP. The complete endpoint copies it
+    // across, but this record can be written after that call, so pick it up
+    // here too rather than losing it to ordering.
+    const hostedSession = await prisma.checkoutSession.findUnique({
+      where: { paymentIntentId: paymentIntent.id },
+      select: { customerIpAddress: true, customerUserAgent: true },
+    }).catch(() => null);
+
     await prisma.pendingPartnerPayment.update({
       where: { paymentIntentId: paymentIntent.id },
       data: {
         status: 'COMPLETED',
         holdId,
         completedAt: new Date(),
+        ...(hostedSession?.customerIpAddress
+          ? {
+              customerIpAddress: hostedSession.customerIpAddress,
+              customerUserAgent: hostedSession.customerUserAgent,
+            }
+          : {}),
       },
     });
 

@@ -108,6 +108,20 @@ own infrastructure.
 
 ---
 
+## If you use our hosted checkout, you do not need to do anything
+
+On the hosted checkout page — including embedded in an iframe on your site —
+the backer's browser talks to us directly, so we observe their address
+ourselves and record it against the session and the payment. No field to send,
+no change on your side.
+
+This applies to any charge completed on `/checkout/…`. It does **not** cover
+`create-payment-intent` or `charge-saved-payment-method`, which are
+server-to-server and where the IP we see is your server's. If you use both
+flows, the fields above still matter for the direct ones.
+
+---
+
 ## Scheduled and off-session charges
 
 `charge-saved-payment-method` on a cron has no browser present, so there is no

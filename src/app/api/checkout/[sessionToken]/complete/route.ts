@@ -20,9 +20,20 @@ function appendSessionId(url: string, sessionToken: string): string {
   }
 }
 
-export async function POST(_req: NextRequest, props: { params: Promise<{ sessionToken: string }> }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ sessionToken: string }> }) {
   const params = await props.params;
   const { sessionToken } = params;
+
+  // This request comes from the backer's own browser, so the forwarded address
+  // is theirs — unlike the server-to-server endpoints, where it is the
+  // partner's datacenter. It is the only point in the hosted flow where we can
+  // observe the purchaser directly, and it is what a non-authorisation dispute
+  // turns on.
+  const customerIpAddress =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip')?.trim() ||
+    null;
+  const customerUserAgent = req.headers.get('user-agent')?.slice(0, 512) || null;
 
   try {
     const session = await prisma.checkoutSession.findUnique({
@@ -117,8 +128,23 @@ export async function POST(_req: NextRequest, props: { params: Promise<{ session
         status: nextStatus,
         completedAt,
         paymentMethodId,
+        customerIpAddress,
+        customerUserAgent,
       },
     });
+
+    // Carry it onto the payment record, which is what the evidence bundle
+    // reads. updateMany rather than update: the row is created by the Stripe
+    // webhook, which may not have landed yet, and a missing row here must not
+    // fail the customer's checkout.
+    if (session.paymentIntentId && customerIpAddress) {
+      await prisma.pendingPartnerPayment
+        .updateMany({
+          where: { paymentIntentId: session.paymentIntentId },
+          data: { customerIpAddress, customerUserAgent },
+        })
+        .catch(() => { /* best-effort; the session row still holds it */ });
+    }
 
     // Fire the partner's checkout.* webhook (idempotent — no-op if
     // already fired by a different code path).

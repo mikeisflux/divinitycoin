@@ -1213,6 +1213,12 @@ model CheckoutSession {
   // transitioned the session to terminal.
   webhookFiredAt DateTime?
 
+  // Captured when the backer's own browser completes the hosted page. On this
+  // flow the browser talks to us directly, so unlike the server-to-server
+  // endpoints we can observe the purchaser's real address ourselves.
+  customerIpAddress String?
+  customerUserAgent String?
+
   @@index([partnerId])
   @@index([sessionToken])
   @@index([status])
