@@ -62,6 +62,9 @@ export async function reportBlockedAttempt(args: {
       headers: {
         Authorization: `Bearer ${reportToken}`,
         'Content-Type': 'application/json',
+        // See the note in partner/webhook.ts: no compression from a
+        // partner-controlled URL.
+        'Accept-Encoding': 'identity',
       },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(10_000),

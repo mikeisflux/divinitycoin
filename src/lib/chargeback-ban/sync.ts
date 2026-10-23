@@ -90,6 +90,9 @@ async function fetchFeedOnce(feedUrl: string, feedToken: string): Promise<FeedRe
       headers: {
         Authorization: `Bearer ${feedToken}`,
         Accept: 'application/json',
+        // See the note in partner/webhook.ts: no compression from a
+        // partner-controlled URL.
+        'Accept-Encoding': 'identity',
       },
       // Do NOT follow redirects. A feed URL that 302s to a login or
       // marketing page yields a 200 with an HTML body, which used to

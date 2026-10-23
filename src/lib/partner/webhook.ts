@@ -53,6 +53,11 @@ export async function sendWebhook(
         'X-Webhook-Signature': signature,
         'X-Webhook-Event': event,
         'User-Agent': 'DivinityCoin-Webhook/1.0',
+        // Never negotiate a compressed response from a partner-controlled
+        // URL. Decompressing a hostile body is remote code execution on an
+        // unpatched runtime (CVE-2026-111497); these bodies are a few
+        // hundred bytes, so there is nothing to gain by compressing them.
+        'Accept-Encoding': 'identity',
       },
       body: payloadString,
       signal: AbortSignal.timeout(10000), // 10 second timeout
