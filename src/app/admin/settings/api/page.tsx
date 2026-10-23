@@ -134,7 +134,7 @@ export default function ApiKeysSettingsPage() {
 
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
         <div className="flex gap-3">
-          <svg className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <div>
@@ -162,14 +162,14 @@ export default function ApiKeysSettingsPage() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium text-neutral-900">{config.label}</h3>
                       {config.hasValue && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-green-100 text-green-800">
                           Configured
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-neutral-500 mt-1">{config.description}</p>
                     {config.hasValue && config.maskedValue && (
-                      <p className="text-sm font-mono text-neutral-600 mt-2 bg-neutral-50 px-2 py-1 rounded inline-block">
+                      <p className="text-sm font-mono text-neutral-600 mt-2 bg-neutral-50 px-2 py-1 rounded-sm inline-block">
                         {config.maskedValue}
                       </p>
                     )}
@@ -229,7 +229,7 @@ export default function ApiKeysSettingsPage() {
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       placeholder={`Enter ${config.label}`}
-                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition font-mono text-sm"
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition font-mono text-sm"
                       autoComplete="off"
                     />
                     <p className="text-xs text-neutral-500 mt-2">

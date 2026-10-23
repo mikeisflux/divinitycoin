@@ -8,7 +8,7 @@ export default function ForCreatorsPage() {
   return (
     <>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-neutral-900 to-neutral-800 text-white py-24">
+      <section className="bg-linear-to-br from-neutral-900 to-neutral-800 text-white py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <span className="inline-block px-4 py-1 bg-primary-500/20 text-primary-300 rounded-full text-sm font-medium mb-6">
             For Platforms & Creators
@@ -161,7 +161,7 @@ export default function ForCreatorsPage() {
               },
             ].map((item) => (
               <div key={item.step} className="flex gap-6">
-                <div className="flex-shrink-0 w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold">
+                <div className="shrink-0 w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold">
                   {item.step}
                 </div>
                 <div>

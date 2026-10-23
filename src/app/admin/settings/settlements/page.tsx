@@ -115,7 +115,7 @@ export default function SettlementSettingsPage() {
               step="0.1"
               value={settings.defaultPartnerFee}
               onChange={(e) => setSettings(prev => ({ ...prev, defaultPartnerFee: parseFloat(e.target.value) || 0 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Platform fee deducted from partner settlements (default: 6%)
@@ -132,7 +132,7 @@ export default function SettlementSettingsPage() {
               step="1"
               value={settings.defaultMinimumSettlement}
               onChange={(e) => setSettings(prev => ({ ...prev, defaultMinimumSettlement: parseFloat(e.target.value) || 0 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Minimum amount required to trigger a settlement
@@ -152,7 +152,7 @@ export default function SettlementSettingsPage() {
               id="autoApprove"
               checked={settings.autoApproveEnabled}
               onChange={(e) => setSettings(prev => ({ ...prev, autoApproveEnabled: e.target.checked }))}
-              className="w-5 h-5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+              className="w-5 h-5 rounded-sm border-neutral-300 text-primary-600 focus:ring-primary-500"
             />
             <label htmlFor="autoApprove" className="text-neutral-700">
               Enable automatic approval for settlements under threshold
@@ -170,7 +170,7 @@ export default function SettlementSettingsPage() {
                 step="1"
                 value={settings.autoApproveThreshold}
                 onChange={(e) => setSettings(prev => ({ ...prev, autoApproveThreshold: parseFloat(e.target.value) || 0 }))}
-                className="w-64 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-64 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
               />
               <p className="text-sm text-neutral-500 mt-1">
                 Settlements below this amount will be automatically approved
@@ -193,7 +193,7 @@ export default function SettlementSettingsPage() {
             value={settings.settlementNotificationEmail}
             onChange={(e) => setSettings(prev => ({ ...prev, settlementNotificationEmail: e.target.value }))}
             placeholder="finance@example.com"
-            className="w-full md:w-96 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            className="w-full md:w-96 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
           />
           <p className="text-sm text-neutral-500 mt-1">
             Email address for settlement notifications (leave empty to disable)
@@ -217,7 +217,7 @@ export default function SettlementSettingsPage() {
               step="1"
               value={settings.webhookRetryAttempts}
               onChange={(e) => setSettings(prev => ({ ...prev, webhookRetryAttempts: parseInt(e.target.value) || 0 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Number of times to retry failed webhook deliveries
@@ -235,7 +235,7 @@ export default function SettlementSettingsPage() {
               step="1000"
               value={settings.webhookTimeoutMs}
               onChange={(e) => setSettings(prev => ({ ...prev, webhookTimeoutMs: parseInt(e.target.value) || 10000 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Timeout for webhook delivery requests

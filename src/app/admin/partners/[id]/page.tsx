@@ -421,13 +421,13 @@ export default function PartnerDetailPage() {
           <h4 className="font-medium text-blue-900 mb-2">Partner Setup URL</h4>
           <p className="text-sm text-blue-800 mb-2">Send this link to the partner to complete their account setup:</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 bg-white px-3 py-2 rounded border text-sm break-all">{setupUrl}</code>
+            <code className="flex-1 bg-white px-3 py-2 rounded-sm border text-sm break-all">{setupUrl}</code>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(setupUrl);
                 alert('Copied to clipboard!');
               }}
-              className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              className="px-3 py-2 bg-blue-600 text-white rounded-sm text-sm hover:bg-blue-700"
             >
               Copy
             </button>
@@ -444,14 +444,14 @@ export default function PartnerDetailPage() {
               <div className="col-span-2">
                 <dt className="text-sm text-neutral-500">Partner ID</dt>
                 <dd className="flex items-center gap-2">
-                  <code className="text-neutral-900 font-mono text-sm bg-neutral-100 px-2 py-1 rounded">{partner.id}</code>
+                  <code className="text-neutral-900 font-mono text-sm bg-neutral-100 px-2 py-1 rounded-sm">{partner.id}</code>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(partner.id);
                       setMessage({ type: 'success', text: 'Partner ID copied to clipboard!' });
                       setTimeout(() => setMessage(null), 2000);
                     }}
-                    className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                    className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded-sm transition"
                   >
                     Copy
                   </button>
@@ -482,7 +482,7 @@ export default function PartnerDetailPage() {
                   <button
                     onClick={handleToggleSandbox}
                     disabled={togglingSandbox}
-                    className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition disabled:opacity-50"
+                    className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded-sm transition disabled:opacity-50"
                   >
                     {togglingSandbox ? 'Switching...' : partner.sandboxMode ? 'Go Live' : 'Switch to Sandbox'}
                   </button>
@@ -524,7 +524,7 @@ export default function PartnerDetailPage() {
                         value={webhookUrlInput}
                         onChange={(e) => setWebhookUrlInput(e.target.value)}
                         placeholder="https://partner-site.com/api/webhooks/divinitycoin"
-                        className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                       />
                       <button
                         onClick={handleSaveWebhookUrl}
@@ -550,7 +550,7 @@ export default function PartnerDetailPage() {
                           setWebhookUrlInput(partner.webhookUrl || '');
                           setEditingWebhookUrl(true);
                         }}
-                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded-sm transition"
                       >
                         {partner.webhookUrl ? 'Edit' : 'Set URL'}
                       </button>
@@ -563,12 +563,12 @@ export default function PartnerDetailPage() {
                 <dd className="flex items-center gap-2">
                   {partner.webhookSecret ? (
                     <>
-                      <code className="flex-1 text-neutral-900 font-mono text-sm bg-neutral-100 px-3 py-2 rounded break-all">
+                      <code className="flex-1 text-neutral-900 font-mono text-sm bg-neutral-100 px-3 py-2 rounded-sm break-all">
                         {showWebhookSecret ? partner.webhookSecret : '••••••••••••••••••••••••••••••••'}
                       </code>
                       <button
                         onClick={() => setShowWebhookSecret(!showWebhookSecret)}
-                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded-sm transition"
                         title={showWebhookSecret ? 'Hide secret' : 'Show secret'}
                       >
                         {showWebhookSecret ? 'Hide' : 'Show'}
@@ -579,14 +579,14 @@ export default function PartnerDetailPage() {
                           setMessage({ type: 'success', text: 'Webhook secret copied to clipboard!' });
                           setTimeout(() => setMessage(null), 2000);
                         }}
-                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded transition"
+                        className="text-xs px-2 py-1 bg-neutral-200 hover:bg-neutral-300 rounded-sm transition"
                       >
                         Copy
                       </button>
                       <button
                         onClick={handleRegenerateSecret}
                         disabled={regeneratingSecret}
-                        className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 hover:bg-yellow-200 rounded transition disabled:opacity-50"
+                        className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 hover:bg-yellow-200 rounded-sm transition disabled:opacity-50"
                       >
                         {regeneratingSecret ? 'Regenerating...' : 'Regenerate'}
                       </button>
@@ -709,7 +709,7 @@ export default function PartnerDetailPage() {
                           <button
                             onClick={() => handleDeleteKey(key.id, key.name)}
                             disabled={keyActionLoading === key.id}
-                            className="text-xs px-2 py-1 bg-red-100 text-red-800 hover:bg-red-200 rounded transition disabled:opacity-50"
+                            className="text-xs px-2 py-1 bg-red-100 text-red-800 hover:bg-red-200 rounded-sm transition disabled:opacity-50"
                           >
                             {keyActionLoading === key.id ? '...' : 'Delete'}
                           </button>

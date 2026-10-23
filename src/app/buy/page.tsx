@@ -376,13 +376,13 @@ export default function BuyPage() {
                 </p>
 
                 {resendSuccess && (
-                  <div className="bg-green-100 text-green-700 px-3 py-2 rounded text-sm mb-3">
+                  <div className="bg-green-100 text-green-700 px-3 py-2 rounded-sm text-sm mb-3">
                     Request submitted! Please check your email and spam folder.
                   </div>
                 )}
 
                 {resendError && (
-                  <div className="bg-red-100 text-red-700 px-3 py-2 rounded text-sm mb-3">
+                  <div className="bg-red-100 text-red-700 px-3 py-2 rounded-sm text-sm mb-3">
                     {resendError}
                   </div>
                 )}
@@ -518,7 +518,7 @@ export default function BuyPage() {
                       id="name"
                       value={authData.name}
                       onChange={(e) => setAuthData({ ...authData, name: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors"
+                      className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-hidden transition-colors"
                       placeholder="Your name"
                     />
                   </div>
@@ -534,7 +534,7 @@ export default function BuyPage() {
                     required
                     value={authData.email}
                     onChange={(e) => setAuthData({ ...authData, email: e.target.value })}
-                    className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors"
+                    className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-hidden transition-colors"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -549,7 +549,7 @@ export default function BuyPage() {
                     required
                     value={authData.password}
                     onChange={(e) => setAuthData({ ...authData, password: e.target.value })}
-                    className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors"
+                    className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-hidden transition-colors"
                     placeholder="********"
                   />
                 </div>
@@ -565,7 +565,7 @@ export default function BuyPage() {
                       required
                       value={authData.confirmPassword}
                       onChange={(e) => setAuthData({ ...authData, confirmPassword: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors"
+                      className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-hidden transition-colors"
                       placeholder="********"
                     />
                   </div>
@@ -666,7 +666,7 @@ export default function BuyPage() {
                     value={selectedPartnerId}
                     onChange={(e) => setSelectedPartnerId(e.target.value)}
                     required
-                    className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none transition-colors bg-white"
+                    className="w-full px-4 py-3 rounded-lg border-2 border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-hidden transition-colors bg-white"
                   >
                     <option value="">Select a partner...</option>
                     {partners.map((partner) => (

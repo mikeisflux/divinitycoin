@@ -122,7 +122,7 @@ export default function BecomeAPartnerPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-50 via-white to-white py-16">
+      <section className="bg-linear-to-br from-primary-50 via-white to-white py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-neutral-900">
             Become a <span className="text-primary-600">Partner</span>
@@ -157,7 +157,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.contactName}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="John Smith"
                       />
                     </div>
@@ -172,7 +172,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.contactEmail}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="john@company.com"
                       />
                     </div>
@@ -186,7 +186,7 @@ export default function BecomeAPartnerPage() {
                         name="contactPhone"
                         value={formData.contactPhone}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="+1 (555) 123-4567"
                       />
                     </div>
@@ -210,7 +210,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.businessName}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="Acme Platforms Inc."
                       />
                     </div>
@@ -224,7 +224,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.businessType}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden bg-white"
                       >
                         <option value="llc">LLC</option>
                         <option value="corporation">Corporation</option>
@@ -245,7 +245,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.taxId}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="XX-XXXXXXX"
                       />
                       <p className="mt-1 text-sm text-neutral-500">
@@ -272,7 +272,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.addressLine1}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="123 Main Street"
                       />
                     </div>
@@ -286,7 +286,7 @@ export default function BecomeAPartnerPage() {
                         name="addressLine2"
                         value={formData.addressLine2}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="Suite 100"
                       />
                     </div>
@@ -302,7 +302,7 @@ export default function BecomeAPartnerPage() {
                           required
                           value={formData.city}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                           placeholder="New York"
                         />
                       </div>
@@ -317,7 +317,7 @@ export default function BecomeAPartnerPage() {
                           required
                           value={formData.state}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                           placeholder="NY"
                         />
                       </div>
@@ -334,7 +334,7 @@ export default function BecomeAPartnerPage() {
                           required
                           value={formData.zipCode}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                           placeholder="10001"
                         />
                       </div>
@@ -348,7 +348,7 @@ export default function BecomeAPartnerPage() {
                           required
                           value={formData.country}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                          className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden bg-white"
                         >
                           <option value="US">United States</option>
                           <option value="CA">Canada</option>
@@ -380,7 +380,7 @@ export default function BecomeAPartnerPage() {
                         required
                         value={formData.websiteUrl}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="https://yourplatform.com"
                       />
                     </div>
@@ -395,7 +395,7 @@ export default function BecomeAPartnerPage() {
                         rows={4}
                         value={formData.platformDescription}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden resize-none"
                         placeholder="Describe your platform, what you do, and how you plan to use DivinityCoin..."
                       />
                     </div>
@@ -408,7 +408,7 @@ export default function BecomeAPartnerPage() {
                         name="expectedMonthlyVolume"
                         value={formData.expectedMonthlyVolume}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden bg-white"
                       >
                         <option value="">Select an estimate</option>
                         <option value="under_1k">Under $1,000</option>
@@ -430,7 +430,7 @@ export default function BecomeAPartnerPage() {
                       checked={formData.agreeToTerms}
                       onChange={handleChange}
                       required
-                      className="mt-1 w-5 h-5 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                      className="mt-1 w-5 h-5 text-primary-600 border-neutral-300 rounded-sm focus:ring-primary-500"
                     />
                     <span className="text-sm text-neutral-700">
                       I agree to the DivinityCoin{' '}

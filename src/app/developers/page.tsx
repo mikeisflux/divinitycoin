@@ -40,7 +40,7 @@ export default function DevelopersPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-50 via-white to-white py-16">
+      <section className="bg-linear-to-br from-primary-50 via-white to-white py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-neutral-900">
             Developer <span className="text-primary-600">Documentation</span>
@@ -127,7 +127,7 @@ export default function DevelopersPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-neutral-600 mb-4">
-                      Include your API key in all requests using the <code className="bg-neutral-100 px-2 py-1 rounded">Authorization: Bearer</code> header:
+                      Include your API key in all requests using the <code className="bg-neutral-100 px-2 py-1 rounded-sm">Authorization: Bearer</code> header:
                     </p>
                     <div className="bg-neutral-900 text-neutral-100 p-4 rounded-lg overflow-x-auto">
                       <pre className="text-sm">{`curl -X POST "https://divinitycoin.com/internal?action=validate" \\
@@ -295,21 +295,21 @@ Response:
                     <code className="text-primary-600 font-mono">https://divinitycoin.com/internal</code>
                   </div>
 
-                  <div className="border-l-4 border-red-400 bg-red-50 p-4 rounded mb-6">
+                  <div className="border-l-4 border-red-400 bg-red-50 p-4 rounded-sm mb-6">
                     <p className="font-semibold text-neutral-900 mb-2 text-sm">
-                      The path is <code className="font-mono text-xs bg-white px-1 rounded">/internal</code>, not{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">/api/internal</code>
+                      The path is <code className="font-mono text-xs bg-white px-1 rounded-sm">/internal</code>, not{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">/api/internal</code>
                     </p>
                     <p className="text-neutral-700 text-sm mb-2">
                       Every other route on this host is under{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">/api/</code>, so the
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">/api/</code>, so the
                       partner API looks like it should be too. It isn&apos;t.{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">/api/internal/…</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">/api/internal/…</code>{' '}
                       is rejected by our edge before the application sees it, which produces an HTML{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">403</code> rather than a
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">403</code> rather than a
                       JSON error — easy to mistake for a rejected key or a blocked IP.
                     </p>
-                    <div className="bg-white p-3 rounded overflow-x-auto">
+                    <div className="bg-white p-3 rounded-sm overflow-x-auto">
                       <pre className="text-xs">{`✓  https://divinitycoin.com/internal?action=validate
 ✗  https://divinitycoin.com/api/internal/validate
 ✗  https://divinitycoin.com/api/internal?action=validate`}</pre>
@@ -317,7 +317,7 @@ Response:
                     <p className="text-neutral-700 text-sm mt-2">
                       An HTML 403 means the path is wrong. A real authentication
                       failure is always JSON:{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">
                         {'{"error":"Invalid or expired API key"}'}
                       </code>.
                     </p>
@@ -422,9 +422,9 @@ GET  /internal?action=captures`}</pre>
                   </div>
 
                   <p className="text-neutral-600 mt-4 text-sm">
-                    A <code className="font-mono text-xs bg-neutral-100 px-1 rounded">deduplicated</code>{' '}
+                    A <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">deduplicated</code>{' '}
                     field appeared briefly on{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">create-payment-intent</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">create-payment-intent</code>{' '}
                     responses during August and has been withdrawn in favour of the
                     explicit key above. If you branched on it, remove that branch.
                   </p>
@@ -435,7 +435,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=validate
                   </CardTitle>
                 </CardHeader>
@@ -465,7 +465,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=balance
                   </CardTitle>
                 </CardHeader>
@@ -503,7 +503,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=hold
                   </CardTitle>
                 </CardHeader>
@@ -537,7 +537,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=capture
                   </CardTitle>
                 </CardHeader>
@@ -565,7 +565,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=record_capture
                   </CardTitle>
                 </CardHeader>
@@ -604,7 +604,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=release
                   </CardTitle>
                 </CardHeader>
@@ -633,22 +633,22 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=create-payment-intent
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
                     Create a payment intent for seamless in-platform payment. Returns
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">clientSecret</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">clientSecret</code>
                     and
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">publishableKey</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">publishableKey</code>
                     so you can mount the embedded card fields directly on your checkout — no
                     redirect to DivinityCoin required. DC charges immediately and uses
                     credit holds, so there is no setup-intent flow.
                   </p>
 
-                  <div className="border-l-4 border-sky-400 bg-sky-50 p-4 rounded mb-4">
+                  <div className="border-l-4 border-sky-400 bg-sky-50 p-4 rounded-sm mb-4">
                     <p className="font-semibold text-neutral-900 mb-2 text-sm">
                       Retries and duplicate charges
                     </p>
@@ -663,11 +663,11 @@ GET  /internal?action=captures`}</pre>
                     <p className="text-neutral-700 text-sm mb-2">
                       So if you retry after a timeout and don&apos;t know whether
                       the first call went through, pass an{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">idempotencyKey</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">idempotencyKey</code>{' '}
                       — any stable string you generate per intended charge, reused
                       across retries of <em>that</em> charge:
                     </p>
-                    <div className="bg-white p-3 rounded mb-2 overflow-x-auto">
+                    <div className="bg-white p-3 rounded-sm mb-2 overflow-x-auto">
                       <pre className="text-xs">{`{ "pledgeId": "pledge_abc", "amount": 1000,
   "idempotencyKey": "pledge_abc-base" }`}</pre>
                     </div>
@@ -682,7 +682,7 @@ GET  /internal?action=captures`}</pre>
                       Reusing a key with different parameters is rejected by the
                       processor rather than silently charging, so a mistake
                       surfaces as an error. Past 24 hours the key expires; use{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">action=lookup-payment</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">action=lookup-payment</code>{' '}
                       to check before retrying.
                     </p>
                   </div>
@@ -710,9 +710,9 @@ GET  /internal?action=captures`}</pre>
 }`}</pre>
                   </div>
 
-                  <div className="border-l-4 border-emerald-400 bg-emerald-50 p-4 rounded mb-4">
+                  <div className="border-l-4 border-emerald-400 bg-emerald-50 p-4 rounded-sm mb-4">
                     <p className="font-semibold text-neutral-900 mb-2 text-sm">
-                      Please send <code className="font-mono text-xs bg-white px-1 rounded">customerIpAddress</code>
+                      Please send <code className="font-mono text-xs bg-white px-1 rounded-sm">customerIpAddress</code>
                     </p>
                     <p className="text-neutral-700 text-sm mb-2">
                       This call reaches us server-to-server, so the only IP we can observe is
@@ -729,7 +729,7 @@ GET  /internal?action=captures`}</pre>
                     </p>
                     <p className="text-neutral-700 text-sm">
                       Send whatever your framework reports as the client IP — the first entry of{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">X-Forwarded-For</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">X-Forwarded-For</code>{' '}
                       in most setups. We record it as reported and never treat it as verified.
                       Omit it and nothing breaks.
                     </p>
@@ -758,46 +758,46 @@ GET  /internal?action=captures`}</pre>
                     An alternative path for partners who want DC to host the
                     card capture surface instead of mounting Stripe Elements on
                     their own checkout. Create a session, redirect the user to
-                    the returned <code className="font-mono text-xs bg-neutral-100 px-1 rounded">checkoutUrl</code>,
+                    the returned <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">checkoutUrl</code>,
                     user pays (or saves a card) on a DC-branded page, then DC
-                    redirects them back to your <code className="font-mono text-xs bg-neutral-100 px-1 rounded">returnUrl</code>
-                    with a <code className="font-mono text-xs bg-neutral-100 px-1 rounded">session_id</code> query param.
+                    redirects them back to your <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">returnUrl</code>
+                    with a <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">session_id</code> query param.
                   </p>
                   <p className="text-neutral-600 mb-3">
                     This is fully opt-in and coexists with the direct
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">create-payment-intent</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">create-payment-intent</code>
                     flow above — existing integrations are unaffected. Use this
                     when you want SCA / 3DS, card brand UI, and any Stripe
                     Elements branding to live entirely on
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">divinitycoin.com</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">divinitycoin.com</code>
                     rather than your own page.
                   </p>
                   <p className="text-neutral-600 mb-3">
                     For PAYMENT mode the underlying PaymentIntent is created
                     up-front, so the existing
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.succeeded</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">payment.succeeded</code>
                     /
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.failed</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">payment.failed</code>
                     /
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.requires_action</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">payment.requires_action</code>
                     webhooks fire exactly as they do for the direct flow. For
                     SETUP mode, learn the saved
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">paymentMethodId</code>
                     by calling
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">get-checkout-session</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">get-checkout-session</code>
                     after the user returns; that id is then valid input for
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">charge-saved-payment-method</code>.
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">charge-saved-payment-method</code>.
                   </p>
                   <p className="text-neutral-600 mb-3">
                     <strong>Iframe embedding (optional).</strong> Instead of redirecting the user
-                    to the <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkoutUrl</code>,
+                    to the <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkoutUrl</code>,
                     you can mount it in an iframe on your own page. We have to
                     allowlist your origin via our
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">CHECKOUT_FRAME_ANCESTORS</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">CHECKOUT_FRAME_ANCESTORS</code>
                     config — send us the origin(s) you want enabled (apex, www,
                     staging, etc.). Once enabled, the iframe streams three
                     postMessages to your page (all share
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">namespace: &quot;divinitycoin-checkout&quot;</code>):
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">namespace: &quot;divinitycoin-checkout&quot;</code>):
                   </p>
                   <ul className="text-neutral-600 mb-3 ml-6 list-disc text-sm space-y-1">
                     <li><code className="font-mono text-xs">type: &quot;ready&quot;</code> — on initial load, with the <code className="font-mono text-xs">sessionId</code>.</li>
@@ -813,7 +813,7 @@ GET  /internal?action=captures`}</pre>
                     popup completes payment and postMessages the iframe; the
                     iframe also polls a lightweight status endpoint as a
                     backstop. From the partner&apos;s perspective the final
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">complete</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">complete</code>
                     message and the top-nav to <code className="font-mono text-xs">returnUrl</code>
                     behave identically — no mobile-specific code needed on your side.
                   </p>
@@ -844,19 +844,19 @@ GET  /internal?action=captures`}</pre>
                   <p className="text-neutral-600 mb-3">
                     DC also fires dedicated session-level events when a hosted
                     session reaches a terminal state:
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.completed</code>,
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.failed</code>,
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.expired</code>,
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkout.canceled</code>.
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkout.completed</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkout.failed</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkout.expired</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkout.canceled</code>.
                     Each event delivers the same envelope as our other
                     webhooks and includes
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">sessionId</code>,
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">mode</code>,
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentIntentId</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">sessionId</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">mode</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">paymentIntentId</code>
                     /
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">setupIntentId</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">setupIntentId</code>,
                     and
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">paymentMethodId</code>
                     (on COMPLETE) — particularly useful for SETUP mode where no
                     payment.* event would otherwise fire, and at-most-once on
                     our side so they can be safely combined with the existing
@@ -871,16 +871,16 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=create-checkout-session
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
                     Create a hosted checkout session and receive a
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">checkoutUrl</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkoutUrl</code>
                     to redirect the user to. Session expires after
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">expiresInMinutes</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">expiresInMinutes</code>
                     (default 30, max 1440).
                   </p>
 
@@ -935,7 +935,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=get-checkout-session
                   </CardTitle>
                 </CardHeader>
@@ -943,12 +943,12 @@ GET  /internal?action=captures`}</pre>
                   <p className="text-neutral-600 mb-4">
                     Look up the current state of a hosted checkout session.
                     Self-heals: if our local state is still
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">pending</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">pending</code>
                     but the underlying PaymentIntent / SetupIntent has moved on
                     at the processor, we refresh from live status before
                     responding. Call this after the user returns to your
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">returnUrl</code>
-                    with the <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">session_id</code> query param.
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">returnUrl</code>
+                    with the <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">session_id</code> query param.
                   </p>
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
@@ -988,7 +988,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=refund
                   </CardTitle>
                 </CardHeader>
@@ -996,7 +996,7 @@ GET  /internal?action=captures`}</pre>
                   <p className="text-neutral-600 mb-4">
                     Refund a partner payment. Full refunds void the gift card, release
                     the hold, deduct from balance, and fire a
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">refund.completed</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">refund.completed</code>
                     webhook. Partial refunds (pledge modifications) deduct from balance
                     only — the hold and gift card stay active and no webhook is sent.
                   </p>
@@ -1030,7 +1030,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=verify-payment
                   </CardTitle>
                 </CardHeader>
@@ -1046,10 +1046,10 @@ GET  /internal?action=captures`}</pre>
                     Works even with no local DC record yet (e.g. a saved-card
                     charge that hit 3DS): when there&apos;s no record, the call
                     is authorized via the PaymentIntent&apos;s
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">partnerId</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">partnerId</code>
                     metadata instead, and the
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">dcStatus</code>
-                    field comes back <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">null</code>.
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">dcStatus</code>
+                    field comes back <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">null</code>.
                   </p>
 
                   <h4 className="font-semibold text-neutral-900 mb-2">Request Body</h4>
@@ -1079,14 +1079,14 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=lookup-payment
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
                     Find every charge attempt recorded against a{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">pledgeId</code>.
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">pledgeId</code>.
                     Use this when a request timed out and you don&apos;t know
                     whether the card was captured — check here rather than
                     retrying blind. Each attempt is reconciled against the live
@@ -1128,9 +1128,9 @@ GET  /internal?action=captures`}</pre>
                   </div>
                   <p className="text-neutral-600 mt-4 text-sm">
                     Returns the 10 most recent attempts, newest first. An empty{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">attempts</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">attempts</code>{' '}
                     array with{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">hasSuccessfulCharge: false</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">hasSuccessfulCharge: false</code>{' '}
                     means no charge was ever recorded for that pledge — safe to
                     submit one.
                   </p>
@@ -1143,22 +1143,22 @@ GET  /internal?action=captures`}</pre>
                 Let users save a card on the partner site and charge it later
                 (e.g. when they win an auction) without prompting them again.
                 Cards are attached to the DC customer record for that
-                <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">platformUserId</code>;
-                you only ever store the returned <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>.
+                <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">platformUserId</code>;
+                you only ever store the returned <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">paymentMethodId</code>.
               </p>
 
               {/* Create Setup Intent */}
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=create-setup-intent
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-neutral-600 mb-4">
                     Create a setup intent so a user can save a card on
-                    file. Returns a <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">clientSecret</code>
+                    file. Returns a <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">clientSecret</code>
                     you confirm client-side with the embedded card fields to
                     collect and store the card. On success the card is attached
                     to the DC customer record for this user and is ready for
@@ -1191,7 +1191,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=get-setup-intent
                   </CardTitle>
                 </CardHeader>
@@ -1201,7 +1201,7 @@ GET  /internal?action=captures`}</pre>
                     — e.g. after a 3DS redirect, or if you never received the
                     client-side result. Returns the SetupIntent status and, once
                     it has succeeded, the resulting
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">paymentMethodId</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">paymentMethodId</code>
                     to store.
                   </p>
 
@@ -1231,7 +1231,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=list-payment-methods
                   </CardTitle>
                 </CardHeader>
@@ -1272,7 +1272,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=detach-payment-method
                   </CardTitle>
                 </CardHeader>
@@ -1304,7 +1304,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded mr-2">POST</span>
+                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-mono rounded-sm mr-2">POST</span>
                     /internal?action=charge-saved-payment-method
                   </CardTitle>
                 </CardHeader>
@@ -1314,11 +1314,11 @@ GET  /internal?action=captures`}</pre>
                     won-auction billing where the user isn&apos;t actively at
                     the checkout. The PaymentIntent is created and confirmed in
                     one call. Idempotent on
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">pledgeId</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">pledgeId</code>
                     — retrying the same call returns the same charge.
                   </p>
 
-                  <div className="border-l-4 border-amber-400 bg-amber-50 p-4 rounded mb-4">
+                  <div className="border-l-4 border-amber-400 bg-amber-50 p-4 rounded-sm mb-4">
                     <p className="font-semibold text-neutral-900 mb-2 text-sm">
                       Retrying a declined charge
                     </p>
@@ -1328,16 +1328,16 @@ GET  /internal?action=captures`}</pre>
                       <strong>24 hours</strong> — and that cache includes
                       failures. A card decline is stored just like a success, so
                       repeating the identical call inside the window replays the
-                      cached <code className="font-mono text-xs bg-white px-1 rounded">402</code>{' '}
+                      cached <code className="font-mono text-xs bg-white px-1 rounded-sm">402</code>{' '}
                       <em>without contacting the bank again</em>.
                     </p>
                     <p className="text-neutral-700 text-sm mb-2">
                       To genuinely re-attempt a declined card, pass a distinct{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">idempotencyKey</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">idempotencyKey</code>{' '}
                       per attempt (e.g.{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">&quot;attempt-2&quot;</code>).
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">&quot;attempt-2&quot;</code>).
                       Do <strong>not</strong> mutate{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">pledgeId</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">pledgeId</code>{' '}
                       to force a new key — it is stored on the payment record and
                       echoed in webhooks, so changing it breaks your
                       reconciliation.
@@ -1346,12 +1346,12 @@ GET  /internal?action=captures`}</pre>
                       Conversely, after a timeout where you don&apos;t know
                       whether the card was captured, retry with the{' '}
                       <em>same</em> parameters and no{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">idempotencyKey</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">idempotencyKey</code>{' '}
                       — within 24 hours you are guaranteed the original
                       PaymentIntent rather than a second charge. Past 24 hours
                       the key expires and a retry <strong>will</strong> charge
                       again; use{' '}
-                      <code className="font-mono text-xs bg-white px-1 rounded">action=lookup-payment</code>{' '}
+                      <code className="font-mono text-xs bg-white px-1 rounded-sm">action=lookup-payment</code>{' '}
                       to check first.
                     </p>
                   </div>
@@ -1400,9 +1400,9 @@ GET  /internal?action=captures`}</pre>
                   <h4 className="font-semibold text-neutral-900 mb-2 mt-4">Async notification when SCA is required</h4>
                   <p className="text-neutral-600 mb-3 text-sm">
                     If you missed the synchronous
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">requires_action</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">requires_action</code>
                     response (server crash, network blip, etc.), DC also fires a
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.requires_action</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">payment.requires_action</code>
                     webhook to your endpoint when the PaymentIntent enters that state.
                     Same envelope and signature as other partner webhooks, including
                     the <code className="font-mono text-xs">clientSecret</code> so you
@@ -1424,7 +1424,7 @@ GET  /internal?action=captures`}</pre>
                   </div>
                   <p className="text-neutral-600 mt-3 text-sm">
                     Hosted-checkout sessions also produce
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded">payment.requires_action</code>
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">payment.requires_action</code>
                     events for their underlying PaymentIntent, but in the hosted
                     flow DC drives the challenge on its own page so the event is
                     informational rather than actionable for your side.
@@ -1436,7 +1436,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-amber-100 text-amber-800 text-xs font-mono rounded mr-2">WEBHOOK</span>
+                    <span className="inline-block px-2 py-1 bg-amber-100 text-amber-800 text-xs font-mono rounded-sm mr-2">WEBHOOK</span>
                     payment.failed
                   </CardTitle>
                 </CardHeader>
@@ -1465,9 +1465,9 @@ GET  /internal?action=captures`}</pre>
 
                   <p className="text-neutral-600 mb-3 text-sm">
                     If you use{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">charge-saved-payment-method</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">charge-saved-payment-method</code>,
                     an off-session decline already reaches you synchronously as a{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">402</code>.
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">402</code>.
                     This webhook is a deliberate second signal: the synchronous
                     response is lost if your request times out or your process
                     dies mid-call, which is precisely when you most need to know
@@ -1479,7 +1479,7 @@ GET  /internal?action=captures`}</pre>
                     call — within 24 hours the processor replays its cached result,
                     including the failure, without contacting the bank. Pass a
                     distinct{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">idempotencyKey</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">idempotencyKey</code>{' '}
                     per attempt to force a genuine new authorization.
                   </p>
 
@@ -1487,11 +1487,11 @@ GET  /internal?action=captures`}</pre>
                     The same event name is also used when a charge succeeded but
                     DC&apos;s own post-processing failed. The two are distinguishable:
                     a real decline carries{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">code</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">code</code>{' '}
                     and usually{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">declineCode</code>,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">declineCode</code>,
                     and its{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">status</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">status</code>{' '}
                     is a non-terminal PaymentIntent state.
                   </p>
                 </CardContent>
@@ -1501,7 +1501,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs font-mono rounded mr-2">WEBHOOK</span>
+                    <span className="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs font-mono rounded-sm mr-2">WEBHOOK</span>
                     dispute.created
                   </CardTitle>
                 </CardHeader>
@@ -1535,8 +1535,8 @@ GET  /internal?action=captures`}</pre>
                   <p className="text-neutral-600 mb-3 text-sm">
                     A dispute is raised against a <em>charge</em>, not an order, so
                     the authoritative key is{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">stripePaymentIntentId</code>.{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">pledgeId</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">stripePaymentIntentId</code>.{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">pledgeId</code>{' '}
                     is resolved from DC&apos;s payment record and included whenever
                     we hold one, which is every partner charge.
                   </p>
@@ -1546,17 +1546,17 @@ GET  /internal?action=captures`}</pre>
                     with backoff on any non-2xx or network failure, so your handler
                     must be idempotent — a redelivery must not decrement a campaign
                     total or release a reward slot twice. Return{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">2xx</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">2xx</code>{' '}
                     once you have accepted the event, including when no order
                     matches; a non-2xx means we try again.
                   </p>
 
                   <p className="text-neutral-600 text-sm">
-                    Same envelope, <code className="font-mono text-xs bg-neutral-100 px-1 rounded">X-Webhook-Signature</code>{' '}
+                    Same envelope, <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">X-Webhook-Signature</code>{' '}
                     header and HMAC scheme as every other partner webhook. Only
                     disputes on your own charges are sent. If you have set an
                     explicit event allowlist in your partner settings, add{' '}
-                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded">dispute.created</code>{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">dispute.created</code>{' '}
                     to it — an empty allowlist continues to receive everything.
                   </p>
                 </CardContent>
@@ -1566,7 +1566,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
+                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded-sm mr-2">GET</span>
                     /internal?action=health
                   </CardTitle>
                 </CardHeader>
@@ -1700,7 +1700,7 @@ GET  /internal?action=captures`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
+                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded-sm mr-2">GET</span>
                     /internal?action=settlements
                   </CardTitle>
                 </CardHeader>
@@ -1744,7 +1744,7 @@ to        - Period end before date (ISO)`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
+                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded-sm mr-2">GET</span>
                     /internal?action=settlement&amp;partnerId=xxx&amp;id=yyy
                   </CardTitle>
                 </CardHeader>
@@ -1788,7 +1788,7 @@ to        - Period end before date (ISO)`}</pre>
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded mr-2">GET</span>
+                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded-sm mr-2">GET</span>
                     /internal?action=captures
                   </CardTitle>
                 </CardHeader>

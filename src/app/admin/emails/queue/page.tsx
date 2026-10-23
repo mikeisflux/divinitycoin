@@ -246,7 +246,7 @@ export default function EmailQueuePage() {
             <p className="text-sm text-blue-800 mb-2">
               The email queue requires a cron job to process pending emails. Set up a cron job to hit this endpoint every minute:
             </p>
-            <code className="block bg-blue-100 text-blue-900 p-2 rounded text-sm overflow-x-auto">
+            <code className="block bg-blue-100 text-blue-900 p-2 rounded-sm text-sm overflow-x-auto">
               curl -X POST https://divinitycoin.com/api/cron/process-email-queue?secret=YOUR_CRON_SECRET
             </code>
             <p className="text-xs text-blue-700 mt-2">

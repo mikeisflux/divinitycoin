@@ -226,7 +226,7 @@ export default function PartnerSettingsPage() {
                 value={settings.webhookUrl}
                 onChange={(e) => setSettings(prev => ({ ...prev, webhookUrl: e.target.value }))}
                 placeholder="https://your-server.com/webhook"
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
               />
               <p className="text-xs text-neutral-500 mt-1">We'll POST events to this URL</p>
             </div>
@@ -288,7 +288,7 @@ export default function PartnerSettingsPage() {
                       type="checkbox"
                       checked={settings.webhookEvents.includes(event.id)}
                       onChange={() => toggleWebhookEvent(event.id)}
-                      className="mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                      className="mt-0.5 rounded-sm border-neutral-300 text-primary-600 focus:ring-primary-500"
                     />
                     <div>
                       <p className="text-sm font-medium text-neutral-900">{event.label}</p>
@@ -316,7 +316,7 @@ export default function PartnerSettingsPage() {
                   value={ipInput}
                   onChange={(e) => setIpInput(e.target.value)}
                   placeholder="192.168.1.1 or 10.0.0.0/8"
-                  className="flex-1 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="flex-1 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   onKeyDown={(e) => e.key === 'Enter' && addIpToWhitelist()}
                 />
                 <button
@@ -357,7 +357,7 @@ export default function PartnerSettingsPage() {
               <select
                 value={settings.rateLimitTier}
                 onChange={(e) => setSettings(prev => ({ ...prev, rateLimitTier: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
               >
                 <option value="standard">Standard (100 req/min)</option>
                 <option value="professional">Professional (500 req/min)</option>
@@ -381,7 +381,7 @@ export default function PartnerSettingsPage() {
               value={settings.notificationEmail}
               onChange={(e) => setSettings(prev => ({ ...prev, notificationEmail: e.target.value }))}
               placeholder="notifications@your-company.com"
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-xs text-neutral-500 mt-1">We'll send important notifications to this email</p>
           </div>
@@ -400,7 +400,7 @@ export default function PartnerSettingsPage() {
                 type="password"
                 value={passwordData.currentPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
               />
             </div>
             <div>
@@ -411,7 +411,7 @@ export default function PartnerSettingsPage() {
                 type="password"
                 value={passwordData.newPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
               />
             </div>
             <div>
@@ -422,7 +422,7 @@ export default function PartnerSettingsPage() {
                 type="password"
                 value={passwordData.confirmPassword}
                 onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
               />
             </div>
             <button

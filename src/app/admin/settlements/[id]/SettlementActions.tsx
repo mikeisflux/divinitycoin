@@ -127,7 +127,7 @@ export function SettlementActions({ settlementId, status }: SettlementActionsPro
               value={disputeReason}
               onChange={(e) => setDisputeReason(e.target.value)}
               placeholder="Enter dispute reason..."
-              className="w-full h-32 p-3 border border-neutral-300 rounded-lg resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full h-32 p-3 border border-neutral-300 rounded-lg resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <div className="flex justify-end gap-3 mt-4">
               <Button variant="outline" onClick={() => setShowDispute(false)}>
@@ -160,7 +160,7 @@ export function SettlementActions({ settlementId, status }: SettlementActionsPro
               value={paymentRef}
               onChange={(e) => setPaymentRef(e.target.value)}
               placeholder="Wire reference, PayPal ID, etc."
-              className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full p-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <div className="flex justify-end gap-3 mt-4">
               <Button variant="outline" onClick={() => setShowPaid(false)}>

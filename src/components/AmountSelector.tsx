@@ -86,7 +86,7 @@ export function AmountSelector({
             isCustom
               ? 'border-primary-500 ring-2 ring-primary-100'
               : 'border-neutral-200 hover:border-neutral-300',
-            'focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
+            'focus:outline-hidden focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
           )}
         />
       </div>

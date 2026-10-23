@@ -43,7 +43,7 @@ export default function RedeemPage() {
 
               <ol className="text-left space-y-4 mb-8">
                 <li className="flex gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  <span className="shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
                     1
                   </span>
                   <span className="text-neutral-600">
@@ -51,7 +51,7 @@ export default function RedeemPage() {
                   </span>
                 </li>
                 <li className="flex gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  <span className="shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
                     2
                   </span>
                   <span className="text-neutral-600">
@@ -59,7 +59,7 @@ export default function RedeemPage() {
                   </span>
                 </li>
                 <li className="flex gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  <span className="shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
                     3
                   </span>
                   <span className="text-neutral-600">
@@ -67,7 +67,7 @@ export default function RedeemPage() {
                   </span>
                 </li>
                 <li className="flex gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  <span className="shrink-0 w-6 h-6 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
                     4
                   </span>
                   <span className="text-neutral-600">

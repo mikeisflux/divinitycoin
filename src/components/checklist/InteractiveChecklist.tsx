@@ -119,13 +119,13 @@ export function InteractiveChecklist({
             <div className="flex gap-2">
               <button
                 onClick={resetProgress}
-                className="text-sm text-neutral-500 hover:text-neutral-700 px-3 py-1 rounded border border-neutral-300 hover:border-neutral-400 transition-colors"
+                className="text-sm text-neutral-500 hover:text-neutral-700 px-3 py-1 rounded-sm border border-neutral-300 hover:border-neutral-400 transition-colors"
               >
                 Reset
               </button>
               <button
                 onClick={markAllComplete}
-                className="text-sm text-primary-600 hover:text-primary-700 px-3 py-1 rounded border border-primary-300 hover:border-primary-400 transition-colors"
+                className="text-sm text-primary-600 hover:text-primary-700 px-3 py-1 rounded-sm border border-primary-300 hover:border-primary-400 transition-colors"
               >
                 Mark All Complete
               </button>
@@ -202,7 +202,7 @@ export function InteractiveChecklist({
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => toggleItem(item.id)}
-                          className="mt-0.5 w-5 h-5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                          className="mt-0.5 w-5 h-5 rounded-sm border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
                         />
                         <div className="flex-1">
                           <span className={`block ${isChecked ? 'line-through text-neutral-500' : 'text-neutral-900'}`}>

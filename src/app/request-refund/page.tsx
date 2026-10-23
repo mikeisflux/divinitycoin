@@ -209,7 +209,7 @@ export default function RequestRefundPage() {
           <Card className="mb-8 border-amber-200 bg-amber-50">
             <CardContent className="py-4">
               <div className="flex gap-3">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <svg className="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                   </svg>
@@ -307,7 +307,7 @@ export default function RequestRefundPage() {
                     <select
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
-                      className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                     >
                       <option value="">Select a reason...</option>
                       {REFUND_REASONS.map((r) => (
@@ -328,7 +328,7 @@ export default function RequestRefundPage() {
                         value={customReason}
                         onChange={(e) => setCustomReason(e.target.value)}
                         rows={3}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                         placeholder="Please provide details about your refund request..."
                       />
                     </div>

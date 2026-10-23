@@ -693,7 +693,7 @@ export default function UserDetailPage() {
                     required
                     value={editForm.email}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   />
                 </div>
 
@@ -705,7 +705,7 @@ export default function UserDetailPage() {
                     type="text"
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                     placeholder="User's name"
                   />
                 </div>
@@ -718,7 +718,7 @@ export default function UserDetailPage() {
                     type="password"
                     value={editForm.password}
                     onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                     placeholder="Leave empty to keep current"
                   />
                   <p className="text-xs text-neutral-500 mt-1">
@@ -732,7 +732,7 @@ export default function UserDetailPage() {
                     id="emailVerified"
                     checked={editForm.emailVerified}
                     onChange={(e) => setEditForm({ ...editForm, emailVerified: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                    className="w-4 h-4 text-primary-600 border-neutral-300 rounded-sm focus:ring-primary-500"
                   />
                   <label htmlFor="emailVerified" className="text-sm text-neutral-700">
                     Email verified
@@ -831,7 +831,7 @@ export default function UserDetailPage() {
                 <textarea
                   value={banReason}
                   onChange={(e) => setBanReason(e.target.value)}
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   placeholder="Enter reason for ban..."
                   rows={3}
                 />

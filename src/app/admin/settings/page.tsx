@@ -105,7 +105,7 @@ export default async function GeneralSettingsPage() {
             className="bg-white rounded-xl border border-neutral-200 p-6 hover:border-primary-300 hover:shadow-md transition"
           >
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
                 <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={section.icon} />
                 </svg>

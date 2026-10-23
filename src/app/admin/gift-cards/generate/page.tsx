@@ -136,7 +136,7 @@ export default function GenerateGiftCardPage() {
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                  className="w-32 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="w-32 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                 />
               </div>
             </div>
@@ -149,7 +149,7 @@ export default function GenerateGiftCardPage() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                 placeholder="recipient@example.com"
               />
             </div>
@@ -161,7 +161,7 @@ export default function GenerateGiftCardPage() {
                   id="sendEmail"
                   checked={formData.sendEmail}
                   onChange={(e) => setFormData(prev => ({ ...prev, sendEmail: e.target.checked }))}
-                  className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                  className="w-4 h-4 text-primary-600 border-neutral-300 rounded-sm focus:ring-primary-500"
                 />
                 <label htmlFor="sendEmail" className="text-sm text-neutral-700">
                   Send email with code to recipient
@@ -177,7 +177,7 @@ export default function GenerateGiftCardPage() {
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 rows={3}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden resize-none"
                 placeholder="Reason for manual generation, etc."
               />
             </div>

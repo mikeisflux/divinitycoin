@@ -275,7 +275,7 @@ export default function PartnerDocumentationPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
           {/* Sidebar */}
-          <nav className="w-64 flex-shrink-0">
+          <nav className="w-64 shrink-0">
             <div className="sticky top-8 bg-white rounded-xl border border-neutral-200 p-4">
               <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
                 API Reference
@@ -301,7 +301,7 @@ export default function PartnerDocumentationPage() {
                 <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
                   Base URL
                 </h3>
-                <code className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-700 block">
+                <code className="text-xs bg-neutral-100 px-2 py-1 rounded-sm text-neutral-700 block">
                   https://api.divinitycoin.com
                 </code>
               </div>
@@ -374,7 +374,7 @@ export default function PartnerDocumentationPage() {
                     <div key={i} className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
                       {/* Endpoint Header */}
                       <div className="px-6 py-4 border-b border-neutral-200 flex items-center gap-4">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${getMethodColor(endpoint.method)}`}>
+                        <span className={`px-2 py-1 rounded-sm text-xs font-bold ${getMethodColor(endpoint.method)}`}>
                           {endpoint.method}
                         </span>
                         <code className="text-sm font-mono text-neutral-900">{endpoint.path}</code>
@@ -385,7 +385,7 @@ export default function PartnerDocumentationPage() {
 
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-neutral-500">Authentication:</span>
-                          <span className="px-2 py-0.5 bg-neutral-100 rounded text-neutral-700 font-mono text-xs">
+                          <span className="px-2 py-0.5 bg-neutral-100 rounded-sm text-neutral-700 font-mono text-xs">
                             {endpoint.auth}
                           </span>
                         </div>
@@ -414,7 +414,7 @@ export default function PartnerDocumentationPage() {
                             <div className="relative">
                               <button
                                 onClick={() => copyCode(endpoint.example!.request || '', `${section.id}-${i}`)}
-                                className="absolute top-2 right-2 px-2 py-1 bg-neutral-700 text-white text-xs rounded hover:bg-neutral-600"
+                                className="absolute top-2 right-2 px-2 py-1 bg-neutral-700 text-white text-xs rounded-sm hover:bg-neutral-600"
                               >
                                 {copiedCode === `${section.id}-${i}` ? 'Copied!' : 'Copy'}
                               </button>
@@ -490,8 +490,8 @@ function verifyWebhookSignature(payload, signature, secret) {
               </table>
               <p className="text-sm text-neutral-500 mt-4">
                 Rate limit headers are included in all responses:
-                <code className="bg-neutral-100 px-1 rounded">X-RateLimit-Remaining</code>,
-                <code className="bg-neutral-100 px-1 rounded">X-RateLimit-Reset</code>
+                <code className="bg-neutral-100 px-1 rounded-sm">X-RateLimit-Remaining</code>,
+                <code className="bg-neutral-100 px-1 rounded-sm">X-RateLimit-Reset</code>
               </p>
             </div>
 
@@ -507,27 +507,27 @@ function verifyWebhookSignature(payload, signature, secret) {
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
                   <tr>
-                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded">400</code></td>
+                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-sm">400</code></td>
                     <td className="py-3 text-sm text-neutral-600">Bad Request - Invalid parameters</td>
                   </tr>
                   <tr>
-                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded">401</code></td>
+                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-sm">401</code></td>
                     <td className="py-3 text-sm text-neutral-600">Unauthorized - Invalid or missing API key</td>
                   </tr>
                   <tr>
-                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded">403</code></td>
+                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-sm">403</code></td>
                     <td className="py-3 text-sm text-neutral-600">Forbidden - Insufficient permissions</td>
                   </tr>
                   <tr>
-                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded">404</code></td>
+                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-sm">404</code></td>
                     <td className="py-3 text-sm text-neutral-600">Not Found - Resource doesn't exist</td>
                   </tr>
                   <tr>
-                    <td className="py-3"><code className="text-sm bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">429</code></td>
+                    <td className="py-3"><code className="text-sm bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-sm">429</code></td>
                     <td className="py-3 text-sm text-neutral-600">Too Many Requests - Rate limit exceeded</td>
                   </tr>
                   <tr>
-                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded">500</code></td>
+                    <td className="py-3"><code className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-sm">500</code></td>
                     <td className="py-3 text-sm text-neutral-600">Internal Server Error - Contact support</td>
                   </tr>
                 </tbody>

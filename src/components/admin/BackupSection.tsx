@@ -128,7 +128,7 @@ export function BackupSection() {
       {/* Backup Section */}
       <div className="bg-white rounded-xl border border-neutral-200 p-6">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
             <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
@@ -214,7 +214,7 @@ export function BackupSection() {
       {/* Restore Section */}
       <div className="bg-white rounded-xl border border-neutral-200 p-6">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
             <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
@@ -253,7 +253,7 @@ export function BackupSection() {
                     type="checkbox"
                     checked={restoreDatabase}
                     onChange={(e) => setRestoreDatabase(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-neutral-300 focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 rounded-sm border-neutral-300 focus:ring-blue-500"
                   />
                   <span className="text-sm text-neutral-700">
                     Restore Database
@@ -265,7 +265,7 @@ export function BackupSection() {
                     type="checkbox"
                     checked={restoreConfigs}
                     onChange={(e) => setRestoreConfigs(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-neutral-300 focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 rounded-sm border-neutral-300 focus:ring-blue-500"
                   />
                   <span className="text-sm text-neutral-700">
                     Restore Config Files
@@ -339,7 +339,7 @@ export function BackupSection() {
             )}
 
             <p className="text-xs text-neutral-500 mt-3">
-              Requires SUPER_ADMIN role. After restoring, you may need to restart the application with <code className="bg-neutral-100 px-1 rounded">pm2 reload divinitycoin</code>
+              Requires SUPER_ADMIN role. After restoring, you may need to restart the application with <code className="bg-neutral-100 px-1 rounded-sm">pm2 reload divinitycoin</code>
             </p>
           </div>
         </div>

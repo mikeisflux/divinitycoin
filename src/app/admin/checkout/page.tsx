@@ -55,7 +55,7 @@ function StatusBadge({ status }: { status: string }) {
 function ModeBadge({ mode }: { mode: string }) {
   const styles = mode === 'SETUP' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800';
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono ${styles}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-mono ${styles}`}>
       {mode.toLowerCase()}
     </span>
   );
@@ -128,14 +128,14 @@ export default function CheckoutSessionsPage() {
               placeholder="Search by session id, email, platform user id, intent id…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition text-sm"
             />
           </div>
           <div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full sm:w-auto px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm bg-white"
+              className="w-full sm:w-auto px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition text-sm bg-white"
             >
               <option value="">All statuses</option>
               <option value="PENDING">Pending</option>
@@ -149,7 +149,7 @@ export default function CheckoutSessionsPage() {
             <select
               value={modeFilter}
               onChange={(e) => setModeFilter(e.target.value)}
-              className="w-full sm:w-auto px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm bg-white"
+              className="w-full sm:w-auto px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition text-sm bg-white"
             >
               <option value="">All modes</option>
               <option value="PAYMENT">Payment</option>
@@ -218,14 +218,14 @@ export default function CheckoutSessionsPage() {
               <button
                 onClick={() => fetchSessions(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="px-3 py-1.5 border border-neutral-200 rounded text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 border border-neutral-200 rounded-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
               <button
                 onClick={() => fetchSessions(pagination.page + 1)}
                 disabled={pagination.page >= pagination.pages}
-                className="px-3 py-1.5 border border-neutral-200 rounded text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 border border-neutral-200 rounded-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

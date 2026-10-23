@@ -172,7 +172,7 @@ export default function DisputesPage() {
           <div className="bg-white rounded-xl border border-neutral-200 p-6">
             <h2 className="text-lg font-semibold text-neutral-900 mb-1">Generate evidence bundle</h2>
             <p className="text-sm text-neutral-500 mb-6">
-              Paste any of: the Stripe PaymentIntent ID (<code className="font-mono text-xs bg-neutral-100 px-1 rounded">pi_...</code>),
+              Paste any of: the Stripe PaymentIntent ID (<code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">pi_...</code>),
               the internal PendingPartnerPayment ID, or the legacy Transaction ID.
               We&apos;ll auto-detect which kind of record it is.
             </p>
@@ -188,7 +188,7 @@ export default function DisputesPage() {
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value)}
                   placeholder="pi_3Abc... or cmqxxx..."
-                  className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm font-mono"
+                  className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition text-sm font-mono"
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
@@ -205,7 +205,7 @@ export default function DisputesPage() {
                   value={vrolCase}
                   onChange={(e) => setVrolCase(e.target.value)}
                   placeholder="5565317469"
-                  className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm font-mono"
+                  className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition text-sm font-mono"
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
@@ -261,23 +261,23 @@ export default function DisputesPage() {
             </p>
             <ul className="text-sm text-neutral-600 space-y-2.5">
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P1</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-sm shrink-0 self-start">P1</span>
                 <span><strong>Transaction Receipt</strong> — internal record of credit issuance, delivery, and redemption timeline; partner-side capture.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P2</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-sm shrink-0 self-start">P2</span>
                 <span><strong>Stripe Payment Context</strong> — pulled live from Stripe API: card brand, last 4, charge ID, balance transaction, receipt URL.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P3</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-sm shrink-0 self-start">P3</span>
                 <span><strong>Compelling-Evidence Response</strong> — pre-filled chargeback response letter with this transaction&apos;s specifics.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded shrink-0 self-start">P4</span>
+                <span className="font-mono text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-sm shrink-0 self-start">P4</span>
                 <span><strong>Terms of Service Excerpts</strong> — sections 3 and 6, what the cardholder agreed to at checkout.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded shrink-0 self-start">APX</span>
+                <span className="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded-sm shrink-0 self-start">APX</span>
                 <span><strong>Raw Evidence JSON</strong> — every queryable field from our DB plus the Stripe context object, in a code block at the end for field-level verification.</span>
               </li>
             </ul>
@@ -341,7 +341,7 @@ export default function DisputesPage() {
                         value={c.status}
                         disabled={busyId === c.id}
                         onChange={(e) => handleStatusChange(c, e.target.value)}
-                        className={`text-xs font-medium rounded-full px-2.5 py-1 border-0 cursor-pointer outline-none ${STATUS_STYLES[c.status]}`}
+                        className={`text-xs font-medium rounded-full px-2.5 py-1 border-0 cursor-pointer outline-hidden ${STATUS_STYLES[c.status]}`}
                       >
                         {STATUS_OPTIONS.map((s) => (
                           <option key={s} value={s}>{s}</option>

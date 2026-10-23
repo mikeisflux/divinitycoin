@@ -111,7 +111,7 @@ export default function SecuritySettingsPage() {
               step="1000"
               value={settings.rateLimitWindowMs}
               onChange={(e) => setSettings(prev => ({ ...prev, rateLimitWindowMs: parseInt(e.target.value) || 60000 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Time window for rate limiting ({settings.rateLimitWindowMs / 1000} seconds)
@@ -127,7 +127,7 @@ export default function SecuritySettingsPage() {
               min="1"
               value={settings.rateLimitMaxAttempts}
               onChange={(e) => setSettings(prev => ({ ...prev, rateLimitMaxAttempts: parseInt(e.target.value) || 5 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Maximum redemption attempts per IP/code
@@ -150,7 +150,7 @@ export default function SecuritySettingsPage() {
               max="72"
               value={settings.adminSessionExpiryHours}
               onChange={(e) => setSettings(prev => ({ ...prev, adminSessionExpiryHours: parseInt(e.target.value) || 8 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Admin sessions expire after this time
@@ -167,7 +167,7 @@ export default function SecuritySettingsPage() {
               max="10"
               value={settings.adminMaxLoginAttempts}
               onChange={(e) => setSettings(prev => ({ ...prev, adminMaxLoginAttempts: parseInt(e.target.value) || 5 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               Failed attempts before lockout
@@ -184,7 +184,7 @@ export default function SecuritySettingsPage() {
               max="120"
               value={settings.adminLockoutMinutes}
               onChange={(e) => setSettings(prev => ({ ...prev, adminLockoutMinutes: parseInt(e.target.value) || 30 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">
               How long to lock account after failed attempts
@@ -210,7 +210,7 @@ export default function SecuritySettingsPage() {
               onChange={(e) => setSettings(prev => ({ ...prev, requireMfa: e.target.checked }))}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-hidden peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
           </label>
         </div>
       </div>

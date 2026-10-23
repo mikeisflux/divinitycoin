@@ -251,7 +251,7 @@ function MatchesTable({ rows }: { rows: MatchRow[] }) {
             <tr key={r.id}>
               <td className="px-3 py-2 whitespace-nowrap text-neutral-500">{formatDate(r.createdAt)}</td>
               <td className="px-3 py-2">
-                <span className={'px-2 py-0.5 rounded text-xs font-medium ' + (DECISION_STYLES[r.decision] ?? '')}>
+                <span className={'px-2 py-0.5 rounded-sm text-xs font-medium ' + (DECISION_STYLES[r.decision] ?? '')}>
                   {r.decision}
                 </span>
                 {r.decision === 'LOGGED_ONLY' && r.intendedDecision !== r.decision && (
@@ -261,7 +261,7 @@ function MatchesTable({ rows }: { rows: MatchRow[] }) {
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
                   {r.matchedSignals.map((s) => (
-                    <span key={s} className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 text-xs">
+                    <span key={s} className="px-1.5 py-0.5 rounded-sm bg-neutral-100 text-neutral-700 text-xs">
                       {s}
                     </span>
                   ))}
@@ -318,7 +318,7 @@ function SignalsTable({ rows }: { rows: SignalRow[] }) {
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
                   {Object.entries(s.identifierCounts).map(([type, count]) => (
-                    <span key={type} className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 text-xs">
+                    <span key={type} className="px-1.5 py-0.5 rounded-sm bg-neutral-100 text-neutral-700 text-xs">
                       {type.toLowerCase()}: {count}
                     </span>
                   ))}
@@ -358,7 +358,7 @@ function CgnatTable(props: {
             value={props.newIp}
             onChange={(e) => props.onChangeIp(e.target.value)}
             placeholder="73.9.8.34"
-            className="border border-neutral-300 rounded px-2 py-1 text-sm font-mono w-48"
+            className="border border-neutral-300 rounded-sm px-2 py-1 text-sm font-mono w-48"
           />
         </div>
         <div className="flex-1">
@@ -367,12 +367,12 @@ function CgnatTable(props: {
             value={props.newIpNote}
             onChange={(e) => props.onChangeNote(e.target.value)}
             placeholder="T-Mobile CGNAT exit, seen on legit pledges"
-            className="border border-neutral-300 rounded px-2 py-1 text-sm w-full"
+            className="border border-neutral-300 rounded-sm px-2 py-1 text-sm w-full"
           />
         </div>
         <button
           type="submit"
-          className="px-3 py-1.5 bg-neutral-900 text-white text-sm rounded hover:bg-neutral-700"
+          className="px-3 py-1.5 bg-neutral-900 text-white text-sm rounded-sm hover:bg-neutral-700"
         >
           Add IP
         </button>

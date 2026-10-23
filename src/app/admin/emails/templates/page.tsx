@@ -86,7 +86,7 @@ export default async function EmailTemplatesPage() {
             {templates.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-neutral-500">
-                  No templates created yet. Run <code className="bg-neutral-100 px-2 py-1 rounded">npm run db:seed</code> to create default templates.
+                  No templates created yet. Run <code className="bg-neutral-100 px-2 py-1 rounded-sm">npm run db:seed</code> to create default templates.
                 </td>
               </tr>
             ) : (
@@ -143,17 +143,17 @@ export default async function EmailTemplatesPage() {
           <div>
             <h4 className="font-medium text-neutral-700 mb-2">Gift Card Emails</h4>
             <ul className="space-y-1 text-neutral-600">
-              <li><code className="bg-white px-1.5 py-0.5 rounded border">{`{{code}}`}</code> - Gift card code</li>
-              <li><code className="bg-white px-1.5 py-0.5 rounded border">{`{{amount}}`}</code> - Gift card amount</li>
-              <li><code className="bg-white px-1.5 py-0.5 rounded border">{`{{expiryDate}}`}</code> - Expiration date</li>
+              <li><code className="bg-white px-1.5 py-0.5 rounded-sm border">{`{{code}}`}</code> - Gift card code</li>
+              <li><code className="bg-white px-1.5 py-0.5 rounded-sm border">{`{{amount}}`}</code> - Gift card amount</li>
+              <li><code className="bg-white px-1.5 py-0.5 rounded-sm border">{`{{expiryDate}}`}</code> - Expiration date</li>
             </ul>
           </div>
           <div>
             <h4 className="font-medium text-neutral-700 mb-2">User Emails</h4>
             <ul className="space-y-1 text-neutral-600">
-              <li><code className="bg-white px-1.5 py-0.5 rounded border">{`{{userName}}`}</code> - User's name</li>
-              <li><code className="bg-white px-1.5 py-0.5 rounded border">{`{{email}}`}</code> - User's email</li>
-              <li><code className="bg-white px-1.5 py-0.5 rounded border">{`{{resetLink}}`}</code> - Password reset link</li>
+              <li><code className="bg-white px-1.5 py-0.5 rounded-sm border">{`{{userName}}`}</code> - User's name</li>
+              <li><code className="bg-white px-1.5 py-0.5 rounded-sm border">{`{{email}}`}</code> - User's email</li>
+              <li><code className="bg-white px-1.5 py-0.5 rounded-sm border">{`{{resetLink}}`}</code> - Password reset link</li>
             </ul>
           </div>
         </div>

@@ -128,7 +128,7 @@ export default function PaymentSettingsPage() {
               step="1"
               value={settings.minAmount}
               onChange={(e) => setSettings(prev => ({ ...prev, minAmount: parseFloat(e.target.value) || 0 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">Minimum purchase amount allowed</p>
           </div>
@@ -143,7 +143,7 @@ export default function PaymentSettingsPage() {
               step="1"
               value={settings.maxAmount}
               onChange={(e) => setSettings(prev => ({ ...prev, maxAmount: parseFloat(e.target.value) || 0 }))}
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <p className="text-sm text-neutral-500 mt-1">Maximum purchase amount allowed</p>
           </div>
@@ -180,7 +180,7 @@ export default function PaymentSettingsPage() {
             value={newPreset}
             onChange={(e) => setNewPreset(e.target.value)}
             placeholder="Enter amount"
-            className="w-32 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            className="w-32 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
           />
           <Button variant="outline" onClick={addPreset}>
             Add Preset
@@ -201,7 +201,7 @@ export default function PaymentSettingsPage() {
           <select
             value={settings.currency}
             onChange={(e) => setSettings(prev => ({ ...prev, currency: e.target.value }))}
-            className="w-full md:w-48 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            className="w-full md:w-48 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
           >
             <option value="USD">USD - US Dollar</option>
             <option value="EUR">EUR - Euro</option>

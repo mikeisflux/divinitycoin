@@ -219,7 +219,7 @@ export default function EmailSettingsPage() {
                     setSettings(prev => ({ ...prev, apiKey: '' }));
                   }
                 }}
-                className="w-full px-4 py-2 pr-12 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                className="w-full px-4 py-2 pr-12 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden font-mono"
                 placeholder="SG.xxxxxxxxxxxxxxxx"
               />
               <button
@@ -266,7 +266,7 @@ export default function EmailSettingsPage() {
                 type="email"
                 value={settings.fromEmail}
                 onChange={(e) => setSettings(prev => ({ ...prev, fromEmail: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                 placeholder="noreply@divinitycoin.com"
               />
               <p className="text-sm text-neutral-500 mt-1">Must be verified in SendGrid</p>
@@ -280,7 +280,7 @@ export default function EmailSettingsPage() {
                 type="text"
                 value={settings.fromName}
                 onChange={(e) => setSettings(prev => ({ ...prev, fromName: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                 placeholder="DivinityCoin"
               />
               <p className="text-sm text-neutral-500 mt-1">Display name for sent emails</p>
@@ -295,7 +295,7 @@ export default function EmailSettingsPage() {
               type="email"
               value={settings.replyTo}
               onChange={(e) => setSettings(prev => ({ ...prev, replyTo: e.target.value }))}
-              className="w-full md:w-1/2 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full md:w-1/2 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
               placeholder="support@divinitycoin.com"
             />
             <p className="text-sm text-neutral-500 mt-1">Where replies will be sent (defaults to From address)</p>
@@ -328,7 +328,7 @@ export default function EmailSettingsPage() {
                 type="email"
                 value={settings.testEmailRecipient}
                 onChange={(e) => setSettings(prev => ({ ...prev, testEmailRecipient: e.target.value }))}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                 placeholder="your@email.com"
               />
             </div>

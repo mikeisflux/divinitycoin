@@ -328,27 +328,27 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
               type="checkbox"
               checked={selectedIds.size === emails.length && emails.length > 0}
               onChange={toggleSelectAll}
-              className="rounded border-neutral-300"
+              className="rounded-sm border-neutral-300"
             />
             {selectedIds.size > 0 && (
               <>
                 <button
                   onClick={() => handleBulkAction('markAsRead')}
-                  className="p-2 hover:bg-neutral-100 rounded"
+                  className="p-2 hover:bg-neutral-100 rounded-sm"
                   title="Mark as read"
                 >
                   ✓
                 </button>
                 <button
                   onClick={() => handleBulkAction('archive')}
-                  className="p-2 hover:bg-neutral-100 rounded"
+                  className="p-2 hover:bg-neutral-100 rounded-sm"
                   title="Archive"
                 >
                   📦
                 </button>
                 <button
                   onClick={() => handleBulkAction('trash')}
-                  className="p-2 hover:bg-neutral-100 rounded"
+                  className="p-2 hover:bg-neutral-100 rounded-sm"
                   title="Delete"
                 >
                   🗑️
@@ -364,11 +364,11 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchEmails()}
-              className="px-3 py-1.5 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="px-3 py-1.5 text-sm border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary-500"
             />
             <button
               onClick={fetchEmails}
-              className="p-2 hover:bg-neutral-100 rounded"
+              className="p-2 hover:bg-neutral-100 rounded-sm"
               disabled={loading}
             >
               🔄
@@ -413,7 +413,7 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
                     }
                     setSelectedIds(newSelected);
                   }}
-                  className="mr-3 rounded border-neutral-300"
+                  className="mr-3 rounded-sm border-neutral-300"
                 />
 
                 <button
@@ -461,7 +461,7 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
           <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
             <button
               onClick={() => setSelectedEmail(null)}
-              className="md:hidden p-2 hover:bg-neutral-100 rounded"
+              className="md:hidden p-2 hover:bg-neutral-100 rounded-sm"
             >
               ← Back
             </button>
@@ -476,7 +476,7 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
               </button>
               <button
                 onClick={() => handleDelete(selectedEmail.id)}
-                className="p-2 text-neutral-400 hover:text-red-500 hover:bg-neutral-100 rounded"
+                className="p-2 text-neutral-400 hover:text-red-500 hover:bg-neutral-100 rounded-sm"
               >
                 🗑️
               </button>
@@ -514,7 +514,7 @@ export function InboxClient({ initialMailboxes, initialEmails, initialFolderCoun
                       href={`/api/admin/inbox/attachments/${att.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-neutral-200 rounded text-sm hover:bg-primary-50 hover:border-primary-300 transition cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-neutral-200 rounded-sm text-sm hover:bg-primary-50 hover:border-primary-300 transition cursor-pointer"
                     >
                       📎 {att.filename}
                     </a>
@@ -647,7 +647,7 @@ function ComposeModal({
             <select
               value={form.mailboxId}
               onChange={(e) => setForm({ ...form, mailboxId: e.target.value })}
-              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-primary-500"
             >
               {mailboxes.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -665,7 +665,7 @@ function ComposeModal({
               onChange={(e) => setForm({ ...form, to: e.target.value })}
               placeholder="recipient@example.com"
               disabled={sendToAll}
-              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100 disabled:text-neutral-500"
+              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100 disabled:text-neutral-500"
             />
           </div>
 
@@ -676,7 +676,7 @@ function ComposeModal({
                 id="sendToAll"
                 checked={sendToAll}
                 onChange={(e) => setSendToAll(e.target.checked)}
-                className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                className="rounded-sm border-neutral-300 text-primary-600 focus:ring-primary-500"
               />
               <label htmlFor="sendToAll" className="text-sm text-amber-800 cursor-pointer">
                 Send to all registered users
@@ -694,7 +694,7 @@ function ComposeModal({
               value={form.cc}
               onChange={(e) => setForm({ ...form, cc: e.target.value })}
               placeholder="cc@example.com"
-              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -705,7 +705,7 @@ function ComposeModal({
               value={form.subject}
               onChange={(e) => setForm({ ...form, subject: e.target.value })}
               placeholder="Subject"
-              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -714,7 +714,7 @@ function ComposeModal({
             onChange={(e) => setForm({ ...form, body: e.target.value })}
             placeholder="Write your message..."
             rows={10}
-            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-primary-500 resize-none"
           />
         </div>
 

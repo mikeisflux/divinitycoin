@@ -1,22 +1,62 @@
 /* app/globals.css */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-primary-50: #f0f7ff;
+  --color-primary-100: #e0effe;
+  --color-primary-200: #bae0fd;
+  --color-primary-300: #7cc8fb;
+  --color-primary-400: #36aaf5;
+  --color-primary-500: #0c8ee7;
+  --color-primary-600: #0070cc;
+  --color-primary-700: #0159a6;
+  --color-primary-800: #064b88;
+  --color-primary-900: #0a3f70;
+
+  --font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    Helvetica Neue, Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono,
+    monospace;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
 
 @layer base {
-  :root {
-    --color-primary-50: 240 247 255;
-    --color-primary-100: 224 239 254;
-    --color-primary-200: 186 224 253;
-    --color-primary-300: 124 200 251;
-    --color-primary-400: 54 170 245;
-    --color-primary-500: 12 142 231;
-    --color-primary-600: 0 112 204;
-    --color-primary-700: 1 89 166;
-    --color-primary-800: 6 75 136;
-    --color-primary-900: 10 63 112;
-  }
+  /* The --color-primary-* custom properties that used to live here held
+     space-separated RGB channels for Tailwind 3's `rgb(var(--x) / <alpha>)`
+     pattern. Nothing ever read them: v3 compiled the hex values from
+     tailwind.config.ts straight into the utilities. Under v4 the utilities
+     resolve `var(--color-primary-600)` instead, so these re-declarations
+     shadowed the @theme block above with a value that is not valid for
+     background-color, and every primary-coloured element rendered
+     transparent. The @theme block is now the single source. */
 
   html {
     scroll-behavior: smooth;
@@ -24,17 +64,5 @@
 
   body {
     @apply text-neutral-900 antialiased;
-  }
-}
-
-@layer components {
-  .container {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
-  }
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
   }
 }

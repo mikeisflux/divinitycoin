@@ -161,7 +161,7 @@ export default function PartnerApiKeysPage() {
                   <code className="text-sm font-mono text-neutral-900 flex-1 break-all">{showNewKey.key}</code>
                   <button
                     onClick={() => copyToClipboard(showNewKey.key)}
-                    className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
+                    className="px-3 py-1 bg-primary-600 text-white rounded-sm text-sm hover:bg-primary-700"
                   >
                     Copy
                   </button>
@@ -212,7 +212,7 @@ export default function PartnerApiKeysPage() {
               value={keyName}
               onChange={(e) => setKeyName(e.target.value)}
               placeholder="Key name (e.g., Production, Staging)"
-              className="flex-1 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="flex-1 px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
             <button
               onClick={generateKey}
@@ -252,7 +252,7 @@ export default function PartnerApiKeysPage() {
                   <tr key={key.id} className="hover:bg-neutral-50">
                     <td className="px-6 py-4 text-sm font-medium text-neutral-900">{key.name}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-800">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-neutral-100 text-neutral-800">
                         {key.type.toUpperCase()}
                       </span>
                     </td>

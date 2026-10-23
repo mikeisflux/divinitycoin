@@ -93,7 +93,7 @@ export default async function PartnerDashboard() {
         </div>
 
         {/* Payout Summary */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl p-6 mb-8 text-white">
+        <div className="bg-linear-to-r from-primary-600 to-primary-700 rounded-xl p-6 mb-8 text-white">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium text-primary-100">Total Paid Out</h3>

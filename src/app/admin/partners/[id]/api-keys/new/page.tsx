@@ -152,7 +152,7 @@ export default function NewPartnerApiKeyPage() {
               <code className="text-sm font-mono text-neutral-900 flex-1 break-all">{generatedKey}</code>
               <button
                 onClick={() => copyToClipboard(generatedKey)}
-                className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
+                className="px-3 py-1 bg-primary-600 text-white rounded-sm text-sm hover:bg-primary-700"
               >
                 Copy
               </button>
@@ -213,7 +213,7 @@ export default function NewPartnerApiKeyPage() {
               value={keyName}
               onChange={(e) => setKeyName(e.target.value)}
               placeholder="e.g., Production, Staging, Test"
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             />
           </div>
 

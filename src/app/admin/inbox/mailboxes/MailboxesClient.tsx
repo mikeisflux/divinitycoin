@@ -272,7 +272,7 @@ export function MailboxesClient({ initialMailboxes }: MailboxesClientProps) {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   disabled={!!editingMailbox}
                   placeholder="support@divinitycoin.com"
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-50"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-50"
                 />
               </div>
 
@@ -285,7 +285,7 @@ export function MailboxesClient({ initialMailboxes }: MailboxesClientProps) {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Support"
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -295,7 +295,7 @@ export function MailboxesClient({ initialMailboxes }: MailboxesClientProps) {
                     type="checkbox"
                     checked={form.isDefault}
                     onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
-                    className="rounded border-neutral-300"
+                    className="rounded-sm border-neutral-300"
                   />
                   <span className="text-sm">Set as default mailbox</span>
                 </label>
@@ -310,7 +310,7 @@ export function MailboxesClient({ initialMailboxes }: MailboxesClientProps) {
                   onChange={(e) => setForm({ ...form, signature: e.target.value })}
                   placeholder="Best regards,&#10;The DivinityCoin Team"
                   rows={3}
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -322,7 +322,7 @@ export function MailboxesClient({ initialMailboxes }: MailboxesClientProps) {
                     onChange={(e) =>
                       setForm({ ...form, autoReplyEnabled: e.target.checked })
                     }
-                    className="rounded border-neutral-300"
+                    className="rounded-sm border-neutral-300"
                   />
                   <span className="text-sm font-medium">Enable auto-reply</span>
                 </label>
@@ -337,7 +337,7 @@ export function MailboxesClient({ initialMailboxes }: MailboxesClientProps) {
                           setForm({ ...form, autoReplySubject: e.target.value })
                         }
                         placeholder="Auto-reply subject"
-                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary-500"
                       />
                     </div>
                     <textarea
@@ -347,7 +347,7 @@ export function MailboxesClient({ initialMailboxes }: MailboxesClientProps) {
                       }
                       placeholder="Thank you for your email. We will get back to you shortly."
                       rows={3}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary-500"
                     />
                   </>
                 )}

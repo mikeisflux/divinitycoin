@@ -174,7 +174,7 @@ export default async function SettlementsPage({ searchParams }: PageProps) {
               {page > 1 && (
                 <Link
                   href={`/admin/settlements?page=${page - 1}${status ? `&status=${status}` : ''}`}
-                  className="px-3 py-1 bg-white border border-neutral-300 rounded text-sm hover:bg-neutral-50"
+                  className="px-3 py-1 bg-white border border-neutral-300 rounded-sm text-sm hover:bg-neutral-50"
                 >
                   Previous
                 </Link>
@@ -182,7 +182,7 @@ export default async function SettlementsPage({ searchParams }: PageProps) {
               {page < totalPages && (
                 <Link
                   href={`/admin/settlements?page=${page + 1}${status ? `&status=${status}` : ''}`}
-                  className="px-3 py-1 bg-white border border-neutral-300 rounded text-sm hover:bg-neutral-50"
+                  className="px-3 py-1 bg-white border border-neutral-300 rounded-sm text-sm hover:bg-neutral-50"
                 >
                   Next
                 </Link>

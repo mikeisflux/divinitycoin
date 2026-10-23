@@ -149,8 +149,8 @@ export default async function EmailAccountsPage() {
         <div className="text-sm text-blue-800 space-y-2">
           <p>For GoDaddy Office 365 email accounts, use these settings:</p>
           <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>SMTP Server: <code className="bg-blue-100 px-1 rounded">smtp.office365.com</code></li>
-            <li>Port: <code className="bg-blue-100 px-1 rounded">587</code> (STARTTLS)</li>
+            <li>SMTP Server: <code className="bg-blue-100 px-1 rounded-sm">smtp.office365.com</code></li>
+            <li>Port: <code className="bg-blue-100 px-1 rounded-sm">587</code> (STARTTLS)</li>
             <li>Username: Your full email address</li>
             <li>Password: Your Office 365 password or app password</li>
           </ul>

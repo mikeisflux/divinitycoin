@@ -296,7 +296,7 @@ export default function GiftCardDetailPage() {
                     min="0"
                     value={editAmount}
                     onChange={(e) => setEditAmount(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition"
                   />
                 </div>
                 <div>
@@ -304,7 +304,7 @@ export default function GiftCardDetailPage() {
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition bg-white"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition bg-white"
                   >
                     <option value="PENDING">Pending</option>
                     <option value="ACTIVE">Active</option>
@@ -318,7 +318,7 @@ export default function GiftCardDetailPage() {
                     type="date"
                     value={editExpiresAt}
                     onChange={(e) => setEditExpiresAt(e.target.value)}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden transition"
                   />
                   <p className="text-xs text-neutral-500 mt-1">Leave empty for no expiration</p>
                 </div>

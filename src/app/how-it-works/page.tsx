@@ -7,7 +7,7 @@ export default function HowItWorksPage() {
   return (
     <>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-primary-50 to-white py-20">
+      <section className="bg-linear-to-br from-primary-50 to-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-neutral-900">
             How DivinityCoin Works
@@ -24,7 +24,7 @@ export default function HowItWorksPage() {
           <div className="space-y-16">
             {/* Step 1 */}
             <div className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="flex-shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
+              <div className="shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
                 1
               </div>
               <div>
@@ -42,7 +42,7 @@ export default function HowItWorksPage() {
 
             {/* Step 2 */}
             <div className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="flex-shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
+              <div className="shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
                 2
               </div>
               <div>
@@ -63,7 +63,7 @@ export default function HowItWorksPage() {
 
             {/* Step 3 */}
             <div className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="flex-shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
+              <div className="shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
                 3
               </div>
               <div>
@@ -81,7 +81,7 @@ export default function HowItWorksPage() {
 
             {/* Step 4 */}
             <div className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="flex-shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
+              <div className="shrink-0 w-24 h-24 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold">
                 4
               </div>
               <div>
@@ -125,7 +125,7 @@ export default function HowItWorksPage() {
                 a: 'Absolutely. All payments are processed through a PCI-compliant payment processor used by millions of businesses.',
               },
             ].map((item, index) => (
-              <div key={index} className="bg-white rounded-xl p-6 shadow-sm">
+              <div key={index} className="bg-white rounded-xl p-6 shadow-xs">
                 <h3 className="font-semibold text-neutral-900 mb-2">
                   {item.q}
                 </h3>

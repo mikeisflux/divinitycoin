@@ -363,7 +363,7 @@ function SetupWizard() {
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="Create a strong password"
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   />
                   <p className="text-xs text-neutral-500 mt-1">
                     Must be at least 8 characters with uppercase, lowercase, and numbers
@@ -379,7 +379,7 @@ function SetupWizard() {
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     placeholder="Confirm your password"
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   />
                 </div>
               </div>
@@ -422,7 +422,7 @@ function SetupWizard() {
                     value={formData.contactName}
                     onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
                     placeholder="Your name"
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   />
                 </div>
 
@@ -435,7 +435,7 @@ function SetupWizard() {
                     value={formData.website}
                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                     placeholder="https://yourcompany.com"
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   />
                 </div>
 
@@ -448,7 +448,7 @@ function SetupWizard() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Briefly describe your platform..."
                     rows={3}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden resize-none"
                   />
                 </div>
               </div>
@@ -523,7 +523,7 @@ function SetupWizard() {
                       value={formData.paypalEmail}
                       onChange={(e) => setFormData({ ...formData, paypalEmail: e.target.value })}
                       placeholder="payments@yourcompany.com"
-                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                     />
                   </div>
                 ) : (
@@ -537,7 +537,7 @@ function SetupWizard() {
                         value={formData.bankName}
                         onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
                         placeholder="Chase, Bank of America, etc."
-                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                       />
                     </div>
 
@@ -554,7 +554,7 @@ function SetupWizard() {
                         }}
                         placeholder="9 digits"
                         maxLength={9}
-                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden font-mono"
                       />
                     </div>
 
@@ -570,7 +570,7 @@ function SetupWizard() {
                           setFormData({ ...formData, bankAccountNumber: value });
                         }}
                         placeholder="Your account number"
-                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden font-mono"
                       />
                     </div>
 
@@ -586,7 +586,7 @@ function SetupWizard() {
                           setFormData({ ...formData, confirmAccountNumber: value });
                         }}
                         placeholder="Re-enter account number"
-                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden font-mono"
                       />
                     </div>
                   </>
@@ -620,19 +620,19 @@ function SetupWizard() {
                 <h3 className="font-semibold text-neutral-900 mb-4">Next Steps:</h3>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">1</span>
+                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium shrink-0">1</span>
                     <span className="text-neutral-600">Generate your API keys in the dashboard</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">2</span>
+                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium shrink-0">2</span>
                     <span className="text-neutral-600">Review the integration documentation</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">3</span>
+                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium shrink-0">3</span>
                     <span className="text-neutral-600">Test with sandbox credentials</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">4</span>
+                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium shrink-0">4</span>
                     <span className="text-neutral-600">Go live and start earning!</span>
                   </li>
                 </ul>

@@ -92,7 +92,7 @@ export default function SupportPage() {
           </h2>
 
           <div className="space-y-6">
-            <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="bg-white rounded-xl p-6 shadow-xs">
               <h3 className="font-semibold text-neutral-900 mb-2">
                 I didn't receive my code
               </h3>
@@ -103,7 +103,7 @@ export default function SupportPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="bg-white rounded-xl p-6 shadow-xs">
               <h3 className="font-semibold text-neutral-900 mb-2">
                 My code isn't working
               </h3>
@@ -114,7 +114,7 @@ export default function SupportPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="bg-white rounded-xl p-6 shadow-xs">
               <h3 className="font-semibold text-neutral-900 mb-2">
                 I want a refund
               </h3>
@@ -125,7 +125,7 @@ export default function SupportPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="bg-white rounded-xl p-6 shadow-xs">
               <h3 className="font-semibold text-neutral-900 mb-2">
                 I was charged twice
               </h3>

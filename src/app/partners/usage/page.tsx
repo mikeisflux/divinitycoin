@@ -122,7 +122,7 @@ export default function PartnerUsagePage() {
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
             >
               <option value="24h">Last 24 Hours</option>
               <option value="7d">Last 7 Days</option>
@@ -210,11 +210,11 @@ export default function PartnerUsagePage() {
             </div>
             <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-neutral-200">
               <span className="flex items-center gap-2 text-sm text-neutral-600">
-                <span className="w-3 h-3 bg-green-500 rounded"></span>
+                <span className="w-3 h-3 bg-green-500 rounded-sm"></span>
                 Successful
               </span>
               <span className="flex items-center gap-2 text-sm text-neutral-600">
-                <span className="w-3 h-3 bg-red-400 rounded"></span>
+                <span className="w-3 h-3 bg-red-400 rounded-sm"></span>
                 Failed
               </span>
             </div>
@@ -257,7 +257,7 @@ export default function PartnerUsagePage() {
             <div className="grid md:grid-cols-3 gap-4">
               {data.errorBreakdown.map((error, i) => (
                 <div key={i} className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
-                  <span className={`px-2 py-1 rounded text-sm font-mono ${getStatusColor(error.code)}`}>
+                  <span className={`px-2 py-1 rounded-sm text-sm font-mono ${getStatusColor(error.code)}`}>
                     {error.code}
                   </span>
                   <div className="flex-1">
@@ -307,7 +307,7 @@ export default function PartnerUsagePage() {
                       </td>
                       <td className="px-6 py-4 text-sm font-mono text-neutral-900">{req.endpoint}</td>
                       <td className="px-6 py-4">
-                        <span className={`text-xs font-mono px-2 py-0.5 rounded ${getStatusColor(req.status)}`}>
+                        <span className={`text-xs font-mono px-2 py-0.5 rounded-sm ${getStatusColor(req.status)}`}>
                           {req.status}
                         </span>
                       </td>

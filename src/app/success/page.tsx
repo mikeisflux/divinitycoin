@@ -37,7 +37,7 @@ export default function SuccessPage() {
           <h2 className="font-semibold text-neutral-900 mb-4">What's Next?</h2>
           <ol className="space-y-3">
             <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium">
+              <span className="shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium">
                 1
               </span>
               <span className="text-neutral-600">
@@ -45,7 +45,7 @@ export default function SuccessPage() {
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium">
+              <span className="shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium">
                 2
               </span>
               <span className="text-neutral-600">
@@ -53,7 +53,7 @@ export default function SuccessPage() {
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium">
+              <span className="shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium">
                 3
               </span>
               <span className="text-neutral-600">

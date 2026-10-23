@@ -8,7 +8,7 @@ export default function HomePage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-white">
+      <section className="relative overflow-hidden bg-linear-to-br from-primary-50 via-white to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -91,7 +91,7 @@ export default function HomePage() {
                 </div>
               </div>
               {/* Background decoration */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-primary-200 to-primary-100 rounded-2xl transform -rotate-2 -z-10" />
+              <div className="absolute -inset-4 bg-linear-to-r from-primary-200 to-primary-100 rounded-2xl transform -rotate-2 -z-10" />
             </div>
           </div>
         </div>
@@ -257,7 +257,7 @@ export default function HomePage() {
                   },
                 ].map((feature, index) => (
                   <div key={index} className="flex gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                    <div className="shrink-0 w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
                       <svg
                         className="w-6 h-6 text-primary-600"
                         fill="none"

@@ -177,11 +177,11 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-4">
             {/* Visa */}
-            <div className="w-10 h-6 bg-white rounded flex items-center justify-center">
+            <div className="w-10 h-6 bg-white rounded-sm flex items-center justify-center">
               <span className="text-[#1A1F71] text-xs font-bold">VISA</span>
             </div>
             {/* Mastercard */}
-            <div className="w-10 h-6 bg-neutral-800 rounded flex items-center justify-center relative overflow-hidden">
+            <div className="w-10 h-6 bg-neutral-800 rounded-sm flex items-center justify-center relative overflow-hidden">
               <div className="absolute w-4 h-4 bg-[#EB001B] rounded-full left-1" />
               <div className="absolute w-4 h-4 bg-[#F79E1B] rounded-full right-1" />
             </div>

@@ -81,7 +81,7 @@ export default function NewPartnerPage() {
                 required
                 value={formData.name}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                 placeholder="Acme Crowdfunding"
               />
             </div>
@@ -96,7 +96,7 @@ export default function NewPartnerPage() {
                 required
                 value={formData.slug}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden font-mono"
                 placeholder="acme-crowdfunding"
               />
               <p className="text-sm text-neutral-500 mt-1">
@@ -114,7 +114,7 @@ export default function NewPartnerPage() {
                   name="contactName"
                   value={formData.contactName}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   placeholder="John Smith"
                 />
               </div>
@@ -128,7 +128,7 @@ export default function NewPartnerPage() {
                   name="contactEmail"
                   value={formData.contactEmail}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                   placeholder="john@acme.com"
                 />
               </div>
@@ -147,7 +147,7 @@ export default function NewPartnerPage() {
                 name="vpnIp"
                 value={formData.vpnIp}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden font-mono"
                 placeholder="10.10.0.2"
               />
               <p className="text-sm text-neutral-500 mt-1">
@@ -164,7 +164,7 @@ export default function NewPartnerPage() {
                 name="webhookUrl"
                 value={formData.webhookUrl}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-hidden"
                 placeholder="https://acme.com/webhooks/divinitycoin"
               />
               <p className="text-sm text-neutral-500 mt-1">
