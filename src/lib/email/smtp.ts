@@ -27,10 +27,13 @@ async function createTransporter(config: SmtpConfig) {
       user: config.user,
       pass: config.pass,
     },
-    tls: {
-      ciphers: 'SSLv3',
-      rejectUnauthorized: false,
-    },
+    // No `tls` overrides on purpose. This used to pass
+    // `rejectUnauthorized: false`, which accepts any certificate and so
+    // hands the mailbox password to anyone able to intercept the
+    // connection, and `ciphers: 'SSLv3'`, copied from old nodemailer docs,
+    // which pins a weak cipher string. Node's defaults verify the chain and
+    // negotiate a modern cipher; Office 365 and GoDaddy both present valid
+    // certificates, so there is nothing here to work around.
   });
 }
 
