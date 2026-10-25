@@ -79,8 +79,22 @@ npx prisma generate
 
 # This project has no committed migrations; schema changes ship via db push.
 # `prisma migrate deploy` would be a silent no-op here.
+#
+# No --skip-generate: Prisma 7 removed it. An unknown option makes db push
+# print its help, apply nothing, and exit 1, which under `set -e` aborts the
+# deploy before the build — safe, but it reads as an unrelated failure, so the
+# flag is gone rather than tolerated.
+#
+# No --accept-data-loss either. db push prompts before anything it considers
+# destructive, and that prompt is a gate worth keeping — answering it needs
+# someone who knows whether the change is additive. It does mean this step
+# blocks without a terminal, so say so rather than hanging silently in a cron.
+if [ ! -t 0 ]; then
+  log "WARNING: no terminal attached. If the schema changed, db push will" \
+      "block on its confirmation prompt. Run it by hand first if so."
+fi
 log "Syncing database schema..."
-npx prisma db push --skip-generate
+npx prisma db push
 
 # Stop BEFORE building. `next build` deletes and rewrites .next in place, so a
 # running process spends the whole build crashing into a half-written
