@@ -37,10 +37,19 @@ export async function fireCheckoutWebhookIfNeeded(sessionId: string): Promise<vo
     where: { id: sessionId },
   });
   if (!session) return;
-  if (session.webhookFiredAt) return; // already fired or deliberately skipped
 
   const eventType = eventForStatus(session.status);
   if (!eventType) return; // still pending or unknown status
+
+  if (session.webhookFiredAt) {
+    // Already fired something. Normally that is the end of it — one
+    // terminal event per session. The exception is completion: a session
+    // can be marked terminal and then genuinely be paid, in which case the
+    // partner has been told the wrong thing and must still hear
+    // checkout.completed. Only completion may supersede, and only once.
+    if (session.webhookFiredEvent === eventType) return;
+    if (eventType !== 'checkout.completed') return;
+  }
 
   const partner = await prisma.partner.findUnique({
     where: { id: session.partnerId },
@@ -51,7 +60,7 @@ export async function fireCheckoutWebhookIfNeeded(sessionId: string): Promise<vo
   if (!partner?.webhookUrl || !partner?.webhookSecret) {
     await prisma.checkoutSession.update({
       where: { id: session.id },
-      data: { webhookFiredAt: new Date() },
+      data: { webhookFiredAt: new Date(), webhookFiredEvent: eventType },
     });
     return;
   }
@@ -61,7 +70,7 @@ export async function fireCheckoutWebhookIfNeeded(sessionId: string): Promise<vo
   if (subscribed.length > 0 && !subscribed.includes(eventType)) {
     await prisma.checkoutSession.update({
       where: { id: session.id },
-      data: { webhookFiredAt: new Date() },
+      data: { webhookFiredAt: new Date(), webhookFiredEvent: eventType },
     });
     return;
   }
@@ -93,7 +102,7 @@ export async function fireCheckoutWebhookIfNeeded(sessionId: string): Promise<vo
   // double-deliver from here.
   await prisma.checkoutSession.update({
     where: { id: session.id },
-    data: { webhookFiredAt: new Date() },
+    data: { webhookFiredAt: new Date(), webhookFiredEvent: eventType },
   });
 
   if (!result.success) {

@@ -1212,6 +1212,12 @@ model CheckoutSession {
   // transitioned the session to terminal.
   webhookFiredAt DateTime?
 
+  // Which checkout.* event webhookFiredAt refers to. Without this the
+  // timestamp alone cannot tell a correct terminal event from one fired
+  // on a state the session later moved off, so a session wrongly marked
+  // failed could never afterwards deliver checkout.completed.
+  webhookFiredEvent String?
+
   // Captured when the backer's own browser completes the hosted page. On this
   // flow the browser talks to us directly, so unlike the server-to-server
   // endpoints we can observe the purchaser's real address ourselves.

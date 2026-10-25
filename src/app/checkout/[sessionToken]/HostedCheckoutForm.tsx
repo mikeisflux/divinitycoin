@@ -154,6 +154,7 @@ function InnerForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [doneStatus, setDoneStatus] = useState<string | null>(null);
   const [walletsReady, setWalletsReady] = useState(false);
   const [popupMode, setPopupMode] = useState(false);
   const [popupOpened, setPopupOpened] = useState(false);
@@ -236,6 +237,7 @@ function InnerForm({
   }, [popupMode, popupOpened, sessionToken]);
 
   function handleTerminal(status: string, redirectUrl: string | null) {
+    setDoneStatus(status);
     setDone(true);
     if (isInIframe()) {
       postToParent({
@@ -362,11 +364,38 @@ function InnerForm({
       : 'Save card';
 
   if (done) {
+    // `done` is set for any terminal status, not just success, and when
+    // disableAutoRedirect is set we deliberately never navigate. Claiming
+    // "Payment complete. Returning to ..." in either case strands the
+    // customer on a screen that is both wrong and waiting for something
+    // that will not happen.
+    const succeeded = doneStatus === 'complete';
+    const headline = succeeded
+      ? mode === 'payment'
+        ? 'Payment complete'
+        : 'Card saved'
+      : doneStatus === 'expired'
+        ? 'This checkout has expired'
+        : doneStatus === 'canceled'
+          ? 'Checkout canceled'
+          : mode === 'payment'
+            ? 'Payment not completed'
+            : 'Card not saved';
+
     return (
       <div className="text-center py-6">
-        <p className="text-neutral-700">
-          {mode === 'payment' ? 'Payment complete' : 'Card saved'}. Returning to {partnerName ?? 'the partner site'}…
-        </p>
+        <p className="text-neutral-700">{headline}</p>
+        {!succeeded && (
+          <p className="text-sm text-neutral-600 mt-2">
+            You have not been charged. Please return to{' '}
+            {partnerName ?? 'the partner site'} and try again.
+          </p>
+        )}
+        {succeeded && !disableAutoRedirect && (
+          <p className="text-sm text-neutral-600 mt-2">
+            Returning to {partnerName ?? 'the partner site'}…
+          </p>
+        )}
       </div>
     );
   }

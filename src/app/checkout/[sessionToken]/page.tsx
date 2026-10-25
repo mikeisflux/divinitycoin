@@ -42,7 +42,12 @@ async function loadSession(sessionToken: string) {
   // already completed at the processor (e.g., webhook hasn't landed
   // yet), trust live status. Handles both PaymentIntent (PAYMENT mode)
   // and SetupIntent (SETUP mode).
-  if (status === 'PENDING') {
+  // PENDING or FAILED. A failed session is not necessarily settled: the
+  // intent behind it can still be paid afterwards, and until this also
+  // healed FAILED sessions a wrongly-failed one reported `failed` and its
+  // never-paid intent id forever. Only success heals a failed session —
+  // we never walk it further backwards.
+  if (status === 'PENDING' || status === 'FAILED') {
     try {
       const stripe = await getStripeClient();
       let transitioned = false;
@@ -59,7 +64,7 @@ async function loadSession(sessionToken: string) {
           });
           status = 'COMPLETE';
           transitioned = true;
-        } else if (pi.status === 'canceled') {
+        } else if (pi.status === 'canceled' && status === 'PENDING') {
           await prisma.checkoutSession.update({
             where: { id: session.id },
             data: { status: 'CANCELED' },
@@ -80,7 +85,7 @@ async function loadSession(sessionToken: string) {
           });
           status = 'COMPLETE';
           transitioned = true;
-        } else if (si.status === 'canceled') {
+        } else if (si.status === 'canceled' && status === 'PENDING') {
           await prisma.checkoutSession.update({
             where: { id: session.id },
             data: { status: 'CANCELED' },

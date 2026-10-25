@@ -78,9 +78,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ sessionT
     }
 
     // Authoritative status from the processor — works for both PI and
-    // SI sessions. Status mapping is identical: succeeded → COMPLETE,
-    // canceled → CANCELED, requires_payment_method → FAILED, everything
+    // SI sessions: succeeded → COMPLETE, canceled → CANCELED, everything
     // else (requires_action, processing) stays PENDING.
+    //
+    // `requires_payment_method` needs care. It is both the state a fresh
+    // intent is born in, before the customer has submitted anything, and
+    // the state an intent returns to after a decline. Only the second is a
+    // failure. We tell them apart by last_payment_error, which is set on a
+    // decline and absent on an intent that has never been confirmed.
+    // Treating the first as FAILED marked live sessions dead while the
+    // customer was still filling in the card form.
     const stripe = await getStripeClient();
 
     let nextStatus: 'COMPLETE' | 'FAILED' | 'CANCELED' | 'PENDING' = 'PENDING';
@@ -95,7 +102,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ sessionT
         paymentMethodId = typeof pi.payment_method === 'string' ? pi.payment_method : null;
       } else if (pi.status === 'canceled') {
         nextStatus = 'CANCELED';
-      } else if (pi.status === 'requires_payment_method') {
+      } else if (pi.status === 'requires_payment_method' && pi.last_payment_error) {
         nextStatus = 'FAILED';
       }
     } else {
@@ -106,7 +113,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ sessionT
         paymentMethodId = typeof si.payment_method === 'string' ? si.payment_method : null;
       } else if (si.status === 'canceled') {
         nextStatus = 'CANCELED';
-      } else if (si.status === 'requires_payment_method') {
+      } else if (si.status === 'requires_payment_method' && si.last_setup_error) {
         nextStatus = 'FAILED';
       }
     }

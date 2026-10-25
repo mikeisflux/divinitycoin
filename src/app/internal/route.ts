@@ -2163,7 +2163,12 @@ async function handleGetCheckoutSession(
     }
 
     // Self-heal against the processor for still-pending sessions.
-    if (status === 'PENDING') {
+    // PENDING or FAILED. A failed session is not necessarily settled: the
+    // intent behind it can still be paid afterwards, and until this also
+    // healed FAILED sessions a wrongly-failed one reported `failed` and its
+    // never-paid intent id forever. Only success heals a failed session —
+    // we never walk it further backwards.
+    if (status === 'PENDING' || status === 'FAILED') {
       let transitioned = false;
       try {
         const stripe = await getStripeClient();
@@ -2178,7 +2183,7 @@ async function handleGetCheckoutSession(
             });
             status = 'COMPLETE';
             transitioned = true;
-          } else if (pi.status === 'canceled') {
+          } else if (pi.status === 'canceled' && status === 'PENDING') {
             await prisma.checkoutSession.update({
               where: { id: stored.id },
               data: { status: 'CANCELED' },
@@ -2197,7 +2202,7 @@ async function handleGetCheckoutSession(
             });
             status = 'COMPLETE';
             transitioned = true;
-          } else if (si.status === 'canceled') {
+          } else if (si.status === 'canceled' && status === 'PENDING') {
             await prisma.checkoutSession.update({
               where: { id: stored.id },
               data: { status: 'CANCELED' },
