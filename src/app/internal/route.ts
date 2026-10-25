@@ -1906,6 +1906,15 @@ async function handleLookupPaymentByPledge(
  *
  * Phase 1a: PAYMENT mode only. SETUP mode rejected for now.
  */
+/** Public URL of the hosted checkout page for a session token. */
+async function checkoutUrlFor(sessionToken: string): Promise<string> {
+  const baseUrl = await getConfig(
+    'NEXT_PUBLIC_BASE_URL',
+    process.env.NEXT_PUBLIC_BASE_URL || 'https://divinitycoin.com',
+  );
+  return `${baseUrl.replace(/\/$/, '')}/checkout/${sessionToken}`;
+}
+
 async function handleCreateCheckoutSession(
   body: {
     platformUserId: string;
@@ -1921,6 +1930,7 @@ async function handleCreateCheckoutSession(
     description?: string;
     expiresInMinutes?: number;
     disableAutoRedirect?: boolean;
+    idempotencyKey?: string;
   },
   partnerId: string,
 ) {
@@ -1931,6 +1941,7 @@ async function handleCreateCheckoutSession(
     returnUrl, cancelUrl, partnerLogoUrl, description,
     expiresInMinutes = 30,
     disableAutoRedirect = false,
+    idempotencyKey,
   } = body;
 
   if (!platformUserId || !email || !returnUrl) {
@@ -1969,12 +1980,62 @@ async function handleCreateCheckoutSession(
   }
   // mode === 'setup' needs only the common fields above.
 
+  if (idempotencyKey !== undefined) {
+    if (typeof idempotencyKey !== 'string' || !idempotencyKey.trim()) {
+      return NextResponse.json(
+        { error: 'idempotencyKey must be a non-empty string' },
+        { status: 400 },
+      );
+    }
+    if (idempotencyKey.length > 255) {
+      return NextResponse.json(
+        { error: 'idempotencyKey must be 255 characters or fewer' },
+        { status: 400 },
+      );
+    }
+  }
+  const idemKey = idempotencyKey?.trim() || null;
+
   // Clamp expiry between 1 minute and 24 hours
   const minutes = Math.min(Math.max(expiresInMinutes, 1), 24 * 60);
   const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
 
   try {
     const stripe = await getStripeClient();
+
+    // An idempotencyKey collapses repeat calls for the same thing onto one
+    // session. Without it every call mints a fresh PaymentIntent, a fresh
+    // tracking row and a fresh session token, so a partner whose checkout
+    // re-mounts accumulates orphaned intents that all carry the same
+    // pledgeId — and a later payment.failed from one of those orphans is
+    // indistinguishable, on the partner's side, from the pledge failing.
+    if (idemKey) {
+      const prior = await prisma.checkoutSession.findUnique({
+        where: { partnerId_idempotencyKey: { partnerId, idempotencyKey: idemKey } },
+      });
+      if (prior) {
+        const live = prior.status === 'PENDING' && prior.expiresAt > new Date();
+        // Hand back a live session, and also a completed one — returning a
+        // fresh session for something already paid is how you charge twice.
+        if (live || prior.status === 'COMPLETE') {
+          return NextResponse.json({
+            success: true,
+            sessionId: prior.sessionToken,
+            checkoutUrl: await checkoutUrlFor(prior.sessionToken),
+            expiresAt: prior.expiresAt.toISOString(),
+            reused: true,
+            status: prior.status.toLowerCase(),
+          });
+        }
+        // Expired, failed or canceled: the customer may legitimately try
+        // again. Release the key so the replacement can hold it, leaving the
+        // old row intact for the partner's own history.
+        await prisma.checkoutSession.update({
+          where: { id: prior.id },
+          data: { idempotencyKey: null },
+        });
+      }
+    }
 
     // Upsert PlatformUser — same pattern as create-payment-intent so a
     // concurrent direct flow + hosted flow for the same user can't race.
@@ -2025,7 +2086,10 @@ async function handleCreateCheckoutSession(
           email,
         },
         automatic_payment_methods: { enabled: true },
-      });
+      },
+      // Scoped to the partner so two partners' keys can never collide.
+      idemKey ? { idempotencyKey: `checkout-pi-${partnerId}-${idemKey}` } : undefined,
+      );
       paymentIntentId = paymentIntent.id;
 
       // Same PendingPartnerPayment row the direct flow writes — this is
@@ -2048,17 +2112,20 @@ async function handleCreateCheckoutSession(
       // a card the partner can later charge off-session via
       // charge-saved-payment-method. No PendingPartnerPayment row —
       // that table is payment-specific.
-      const setupIntent = await stripe.setupIntents.create({
-        customer: stripeCustomerId,
-        usage: 'off_session',
-        metadata: {
-          type: 'partner_setup',
-          partnerId,
-          platformUserId,
-          email,
+      const setupIntent = await stripe.setupIntents.create(
+        {
+          customer: stripeCustomerId,
+          usage: 'off_session',
+          metadata: {
+            type: 'partner_setup',
+            partnerId,
+            platformUserId,
+            email,
+          },
+          automatic_payment_methods: { enabled: true },
         },
-        automatic_payment_methods: { enabled: true },
-      });
+        idemKey ? { idempotencyKey: `checkout-si-${partnerId}-${idemKey}` } : undefined,
+      );
       setupIntentId = setupIntent.id;
     }
 
@@ -2071,7 +2138,8 @@ async function handleCreateCheckoutSession(
     // same model as Stripe Checkout's `cs_...` ids.
     const sessionToken = `cs_${crypto.randomBytes(24).toString('hex')}`;
 
-    await prisma.checkoutSession.create({
+    try {
+      await prisma.checkoutSession.create({
       data: {
         sessionToken,
         partnerId,
@@ -2092,14 +2160,53 @@ async function handleCreateCheckoutSession(
         cancelUrl: cancelUrl ?? null,
         disableAutoRedirect,
         expiresAt,
+        idempotencyKey: idemKey,
       },
-    });
+      });
+    } catch (error) {
+      // Two concurrent calls with the same key can both miss the lookup
+      // above; the unique index lets exactly one row land. The loser hands
+      // back the winner's session and cancels the intent it just created,
+      // rather than leaving behind the orphan this whole key exists to
+      // prevent.
+      const isDuplicateKey =
+        idemKey &&
+        typeof error === 'object' &&
+        error !== null &&
+        (error as { code?: string }).code === 'P2002';
+      if (!isDuplicateKey) throw error;
 
-    const baseUrl = await getConfig(
-      'NEXT_PUBLIC_BASE_URL',
-      process.env.NEXT_PUBLIC_BASE_URL || 'https://divinitycoin.com',
-    );
-    const checkoutUrl = `${baseUrl.replace(/\/$/, '')}/checkout/${sessionToken}`;
+      const winner = await prisma.checkoutSession.findUnique({
+        where: { partnerId_idempotencyKey: { partnerId, idempotencyKey: idemKey! } },
+      });
+      if (!winner) throw error;
+
+      if (paymentIntentId) {
+        await stripe.paymentIntents
+          .cancel(paymentIntentId)
+          .catch(() => { /* best-effort; an uncaptured intent expires anyway */ });
+        await prisma.pendingPartnerPayment
+          .deleteMany({ where: { paymentIntentId } })
+          .catch(() => { /* best-effort */ });
+      }
+
+      logger.info('Checkout session create lost idempotency race', {
+        partnerId,
+        idempotencyKey: idemKey,
+        winner: winner.sessionToken,
+      });
+
+      return NextResponse.json({
+        success: true,
+        sessionId: winner.sessionToken,
+        checkoutUrl: await checkoutUrlFor(winner.sessionToken),
+        expiresAt: winner.expiresAt.toISOString(),
+        reused: true,
+        status: winner.status.toLowerCase(),
+      });
+    }
+
+    const checkoutUrl = await checkoutUrlFor(sessionToken);
 
     logger.info('Checkout session created', {
       sessionId: sessionToken,

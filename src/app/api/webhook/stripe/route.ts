@@ -921,6 +921,30 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
 
   const isUpcharge = paymentIntent.metadata?.type === 'partner_upcharge';
 
+  // A pledge can have more than one PaymentIntent behind it — a partner
+  // whose checkout re-mounts creates one per attempt. When one of the
+  // others has already been paid, this failure is an abandoned sibling, not
+  // the pledge failing, and a partner keying on pledgeId alone cannot tell
+  // the difference. Say so explicitly rather than making them infer it.
+  let pledgeAlreadyPaid = false;
+  let paidPaymentIntentId: string | null = null;
+  if (pledgeId) {
+    const paid = await prisma.pendingPartnerPayment.findFirst({
+      where: {
+        partnerId,
+        pledgeId,
+        status: 'COMPLETED',
+        paymentIntentId: { not: paymentIntent.id },
+      },
+      select: { paymentIntentId: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (paid) {
+      pledgeAlreadyPaid = true;
+      paidPaymentIntentId = paid.paymentIntentId;
+    }
+  }
+
   await sendWebhook(partner.webhookUrl, partner.webhookSecret, 'payment.failed', {
     paymentIntentId: paymentIntent.id,
     amount: paymentIntent.amount,
@@ -932,6 +956,9 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
     code: lastError?.code ?? null,
     declineCode: lastError?.decline_code ?? null,
     status: paymentIntent.status,
+    // New, additive. Existing consumers that ignore them are unaffected.
+    pledgeAlreadyPaid,
+    paidPaymentIntentId,
   });
 
   logger.info('Partner payment.failed delivered', {
@@ -941,5 +968,6 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
     pledgeId,
     code: lastError?.code ?? null,
     declineCode: lastError?.decline_code ?? null,
+    pledgeAlreadyPaid,
   });
 }

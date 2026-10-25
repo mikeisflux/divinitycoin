@@ -1188,6 +1188,13 @@ model CheckoutSession {
   partnerLogoUrl String?
   description    String?
 
+  // Partner-supplied key collapsing repeat create-checkout-session calls
+  // for the same thing (typically their pledge id) onto one session. Null
+  // for partners that don't send one, so the old behaviour — a fresh
+  // session per call — is untouched. Cleared from a superseded row when a
+  // retry mints a replacement, so the key always names the live session.
+  idempotencyKey String?
+
   // Flow control
   returnUrl String?
   cancelUrl String?
@@ -1224,6 +1231,7 @@ model CheckoutSession {
   customerIpAddress String?
   customerUserAgent String?
 
+  @@unique([partnerId, idempotencyKey])
   @@index([partnerId])
   @@index([sessionToken])
   @@index([status])

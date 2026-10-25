@@ -402,6 +402,14 @@ GET  /internal?action=captures`}</pre>
                           <td className="py-2"><strong className="text-neutral-900">Check</strong> — you will receive this in cases that previously produced nothing</td>
                         </tr>
                         <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4"><code className="font-mono text-xs">idempotencyKey</code> on <code className="font-mono text-xs">create-checkout-session</code></td>
+                          <td className="py-2"><strong className="text-neutral-900">Strongly recommended</strong> — without it, every call mints a new session and a new PaymentIntent, so a checkout that re-mounts leaves orphaned intents sharing one <code className="font-mono text-xs">pledgeId</code></td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4"><code className="font-mono text-xs">pledgeAlreadyPaid</code> on <code className="font-mono text-xs">payment.failed</code></td>
+                          <td className="py-2">Recommended — treat a failure carrying <code className="font-mono text-xs">pledgeAlreadyPaid: true</code> as an abandoned attempt, not as the pledge failing</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
                           <td className="py-2 pr-4"><code className="font-mono text-xs">idempotencyKey</code> on <code className="font-mono text-xs">charge-saved-payment-method</code></td>
                           <td className="py-2">Recommended — without it, a retry inside 24 hours replays a cached decline without reaching the bank</td>
                         </tr>
@@ -895,6 +903,10 @@ GET  /internal?action=captures`}</pre>
   "partnerLogoUrl": string,         // Optional. Shown in the hosted page header (defaults to your Partner.logoUrl)
   "description": string,            // Optional. Short blurb shown above the card field
   "expiresInMinutes": number,       // Optional. 1-1440, default 30
+  "idempotencyKey": string,         // Optional but strongly recommended. Max 255 chars.
+                                    //   Repeat calls with the same key return the
+                                    //   SAME session instead of creating another.
+                                    //   Use your pledge id. See the note below.
   "disableAutoRedirect": boolean    // Optional. Default false. When true, the hosted
                                     //   page emits the "complete" postMessage on
                                     //   terminal state but does NOT top-nav to
@@ -919,11 +931,44 @@ GET  /internal?action=captures`}</pre>
                     In <code className="font-mono text-xs">mode="setup"</code> the payment-specific fields above are ignored — DC creates a SetupIntent for the customer that can later be charged off-session via <code className="font-mono text-xs">charge-saved-payment-method</code>.
                   </p>
 
+                  <h4 className="font-semibold text-neutral-900 mb-2">Why you want <code className="font-mono text-xs">idempotencyKey</code></h4>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    Without a key, every call creates a new session <em>and</em> a new
+                    PaymentIntent. A checkout that re-mounts — an iframe remount, a
+                    retried request, a customer reopening the page — therefore
+                    accumulates several intents that all carry the same{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">pledgeId</code>.
+                    Only one of them is ever paid. The rest sit unpaid, and if one is
+                    later declined or abandoned you receive a{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">payment.failed</code>{' '}
+                    for a pledge that is fine. The session id you hold is also whichever
+                    call returned last, which need not be the one that gets paid.
+                  </p>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    Pass your pledge id as the key and all of that goes away: repeat
+                    calls return the same{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">sessionId</code>{' '}
+                    and the same intent, marked{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">reused: true</code>.
+                    A completed session is returned too, so a second call for something
+                    already paid cannot produce a second charge. If the session expired,
+                    failed or was canceled, the next call with that key mints a
+                    replacement — a customer can still legitimately try again.
+                  </p>
+                  <p className="text-neutral-600 mb-4 text-sm">
+                    Keys are scoped to your partner account, so they cannot collide with
+                    another partner&apos;s.
+                  </p>
+
                   <h4 className="font-semibold text-neutral-900 mb-2">Response</h4>
                   <div className="bg-neutral-100 p-4 rounded-lg overflow-x-auto">
                     <pre className="text-sm">{`{
   "success": true,
   "sessionId": "cs_a1b2c3...",
+  "reused": true,              // Present only when an idempotencyKey matched an
+                               //   existing session. Absent on a fresh one.
+  "status": "pending",         // Present alongside "reused" — the matched
+                               //   session's current status
   "checkoutUrl": "https://divinitycoin.com/checkout/cs_a1b2c3...",
   "expiresAt": "2026-05-15T16:30:00.000Z"
 }`}</pre>
@@ -1459,7 +1504,10 @@ GET  /internal?action=captures`}</pre>
   "error": "Your card was declined.",
   "code": "card_declined",             // null if the processor gave none
   "declineCode": "insufficient_funds", // null if the processor gave none
-  "status": "requires_payment_method"
+  "status": "requires_payment_method",
+  "pledgeAlreadyPaid": false,          // true when another intent for this
+                                       // pledge has already been paid
+  "paidPaymentIntentId": null          // that intent's id when it has
 }`}</pre>
                   </div>
 
