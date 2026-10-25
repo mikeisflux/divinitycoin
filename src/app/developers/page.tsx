@@ -842,6 +842,8 @@ GET  /internal?action=captures`}</pre>
       document.getElementById('dc-checkout').style.height = d.height + 'px';
     } else if (d.type === 'complete') {
       // d.status, d.sessionId, d.redirectUrl
+      // d.status is always terminal: complete | failed | expired | canceled.
+      // It is never "pending" — the page keeps checking until it settles.
       // Default: we'll top-nav to d.redirectUrl right after this message.
       // Override by setting window.location yourself + hiding the iframe.
     }
@@ -866,11 +868,70 @@ GET  /internal?action=captures`}</pre>
                     and
                     <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">paymentMethodId</code>
                     (on COMPLETE) — particularly useful for SETUP mode where no
-                    payment.* event would otherwise fire, and at-most-once on
-                    our side so they can be safely combined with the existing
-                    payment.* events without double-processing. Subscribe via
-                    the partner portal → Settings → Webhooks (or leave your
-                    event allowlist empty to receive everything).
+                    payment.* event would otherwise fire. Subscribe via the
+                    partner portal → Settings → Webhooks (or leave your event
+                    allowlist empty to receive everything).
+                  </p>
+
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`// event: "checkout.expired"  (same shape for completed / failed / canceled)
+{
+  "sessionId": "cs_36fcd45...",
+  "mode": "payment",
+  "partnerId": "partner_xyz",
+  "platformUserId": "user_xyz",
+  "email": "buyer@example.com",
+  "amount": 5500,
+  "currency": "usd",
+  "pledgeId": "pledge_xyz",
+  "projectId": "proj_xyz",
+  "paymentIntentId": "pi_3USOSe...",   // this session's own intent
+  "setupIntentId": null,
+  "paymentMethodId": null,             // set on checkout.completed
+  "status": "expired",
+  "completedAt": null,
+  "pledgeAlreadyPaid": true,           // a DIFFERENT session for this pledge was paid
+  "paidPaymentIntentId": "pi_3USOJQ...", // that session's intent, else null
+  "paidSessionId": "cs_207df7b..."       // that session's id, else null
+}`}</pre>
+                  </div>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Delivery guarantees</h4>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    One terminal event per session, with one exception:{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">checkout.completed</code>{' '}
+                    may follow an earlier{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">checkout.failed</code>{' '}
+                    or{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">checkout.expired</code>{' '}
+                    for the same session if the payment behind it goes on to succeed.
+                    Completion is the authoritative outcome; treat it as superseding
+                    anything you received earlier for that{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">sessionId</code>.
+                  </p>
+
+                  <h4 className="font-semibold text-neutral-900 mb-2">Reading <code className="font-mono text-xs">pledgeAlreadyPaid</code></h4>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    A pledge can sit behind several sessions if you create one per
+                    checkout mount (see{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">idempotencyKey</code>{' '}
+                    below). When a <em>different</em> session for the same pledge
+                    has been paid,{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">pledgeAlreadyPaid</code>{' '}
+                    is <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">true</code>{' '}
+                    and the two <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">paid*</code>{' '}
+                    fields name it. On{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">expired</code>,{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">failed</code> or{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">canceled</code>{' '}
+                    that means an abandoned sibling of a paid pledge — informational,
+                    the pledge is fine. On{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">completed</code>{' '}
+                    it means the pledge was paid twice — contact us. The expiry
+                    sweep runs every five minutes, so sessions abandoned before it
+                    existed will surface as{' '}
+                    <code className="font-mono text-xs bg-neutral-100 px-1 rounded-sm">checkout.expired</code>{' '}
+                    with these fields set.
                   </p>
                 </CardContent>
               </Card>

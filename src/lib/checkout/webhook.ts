@@ -75,6 +75,39 @@ export async function fireCheckoutWebhookIfNeeded(sessionId: string): Promise<vo
     return;
   }
 
+  // A pledge can sit behind several sessions — a partner that created one
+  // per mount before idempotencyKey existed, or one that still does. When a
+  // sibling was paid and this session was not, this expired/failed/canceled
+  // event is about an abandoned attempt, not the pledge, and a partner
+  // keying on pledgeId cannot tell. Say so, the way payment.failed does.
+  // On checkout.completed the same flag means the pledge was paid twice.
+  let pledgeAlreadyPaid = false;
+  let paidPaymentIntentId: string | null = null;
+  let paidSessionId: string | null = null;
+  if (session.pledgeId) {
+    const paid = await prisma.pendingPartnerPayment.findFirst({
+      where: {
+        partnerId: session.partnerId,
+        pledgeId: session.pledgeId,
+        status: 'COMPLETED',
+        ...(session.paymentIntentId
+          ? { paymentIntentId: { not: session.paymentIntentId } }
+          : {}),
+      },
+      select: { paymentIntentId: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (paid) {
+      pledgeAlreadyPaid = true;
+      paidPaymentIntentId = paid.paymentIntentId;
+      const paidSession = await prisma.checkoutSession.findUnique({
+        where: { paymentIntentId: paid.paymentIntentId },
+        select: { sessionToken: true },
+      });
+      paidSessionId = paidSession?.sessionToken ?? null;
+    }
+  }
+
   const result = await sendWebhook(
     partner.webhookUrl,
     partner.webhookSecret,
@@ -94,6 +127,10 @@ export async function fireCheckoutWebhookIfNeeded(sessionId: string): Promise<vo
       paymentMethodId: session.paymentMethodId,
       status: session.status.toLowerCase(),
       completedAt: session.completedAt?.toISOString() ?? null,
+      // Additive. Consumers that ignore them are unaffected.
+      pledgeAlreadyPaid,
+      paidPaymentIntentId,
+      paidSessionId,
     },
   );
 

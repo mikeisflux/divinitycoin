@@ -81,6 +81,45 @@ already been paid, and this failure is an abandoned attempt — not the pledge
 failing. Treat it as informational. This is additive; ignoring both fields
 leaves your current behaviour unchanged.
 
+## Also new: the same fields on every `checkout.*` event
+
+`checkout.completed`, `checkout.expired`, `checkout.failed` and
+`checkout.canceled` now carry:
+
+```json
+{
+  "pledgeAlreadyPaid": true,
+  "paidPaymentIntentId": "pi_3USOJQ...",
+  "paidSessionId": "cs_207df7b..."
+}
+```
+
+`pledgeAlreadyPaid` is `true` when a **different** session for the same pledge
+has been paid. Read it per event:
+
+| Event | `pledgeAlreadyPaid: true` means |
+|---|---|
+| `checkout.expired` / `failed` / `canceled` | An abandoned sibling of a paid pledge. Informational; the pledge is fine. |
+| `checkout.completed` | **The pledge has been paid twice.** Contact us — this should not happen once you send an `idempotencyKey`. |
+
+Sessions abandoned before the expiry sweep existed will emit `checkout.expired`
+as the sweep reaches them. For a pledge that was paid on another session, every
+one of those carries `pledgeAlreadyPaid: true` and `paidSessionId` naming the
+session that was.
+
+## The hosted page no longer reports "complete" while a payment is in flight
+
+Previously, if the processor still had a payment as `processing` when the
+customer submitted, the hosted page treated that as terminal: it showed a
+done state and sent the parent frame a `complete` message whose `status` was
+`"pending"`. That message could arrive a minute or more before the payment
+actually completed.
+
+Now the page keeps re-checking until the processor reports a terminal state,
+and only then sends `complete`. The `status` on a `complete` message is now
+always one of `complete`, `failed`, `expired` or `canceled` — never `pending`.
+If your handler already ignored `pending`, nothing changes.
+
 ## If you embed the hosted page in an iframe
 
 With `disableAutoRedirect: true` we deliberately do **not** navigate the top

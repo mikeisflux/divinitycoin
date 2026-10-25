@@ -34,7 +34,7 @@
 //      blocked. Either path triggers the same top-nav to the partner's
 //      returnUrl.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -76,6 +76,13 @@ function appendSessionId(url: string, sessionToken: string): string {
     return url;
   }
 }
+
+// How often, and for how long, to re-ask /complete while the processor
+// still reports the payment as in flight. 48 x 2.5s = two minutes, which
+// covers the slow card networks; bank debits can take days and get the
+// timed-out copy instead.
+const PROCESSING_POLL_MS = 2500;
+const PROCESSING_MAX_ATTEMPTS = 48;
 
 function isInIframe(): boolean {
   if (typeof window === 'undefined') return false;
@@ -155,6 +162,9 @@ function InnerForm({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [doneStatus, setDoneStatus] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [processingTimedOut, setProcessingTimedOut] = useState(false);
+  const processingAttempts = useRef(0);
   const [walletsReady, setWalletsReady] = useState(false);
   const [popupMode, setPopupMode] = useState(false);
   const [popupOpened, setPopupOpened] = useState(false);
@@ -273,6 +283,24 @@ function InnerForm({
       }
       const target = body.redirectUrl as string | null;
       const status = body.status as string;
+
+      // `pending` means the processor still has the payment in flight —
+      // `processing`, or an action that could not be completed inline. It
+      // is not a terminal state. Treating it as one is how the parent frame
+      // used to receive a "complete" message, with status "pending", ninety
+      // seconds before the payment actually completed. Re-ask /complete,
+      // which re-checks the processor and transitions the session once it
+      // settles, until it reports something terminal.
+      if (status === 'pending') {
+        setProcessing(true);
+        if (processingAttempts.current < PROCESSING_MAX_ATTEMPTS) {
+          processingAttempts.current += 1;
+          window.setTimeout(() => { void completeAndRedirect(); }, PROCESSING_POLL_MS);
+        } else {
+          setProcessingTimedOut(true);
+        }
+        return;
+      }
 
       // If we're a popup opened by the iframe (context #3 from the
       // header comment), hand off to our opener and close ourselves —
@@ -394,6 +422,29 @@ function InnerForm({
         {succeeded && !disableAutoRedirect && (
           <p className="text-sm text-neutral-600 mt-2">
             Returning to {partnerName ?? 'the partner site'}…
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (processing) {
+    return (
+      <div className="text-center py-6">
+        <p className="text-neutral-700">
+          {processingTimedOut
+            ? mode === 'payment'
+              ? 'Your payment is still being processed.'
+              : 'Your card is still being saved.'
+            : mode === 'payment'
+              ? 'Confirming your payment…'
+              : 'Saving your card…'}
+        </p>
+        {processingTimedOut && (
+          <p className="text-sm text-neutral-600 mt-2">
+            This can take a few minutes with some banks. You can close this
+            page — {partnerName ?? 'the partner site'} will be notified as soon
+            as it completes.
           </p>
         )}
       </div>
