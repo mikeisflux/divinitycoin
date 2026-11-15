@@ -200,8 +200,7 @@ export default function SecuritySettingsPage() {
           <div>
             <h3 className="font-medium text-neutral-900">Require MFA for All Admins</h3>
             <p className="text-sm text-neutral-500 mt-1">
-              When enabled, all admin users must set up 2FA to access the admin panel
-            </p>
+              When enabled, all admin users must set up 2FA to access the admin panel. You must enrol your own account first.{' '}<a href="/admin/settings/mfa" className="text-primary-600 underline">Set up yours</a></p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input

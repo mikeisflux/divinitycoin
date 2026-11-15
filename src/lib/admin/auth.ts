@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { logSecurityEvent } from '@/lib/security/events';
+import { getConfig } from '@/lib/config';
 
 const SALT_ROUNDS = 12;
 const SESSION_EXPIRY_HOURS = 8;
@@ -64,6 +65,14 @@ export async function validateAdminSession(token: string): Promise<AdminUser | n
     return null;
   }
 
+  // When MFA is required for everyone, an unenrolled admin's existing
+  // session stops being valid; the next sign-in walks them through
+  // enrolment. The MFA routes themselves authenticate with a challenge
+  // cookie, not a session, so this cannot lock anyone out of enrolling.
+  if (!session.admin.mfaEnabled && (await isMfaRequiredForAll())) {
+    return null;
+  }
+
   // Update last activity
   await prisma.adminSession.update({
     where: { id: session.id },
@@ -94,7 +103,7 @@ export async function loginAdmin(
   password: string,
   ipAddress: string,
   userAgent: string
-): Promise<{ success: boolean; token?: string; error?: string; admin?: AdminUser }> {
+): Promise<{ success: boolean; token?: string; error?: string; admin?: AdminUser; mfaRequired?: boolean; mfaEnrollmentRequired?: boolean }> {
   const admin = await prisma.adminUser.findUnique({
     where: { email: email.toLowerCase() },
   });
@@ -158,14 +167,52 @@ export async function loginAdmin(
     },
   });
 
-  const token = await createAdminSession(admin.id, ipAddress, userAgent);
+  const publicAdmin: AdminUser = {
+    id: admin.id,
+    email: admin.email,
+    name: admin.name,
+    role: admin.role,
+    mfaEnabled: admin.mfaEnabled,
+  };
 
+  // The password is right. Whether that is enough depends on MFA:
+  //  - enrolled: the caller must pass a TOTP or recovery code first
+  //  - not enrolled but REQUIRE_MFA is on: the caller must enrol first
+  //  - otherwise: issue the session now
+  // In the first two cases no session exists yet; the route hands out a
+  // short-lived challenge instead (see lib/admin/mfa.ts).
+  if (admin.mfaEnabled) {
+    return { success: true, admin: publicAdmin, mfaRequired: true };
+  }
+  if (await isMfaRequiredForAll()) {
+    return { success: true, admin: publicAdmin, mfaEnrollmentRequired: true };
+  }
+
+  const token = await issueAdminSession(admin.id, email, ipAddress, userAgent);
+  return { success: true, token, admin: publicAdmin };
+}
+
+/** REQUIRE_MFA from system config (Settings → Security), env as fallback. */
+export async function isMfaRequiredForAll(): Promise<boolean> {
+  return (await getConfig('REQUIRE_MFA', process.env.REQUIRE_MFA || 'false')) === 'true';
+}
+
+/**
+ * The one place an admin session is created. loginAdmin calls it when no
+ * second factor is needed; the MFA verify and confirm routes call it once
+ * the second factor has been satisfied.
+ */
+export async function issueAdminSession(
+  adminId: string,
+  email: string,
+  ipAddress: string,
+  userAgent: string,
+): Promise<string> {
+  const token = await createAdminSession(adminId, ipAddress, userAgent);
   void logSecurityEvent({ type: 'LOGIN_SUCCESS', realm: 'admin', subject: email, ipAddress, userAgent });
-
-  // Log successful login
   await prisma.adminAuditLog.create({
     data: {
-      adminId: admin.id,
+      adminId,
       action: 'LOGIN_SUCCESS',
       resource: 'auth',
       details: JSON.stringify({ email, ipAddress }),
@@ -173,18 +220,7 @@ export async function loginAdmin(
       userAgent,
     },
   });
-
-  return {
-    success: true,
-    token,
-    admin: {
-      id: admin.id,
-      email: admin.email,
-      name: admin.name,
-      role: admin.role,
-      mfaEnabled: admin.mfaEnabled,
-    },
-  };
+  return token;
 }
 
 export async function logoutAdmin(token: string): Promise<void> {

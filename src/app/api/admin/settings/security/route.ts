@@ -76,6 +76,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Max attempts must be at least 1' }, { status: 400 });
     }
 
+    // Requiring MFA for everyone logs out every admin who has not enrolled,
+    // the moment it is saved. The admin saving it must therefore already be
+    // enrolled, or they would lock themselves out with their own click.
+    if (requireMfa && !admin!.mfaEnabled) {
+      return NextResponse.json(
+        { error: 'Set up two-factor authentication on your own account (Settings → Two-Factor Authentication) before requiring it for all admins.' },
+        { status: 400 },
+      );
+    }
+
     await prisma.$transaction([
       prisma.systemConfig.upsert({
         where: { key: 'RATE_LIMIT_WINDOW_MS' },

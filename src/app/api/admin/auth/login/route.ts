@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { loginAdmin } from '@/lib/admin/auth';
 import { getClientIP, getUserAgent } from '@/lib/admin/middleware';
 import { cookies } from 'next/headers';
+import { createMfaChallenge } from '@/lib/admin/mfa';
+import { setChallengeCookie } from '../mfa/_shared';
 
 // Uses cookies(); never pre-render during build.
 export const dynamic = 'force-dynamic';
@@ -31,6 +33,23 @@ export async function POST(request: NextRequest) {
         { error: result.error },
         { status: 401 }
       );
+    }
+
+    // Password accepted but a second factor stands between here and a
+    // session. Issue a five-minute challenge; /api/admin/auth/mfa/verify
+    // (or /confirm, for first-time enrolment) turns it into a session.
+    if (result.mfaRequired || result.mfaEnrollmentRequired) {
+      const token = await createMfaChallenge(
+        result.admin!.id,
+        result.mfaRequired ? 'login' : 'enroll',
+        { ipAddress, userAgent },
+      );
+      await setChallengeCookie(token);
+      return NextResponse.json({
+        success: true,
+        mfaRequired: !!result.mfaRequired,
+        mfaEnrollmentRequired: !!result.mfaEnrollmentRequired,
+      });
     }
 
     // Set session cookie

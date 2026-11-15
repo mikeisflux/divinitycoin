@@ -28,6 +28,7 @@ None of them paste a secret: values come from `.env` inline.
 | IOC matching | `src/lib/security/iocs.ts`, alerted by email; `IOC_BLOCK_MODE=block` to refuse |
 | Volume anomaly alerts | `/api/cron/security-anomalies` every 15 min |
 | Settlement actions | finance roles only |
+| Admin MFA | TOTP via authenticator app, `/admin/settings/mfa`; `REQUIRE_MFA` in Security settings forces enrolment at next sign-in |
 
 ## Crontab additions for this work
 

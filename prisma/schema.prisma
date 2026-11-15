@@ -362,7 +362,12 @@ model AdminUser {
 
   // Security
   mfaEnabled          Boolean   @default(false)
-  mfaSecret           String?
+  mfaSecret           String?   // TOTP secret, encrypted with ENCRYPTION_SECRET
+  mfaPendingSecret    String?   // encrypted; set during enrolment, promoted on confirmation
+  mfaRecoveryCodes    String[]  @default([]) // sha256 of each unused recovery code
+  mfaEnrolledAt       DateTime?
+  mfaLastTimeStep     Int?      // last accepted TOTP step, so a code cannot be replayed within its window
+  mfaChallenges       AdminMfaChallenge[]
   lastLoginAt         DateTime?
   lastLoginIp         String?
   failedLoginAttempts Int       @default(0)
@@ -402,6 +407,27 @@ model AdminSession {
 
   @@index([token])
   @@index([adminId])
+}
+
+// A half-finished admin sign-in: password accepted, second factor pending.
+// Lives in a short-lived httpOnly cookie; exchanged for a real AdminSession
+// by a valid TOTP or recovery code (purpose=login), or by completing
+// enrolment when REQUIRE_MFA demands it (purpose=enroll). Five failed codes
+// delete it and the admin starts over at the password.
+model AdminMfaChallenge {
+  id        String    @id @default(cuid())
+  adminId   String
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  purpose   String    // login | enroll
+  attempts  Int       @default(0)
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([adminId])
+  @@index([expiresAt])
 }
 
 model AdminAuditLog {
