@@ -12,6 +12,7 @@ import {
   HARD_LIMIT,
   SUSPICIOUS_LIMIT,
 } from '@/lib/detection';
+import { matchIoc } from '@/lib/security/iocs';
 
 // Define allowed origins for CORS
 const allowedOrigins = [
@@ -64,6 +65,32 @@ function getClientIp(request: NextRequest): string {
 }
 
 /**
+ * Fire-and-forget security event from the edge, where there is no database.
+ * /api/security/event records it and decides on any further action.
+ */
+function reportSecurityEvent(
+  request: NextRequest,
+  type: 'IOC_HIT' | 'ADMIN_ALLOWLIST_DENIED',
+  ip: string,
+  details: Record<string, unknown>,
+): void {
+  const secret = process.env.INTERNAL_API_KEY;
+  if (!secret) return;
+  const origin = `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+  fetch(`${origin}/api/security/event`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+    body: JSON.stringify({
+      type,
+      ip,
+      path: request.nextUrl.pathname,
+      userAgent: request.headers.get('user-agent') || undefined,
+      details,
+    }),
+  }).catch(() => { /* best-effort */ });
+}
+
+/**
  * Fire-and-forget request to /api/botblock/report so the middleware doesn't
  * wait for the firewall/DB roundtrip. Runs only when an IP is clearly abusive.
  */
@@ -101,6 +128,18 @@ export function proxy(request: NextRequest) {
   const origin = request.headers.get('origin') || '';
   const host = request.headers.get('host') || '';
   const ip = getClientIp(request);
+
+  // ---- FBI FLASH-20261113-001 indicators ----
+  // A hit is always recorded and alerted; it is refused only when
+  // IOC_BLOCK_MODE=block has been set deliberately (see lib/security/iocs.ts
+  // for why the default is to log).
+  const ioc = matchIoc(ip);
+  if (ioc) {
+    reportSecurityEvent(request, 'IOC_HIT', ip, { indicator: ioc.indicator, context: ioc.context });
+    if (process.env.IOC_BLOCK_MODE === 'block') {
+      return new NextResponse(null, { status: 403 });
+    }
+  }
 
   const isDocsSurface = NEVER_FLAG_PREFIXES.some(p => pathname.startsWith(p));
 
