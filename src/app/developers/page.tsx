@@ -402,6 +402,10 @@ GET  /internal?action=captures`}</pre>
                           <td className="py-2"><strong className="text-neutral-900">Check</strong> — you will receive this in cases that previously produced nothing</td>
                         </tr>
                         <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4">Rate limit on <code className="font-mono text-xs">/internal</code>: 600 requests per minute per API key</td>
+                          <td className="py-2">Check — far above normal volume; a <code className="font-mono text-xs">429</code> with <code className="font-mono text-xs">Retry-After</code> means back off and retry, and that we will have logged it</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
                           <td className="py-2 pr-4"><code className="font-mono text-xs">idempotencyKey</code> on <code className="font-mono text-xs">create-checkout-session</code></td>
                           <td className="py-2"><strong className="text-neutral-900">Strongly recommended</strong> — without it, every call mints a new session and a new PaymentIntent, so a checkout that re-mounts leaves orphaned intents sharing one <code className="font-mono text-xs">pledgeId</code></td>
                         </tr>

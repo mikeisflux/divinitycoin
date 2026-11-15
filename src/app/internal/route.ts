@@ -4,7 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAndRedeemCode, checkCodeStatus } from '@/lib/giftcard/redeem';
 import { placeHold, releaseHold, captureHold, getBalance } from '@/lib/credits/holds';
-import { redemptionRateLimiter, payRateLimiter, createRateLimitKey } from '@/lib/rateLimit';
+import { redemptionRateLimiter, payRateLimiter, createRateLimitKey, internalAuthFailureLimiter, internalActionLimiter } from '@/lib/rateLimit';
+import { recordInternalRequest } from '@/lib/partner/request-log';
+import { logSecurityEvent } from '@/lib/security/events';
 import { getSettlements, getSettlementDetail, getCaptures, createCapture } from '@/lib/settlements';
 import { SettlementStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
@@ -24,8 +26,12 @@ interface AuthResult {
   valid: boolean;
   partnerId?: string;
   partnerName?: string;
+  apiKeyId?: string;
   error?: string;
 }
+
+/** What the action handlers receive: authentication already succeeded. */
+type ValidAuth = AuthResult & { valid: true; partnerId: string; partnerName: string; apiKeyId: string };
 
 /**
  * Validate internal API request using partner API keys from database
@@ -95,6 +101,7 @@ async function validateInternalRequest(request: NextRequest): Promise<AuthResult
     valid: true,
     partnerId: apiKey.partner.id,
     partnerName: apiKey.partner.name,
+    apiKeyId: apiKey.id,
   };
 }
 
@@ -127,15 +134,7 @@ function getClientIp(request: NextRequest): string {
          '127.0.0.1';
 }
 
-export async function POST(request: NextRequest) {
-  // Validate API key
-  const auth = await validateInternalRequest(request);
-  if (!auth.valid) {
-    return NextResponse.json(
-      { error: auth.error || 'Unauthorized' },
-      { status: 401 }
-    );
-  }
+async function handlePost(request: NextRequest, auth: ValidAuth) {
 
   try {
     const url = new URL(request.url);
@@ -262,15 +261,7 @@ async function handleRecordCapture(body: {
   }
 }
 
-export async function GET(request: NextRequest) {
-  // Validate API key
-  const auth = await validateInternalRequest(request);
-  if (!auth.valid) {
-    return NextResponse.json(
-      { error: auth.error || 'Unauthorized' },
-      { status: 401 }
-    );
-  }
+async function handleGet(request: NextRequest, auth: ValidAuth) {
 
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
@@ -2350,4 +2341,110 @@ async function handleGetCheckoutSession(
     logger.error('Failed to get checkout session', { error, partnerId, sessionId });
     return NextResponse.json({ error: 'Failed to get checkout session' }, { status: 500 });
   }
+}
+
+// ── Entry points ──────────────────────────────────────────────────────
+//
+// Every request through here is recorded, authenticated or not, and the
+// two partner-API rate limits are applied. The action handlers above only
+// ever see a request whose key was valid.
+
+function respond(request: NextRequest, auth: AuthResult, status: number, body: Record<string, unknown>, started: number, requestBody: string | null, action: string | null) {
+  void recordInternalRequest({
+    partnerId: auth.partnerId ?? null,
+    apiKeyId: auth.apiKeyId ?? null,
+    method: request.method,
+    action,
+    path: request.nextUrl.pathname + request.nextUrl.search,
+    ipAddress: getClientIp(request),
+    userAgent: request.headers.get('user-agent'),
+    statusCode: status,
+    responseTimeMs: Date.now() - started,
+    requestBody,
+    responseBody: JSON.stringify(body),
+    errorMessage: typeof body.error === 'string' ? body.error : null,
+  });
+  return NextResponse.json(body, { status });
+}
+
+async function withInternalRequestLog(
+  request: NextRequest,
+  handler: (request: NextRequest, auth: ValidAuth) => Promise<NextResponse>,
+): Promise<NextResponse> {
+  const started = Date.now();
+  const ip = getClientIp(request);
+  const userAgent = request.headers.get('user-agent');
+  const action = request.nextUrl.searchParams.get('action');
+  // Clone before the handler consumes the body; only an excerpt is kept and
+  // sensitive keys are redacted before it is written anywhere.
+  const requestBody = request.method === 'POST' ? await request.clone().text().catch(() => null) : null;
+
+  // An IP that has already burned through its failed-auth budget does not
+  // get another key lookup.
+  const peek = internalAuthFailureLimiter.peek(`internal-auth:${ip}`);
+  if (!peek.allowed) {
+    const res = respond(request, { valid: false }, 429, { error: 'Too many failed authentication attempts' }, started, requestBody, action);
+    res.headers.set('Retry-After', String(peek.retryAfter ?? 60));
+    return res;
+  }
+
+  const auth = await validateInternalRequest(request);
+  if (!auth.valid) {
+    const limit = internalAuthFailureLimiter.check(`internal-auth:${ip}`);
+    void logSecurityEvent({
+      type: limit.allowed ? 'PARTNER_API_AUTH_FAILED' : 'PARTNER_API_RATE_LIMITED',
+      severity: limit.allowed ? 'warn' : 'critical',
+      realm: 'api',
+      ipAddress: ip,
+      userAgent,
+      details: { action, reason: auth.error ?? 'invalid', failuresInWindow: internalAuthFailureLimiter.peek(`internal-auth:${ip}`).allowed ? undefined : 'exhausted' },
+    });
+    const res = respond(request, auth, limit.allowed ? 401 : 429, { error: auth.error ?? 'Unauthorized' }, started, requestBody, action);
+    if (!limit.allowed) res.headers.set('Retry-After', String(limit.retryAfter ?? 60));
+    return res;
+  }
+
+  const valid = auth as ValidAuth;
+  const pace = internalActionLimiter.check(`internal-key:${valid.apiKeyId}`);
+  if (!pace.allowed) {
+    void logSecurityEvent({
+      type: 'PARTNER_API_RATE_LIMITED',
+      severity: 'warn',
+      realm: 'api',
+      subject: valid.partnerId,
+      ipAddress: ip,
+      userAgent,
+      details: { action, apiKeyId: valid.apiKeyId, limit: '600/min' },
+    });
+    const res = respond(request, valid, 429, { error: 'Rate limit exceeded: 600 requests per minute per API key' }, started, requestBody, action);
+    res.headers.set('Retry-After', String(pace.retryAfter ?? 60));
+    return res;
+  }
+
+  const response = await handler(request, valid);
+  // The handlers build their own NextResponse; read a copy for the log.
+  const responseBody = await response.clone().text().catch(() => '');
+  void recordInternalRequest({
+    partnerId: valid.partnerId,
+    apiKeyId: valid.apiKeyId,
+    method: request.method,
+    action,
+    path: request.nextUrl.pathname + request.nextUrl.search,
+    ipAddress: ip,
+    userAgent,
+    statusCode: response.status,
+    responseTimeMs: Date.now() - started,
+    requestBody,
+    responseBody,
+    errorMessage: response.status >= 400 ? (() => { try { return JSON.parse(responseBody)?.error ?? null; } catch { return null; } })() : null,
+  });
+  return response;
+}
+
+export async function POST(request: NextRequest) {
+  return withInternalRequestLog(request, handlePost);
+}
+
+export async function GET(request: NextRequest) {
+  return withInternalRequestLog(request, handleGet);
 }

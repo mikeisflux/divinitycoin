@@ -15,10 +15,23 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 import { INTERNAL_POST_ACTIONS, INTERNAL_GET_ACTIONS } from '@/lib/partner/internal-actions';
+import { logSecurityEvent, ipFromHeaders } from '@/lib/security/events';
 
 function signpost(request: NextRequest) {
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
+
+  // A genuine partner hits this once and reads the answer. Hundreds of hits
+  // from one address, cycling paths, is a scanner mapping the API surface —
+  // worth a line in the security stream even though the answer is public.
+  void logSecurityEvent({
+    type: 'PARTNER_API_WRONG_PATH',
+    severity: 'info',
+    realm: 'api',
+    ipAddress: ipFromHeaders(request.headers),
+    userAgent: request.headers.get('user-agent'),
+    details: { method: request.method, path: url.pathname, action },
+  });
   const correct = `${url.origin}/internal${action ? `?action=${action}` : '?action=<action>'}`;
 
   return NextResponse.json(

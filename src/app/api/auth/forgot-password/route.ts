@@ -6,6 +6,8 @@ import { prisma } from '@/lib/db';
 import { sendEmail } from '@/lib/email/sendgrid';
 import { logger } from '@/lib/logger';
 import crypto from 'crypto';
+import { passwordResetLimiter } from '@/lib/rateLimit';
+import { logSecurityEvent, ipFromHeaders } from '@/lib/security/events';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +16,21 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
+
+    const ipAddress = ipFromHeaders(request.headers);
+    const userAgent = request.headers.get('user-agent');
+    // Five reset requests per address per quarter hour. The response below
+    // is deliberately identical for known and unknown emails, so the limit
+    // is what stops this endpoint being used to test an address list.
+    const limit = passwordResetLimiter.check(`password-reset:${ipAddress || 'unknown'}`);
+    if (!limit.allowed) {
+      void logSecurityEvent({ type: 'RATE_LIMITED', severity: 'warn', realm: 'customer', subject: String(email).toLowerCase(), ipAddress, userAgent, details: { endpoint: '/api/auth/forgot-password' } });
+      return NextResponse.json(
+        { error: 'Too many reset requests. Please wait and try again.' },
+        { status: 429, headers: { 'Retry-After': String(limit.retryAfter ?? 60) } }
+      );
+    }
+    void logSecurityEvent({ type: 'PASSWORD_RESET_REQUESTED', realm: 'customer', subject: String(email).toLowerCase(), ipAddress, userAgent });
 
     // Find user by email
     const user = await prisma.user.findUnique({

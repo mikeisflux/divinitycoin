@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
+import { logSecurityEvent } from '@/lib/security/events';
 
 const SALT_ROUNDS = 12;
 const SESSION_EXPIRY_HOURS = 8;
@@ -99,12 +100,14 @@ export async function loginAdmin(
   });
 
   if (!admin) {
+    void logSecurityEvent({ type: 'LOGIN_FAILED', severity: 'warn', realm: 'admin', subject: email, ipAddress, userAgent, details: { reason: 'unknown_email' } });
     return { success: false, error: 'Invalid email or password' };
   }
 
   // Check if locked out
   if (admin.lockedUntil && admin.lockedUntil > new Date()) {
     const remainingMinutes = Math.ceil((admin.lockedUntil.getTime() - Date.now()) / 60000);
+    void logSecurityEvent({ type: 'LOGIN_FAILED', severity: 'warn', realm: 'admin', subject: email, ipAddress, userAgent, details: { reason: 'locked', remainingMinutes } });
     return {
       success: false,
       error: `Account locked. Try again in ${remainingMinutes} minutes.`,
@@ -118,9 +121,11 @@ export async function loginAdmin(
     // Increment failed attempts
     const failedAttempts = admin.failedLoginAttempts + 1;
     const updateData: any = { failedLoginAttempts: failedAttempts };
+    void logSecurityEvent({ type: 'LOGIN_FAILED', severity: 'warn', realm: 'admin', subject: email, ipAddress, userAgent, details: { reason: 'bad_password', failedAttempts } });
 
     if (failedAttempts >= MAX_LOGIN_ATTEMPTS) {
       updateData.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
+      void logSecurityEvent({ type: 'LOCKOUT', severity: 'critical', realm: 'admin', subject: email, ipAddress, userAgent, details: { failedAttempts, minutes: LOCKOUT_DURATION_MINUTES } });
     }
 
     await prisma.adminUser.update({
@@ -154,6 +159,8 @@ export async function loginAdmin(
   });
 
   const token = await createAdminSession(admin.id, ipAddress, userAgent);
+
+  void logSecurityEvent({ type: 'LOGIN_SUCCESS', realm: 'admin', subject: email, ipAddress, userAgent });
 
   // Log successful login
   await prisma.adminAuditLog.create({

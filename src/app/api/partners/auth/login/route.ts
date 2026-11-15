@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 import { loginPartner } from '@/lib/partner/auth';
 import { cookies } from 'next/headers';
+import { logSecurityEvent } from '@/lib/security/events';
 
 // Uses cookies(); never pre-render during build.
 export const dynamic = 'force-dynamic';
@@ -38,11 +39,14 @@ export async function POST(request: NextRequest) {
     const result = await loginPartner(email, password, ipAddress, userAgent);
 
     if (!result.success) {
+      void logSecurityEvent({ type: 'LOGIN_FAILED', severity: 'warn', realm: 'partner', subject: String(email).toLowerCase(), ipAddress, userAgent, details: { reason: result.error } });
       return NextResponse.json(
         { error: result.error },
         { status: 401 }
       );
     }
+
+    void logSecurityEvent({ type: 'LOGIN_SUCCESS', realm: 'partner', subject: String(email).toLowerCase(), ipAddress, userAgent });
 
     // Set session cookie
     // SECURITY: Must await cookies() in Next.js 14+

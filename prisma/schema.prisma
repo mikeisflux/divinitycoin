@@ -1297,6 +1297,29 @@ enum DisputeStatus {
 // Stripe webhook idempotency. We insert `eventId` before processing an
 // event and skip processing if the insert raises a unique-constraint
 // violation. This makes every Stripe event exactly-once under retries.
+// Cross-realm security event stream: admin, partner and customer sign-ins,
+// partner API auth failures and rate-limit hits, IOC matches, volume
+// anomalies, MFA changes. AdminAuditLog records what admins did; this records
+// what was done TO the system, by anyone, so "review failed authentications
+// since <date>" is a single query. Written best-effort — never on the request
+// path's critical section.
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  type      String
+  severity  String   @default("info") // info | warn | critical
+  realm     String?  // admin | partner | customer | api
+  subject   String?  // email, partner id or api key id — whoever the event is about
+  ipAddress String?
+  userAgent String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([createdAt])
+  @@index([ipAddress])
+  @@index([subject])
+}
+
 model StripeWebhookEvent {
   id          String   @id @default(cuid())
   eventId     String   @unique

@@ -5,6 +5,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { getAdminFromRequest } from '@/lib/admin/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
+import SecurityEventsPanel from './SecurityEventsPanel';
 import Link from 'next/link';
 
 async function getSecurityLogs(page: number = 1) {
@@ -152,6 +153,7 @@ export default async function SecurityLogsPage(
 
       {/* Logs Table */}
       <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+        <SecurityEventsPanel />
         <table className="min-w-full divide-y divide-neutral-200">
           <thead className="bg-neutral-50">
             <tr>

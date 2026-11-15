@@ -44,6 +44,23 @@ export class RateLimiter {
    * Check if the key is rate limited
    * Returns { allowed: true } if under limit, { allowed: false, retryAfter } if limited
    */
+  /**
+   * Whether `key` is currently over its limit, without counting this call.
+   * Lets a caller refuse work for an IP that has already exhausted its
+   * window — e.g. skip the database lookup for an API key when that IP has
+   * already failed authentication twenty times — while only counting the
+   * attempts that actually fail.
+   */
+  peek(key: string): { allowed: boolean; retryAfter?: number } {
+    const entry = this.store.get(key);
+    const now = Date.now();
+    if (!entry || entry.resetAt <= now) return { allowed: true };
+    if (entry.count >= this.maxAttempts) {
+      return { allowed: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
+    }
+    return { allowed: true };
+  }
+
   check(key: string): { allowed: boolean; remaining: number; retryAfter?: number } {
     const now = Date.now();
     const entry = this.store.get(key);
@@ -328,6 +345,31 @@ export const payRateLimiter = new RateLimiter({
 });
 
 // General API rate limiter
+/**
+ * Partner API (/internal). Two limiters, both keyed so one partner cannot
+ * affect another:
+ *
+ * - internalAuthFailureLimiter, per IP, counts only failed authentications.
+ *   Twenty bad keys in ten minutes is not a partner with a typo.
+ * - internalActionLimiter, per API key, 600 requests a minute. Far above any
+ *   observed partner volume; exists so a stolen key cannot enumerate at
+ *   machine speed, and so a 429 shows up in the request log as a signal.
+ *
+ * /internal is exempt from the generic middleware limiter and sits outside
+ * nginx's /api/ zone, so these are the only limits it has.
+ */
+export const internalAuthFailureLimiter = new RateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 20,
+});
+export const internalActionLimiter = new RateLimiter({
+  windowMs: 60 * 1000,
+  maxAttempts: 600,
+});
+/** Customer-facing auth endpoints that no other limiter covers. */
+export const customerLoginLimiter = new RateLimiter({ windowMs: 60 * 1000, maxAttempts: 10 });
+export const passwordResetLimiter = new RateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 5 });
+
 export const apiRateLimiter = new RateLimiter({
   windowMs: 60000, // 1 minute
   maxAttempts: 100, // 100 requests per minute
