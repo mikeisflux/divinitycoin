@@ -1,7 +1,7 @@
 // app/api/admin/settlements/[id]/failed/route.ts
 import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminFromRequest } from '@/lib/admin/auth';
+import { getAdminFromRequest, canManageSettlements } from '@/lib/admin/auth';
 import { markSettlementFailed, getSettlementDetail } from '@/lib/settlements';
 import { prisma } from '@/lib/db';
 
@@ -13,6 +13,9 @@ export async function POST(
     const admin = await getAdminFromRequest();
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!canManageSettlements(admin.role)) {
+      return NextResponse.json({ error: 'Settlement actions require a finance role' }, { status: 403 });
     }
 
     const { id } = await params;

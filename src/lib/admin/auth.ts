@@ -240,6 +240,16 @@ export function canViewUsers(role: string): boolean {
   return ['SUPER_ADMIN', 'ADMIN', 'SUPPORT'].includes(role);
 }
 
+/**
+ * Settlement approval, processing and marking paid move partner money.
+ * Until this existed any admin session could do it, including SUPPORT and
+ * VIEWER. Least privilege on high-impact business APIs is the FBI's ARTEX
+ * guidance verbatim; it is also just correct.
+ */
+export function canManageSettlements(role: string): boolean {
+  return ['SUPER_ADMIN', 'ADMIN', 'FINANCE'].includes(role);
+}
+
 export function canManageSettings(role: string): boolean {
   return ['SUPER_ADMIN', 'ADMIN'].includes(role);
 }

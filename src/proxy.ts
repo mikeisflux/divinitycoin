@@ -54,6 +54,38 @@ const NEVER_FLAG_PREFIXES = [
   '/api/internal',
 ];
 
+/** ADMIN_IP_ALLOWLIST: comma/space-separated IPv4 addresses or CIDRs. */
+const ADMIN_ALLOWLIST: Array<{ base: number; mask: number }> = (process.env.ADMIN_IP_ALLOWLIST || '')
+  .split(/[\s,]+/)
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map(parseCidr)
+  .filter((c): c is { base: number; mask: number } => c !== null);
+
+function ipv4ToInt(ip: string): number | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!m) return null;
+  const parts = m.slice(1).map(Number);
+  if (parts.some((n) => n > 255)) return null;
+  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+}
+
+function parseCidr(entry: string): { base: number; mask: number } | null {
+  const [ipPart, bitsPart] = entry.split('/');
+  const ip = ipv4ToInt(ipPart);
+  if (ip === null) return null;
+  const bits = bitsPart === undefined ? 32 : Number(bitsPart);
+  if (!Number.isInteger(bits) || bits < 0 || bits > 32) return null;
+  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+  return { base: (ip & mask) >>> 0, mask };
+}
+
+function ipAllowed(ip: string, list: Array<{ base: number; mask: number }>): boolean {
+  const n = ipv4ToInt(ip);
+  if (n === null) return false;
+  return list.some((c) => ((n & c.mask) >>> 0) === c.base);
+}
+
 function getClientIp(request: NextRequest): string {
   const xff = request.headers.get('x-forwarded-for');
   if (xff) return xff.split(',')[0]?.trim() || '';
@@ -142,6 +174,20 @@ export function proxy(request: NextRequest) {
   }
 
   const isDocsSurface = NEVER_FLAG_PREFIXES.some(p => pathname.startsWith(p));
+
+  // ---- Admin interface allowlist (opt-in) ----
+  // The host firewall already restricts SSH to known addresses; this is the
+  // same control for /admin, which shares port 443 with the public site and
+  // so cannot be firewalled on its own. Empty (the default) means off.
+  // Anything outside the list gets the same 404 a non-existent path would,
+  // and the attempt is recorded. Mind dynamic home IPs and CGNAT before
+  // turning this on; see docs/SERVER-HARDENING.md for the recovery path.
+  if (ADMIN_ALLOWLIST.length > 0 && (pathname.startsWith('/admin') || pathname.startsWith('/api/admin'))) {
+    if (!ipAllowed(ip, ADMIN_ALLOWLIST)) {
+      reportSecurityEvent(request, 'ADMIN_ALLOWLIST_DENIED', ip, {});
+      return new NextResponse(null, { status: 404 });
+    }
+  }
 
   // ---- Rate limit / abuse detection ----
   const rateLimitable =
