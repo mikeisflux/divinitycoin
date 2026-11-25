@@ -66,3 +66,88 @@
     @apply text-neutral-900 antialiased;
   }
 }
+
+/* ── Hosted checkout theming (src/lib/checkout/theme.ts) ───────────────
+   The checkout markup is written against Tailwind's neutral scale. A
+   themed checkout re-points that scale, inside .dc-checkout only, at
+   mixes of one background (--dc-bg) and one foreground (--dc-fg) colour,
+   so the same markup renders dark or in a partner's own colours.
+   Unthemed checkouts carry no data-dc-* attribute, match none of these
+   selectors, and look exactly as before.
+
+   Unlayered on purpose: it has to win over Tailwind's utilities layer.
+   The scale block appears twice because `auto` can only be resolved by
+   a media query; keep the two copies identical. */
+.dc-checkout[data-dc-theme='dark'] {
+  --dc-bg: #0f1115;
+  --dc-fg: #f4f4f5;
+  color-scheme: dark;
+}
+
+.dc-checkout[data-dc-theme='dark'],
+.dc-checkout[data-dc-theme='custom'] {
+  --dc-surface: color-mix(in srgb, var(--dc-fg) 6%, var(--dc-bg));
+  --dc-link: color-mix(in srgb, var(--color-primary-600) 55%, var(--dc-fg));
+  --color-neutral-50: var(--dc-bg);
+  --color-neutral-100: color-mix(in srgb, var(--dc-fg) 10%, var(--dc-bg));
+  --color-neutral-200: color-mix(in srgb, var(--dc-fg) 16%, var(--dc-bg));
+  --color-neutral-400: color-mix(in srgb, var(--dc-fg) 55%, var(--dc-bg));
+  --color-neutral-500: color-mix(in srgb, var(--dc-fg) 65%, var(--dc-bg));
+  --color-neutral-600: color-mix(in srgb, var(--dc-fg) 75%, var(--dc-bg));
+  --color-neutral-700: color-mix(in srgb, var(--dc-fg) 88%, var(--dc-bg));
+  --color-neutral-900: var(--dc-fg);
+  --color-amber-50: color-mix(in srgb, #f59e0b 14%, var(--dc-bg));
+  --color-amber-200: color-mix(in srgb, #f59e0b 40%, var(--dc-bg));
+  --color-amber-900: color-mix(in srgb, #f59e0b 35%, var(--dc-fg));
+  --color-red-50: color-mix(in srgb, #ef4444 14%, var(--dc-bg));
+  --color-red-700: color-mix(in srgb, #ef4444 50%, var(--dc-fg));
+  --color-green-100: color-mix(in srgb, #22c55e 18%, var(--dc-bg));
+  --color-green-600: color-mix(in srgb, #22c55e 60%, var(--dc-fg));
+}
+
+@media (prefers-color-scheme: dark) {
+  .dc-checkout[data-dc-theme='auto'] {
+    --dc-bg: #0f1115;
+    --dc-fg: #f4f4f5;
+    color-scheme: dark;
+    --dc-surface: color-mix(in srgb, var(--dc-fg) 6%, var(--dc-bg));
+    --dc-link: color-mix(in srgb, var(--color-primary-600) 55%, var(--dc-fg));
+    --color-neutral-50: var(--dc-bg);
+    --color-neutral-100: color-mix(in srgb, var(--dc-fg) 10%, var(--dc-bg));
+    --color-neutral-200: color-mix(in srgb, var(--dc-fg) 16%, var(--dc-bg));
+    --color-neutral-400: color-mix(in srgb, var(--dc-fg) 55%, var(--dc-bg));
+    --color-neutral-500: color-mix(in srgb, var(--dc-fg) 65%, var(--dc-bg));
+    --color-neutral-600: color-mix(in srgb, var(--dc-fg) 75%, var(--dc-bg));
+    --color-neutral-700: color-mix(in srgb, var(--dc-fg) 88%, var(--dc-bg));
+    --color-neutral-900: var(--dc-fg);
+    --color-amber-50: color-mix(in srgb, #f59e0b 14%, var(--dc-bg));
+    --color-amber-200: color-mix(in srgb, #f59e0b 40%, var(--dc-bg));
+    --color-amber-900: color-mix(in srgb, #f59e0b 35%, var(--dc-fg));
+    --color-red-50: color-mix(in srgb, #ef4444 14%, var(--dc-bg));
+    --color-red-700: color-mix(in srgb, #ef4444 50%, var(--dc-fg));
+    --color-green-100: color-mix(in srgb, #22c55e 18%, var(--dc-bg));
+    --color-green-600: color-mix(in srgb, #22c55e 60%, var(--dc-fg));
+  }
+}
+
+/* Cards and the header are `bg-white`, and `text-white` shares the same
+   variable, so the surface is re-pointed by class rather than by
+   variable. Fallbacks keep `auto` on a light device untouched. */
+.dc-checkout[data-dc-theme] .bg-white {
+  background-color: var(--dc-surface, #fff);
+}
+
+.dc-checkout[data-dc-theme] .text-primary-600 {
+  color: var(--dc-link, var(--color-primary-600));
+}
+
+.dc-checkout[data-dc-accent] {
+  --color-primary-600: var(--dc-accent);
+  --color-primary-700: color-mix(in srgb, var(--dc-accent) 85%, #000);
+  --color-primary-200: color-mix(in srgb, var(--dc-accent) 35%, transparent);
+}
+
+.dc-checkout[data-dc-accent] .bg-primary-600,
+.dc-checkout[data-dc-accent] .bg-primary-600 .text-white {
+  color: var(--dc-on-accent);
+}

@@ -829,6 +829,29 @@ GET  /internal?action=captures`}</pre>
                     message and the top-nav to <code className="font-mono text-xs">returnUrl</code>
                     behave identically — no mobile-specific code needed on your side.
                   </p>
+                  <p className="text-neutral-600 mb-3">
+                    <strong>Matching your site&apos;s look (optional).</strong> A
+                    cross-origin iframe can&apos;t read your page&apos;s CSS, so tell
+                    the checkout which colours to use by adding query params to the
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkoutUrl</code>:
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">theme=dark</code>
+                    for our built-in dark theme,
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">theme=auto</code>
+                    to follow the visitor&apos;s device setting, or your own colours as
+                    hex without the #:
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">bg</code> (page background),
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">text</code> and
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">accent</code> (pay button).
+                    For example
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">?bg=14110f&amp;text=f5ede6&amp;accent=e11d48</code>.
+                    Card, border and field colours are derived from those; a text
+                    colour too close to the background to read is replaced. With no
+                    params the checkout looks exactly as it always has. To set
+                    colours at runtime instead, post
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">{`{ namespace: "divinitycoin-checkout", type: "theme", bg, text, accent }`}</code>
+                    to the iframe when you receive
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">ready</code>.
+                  </p>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`<!-- Minimal partner embed snippet -->
 <iframe

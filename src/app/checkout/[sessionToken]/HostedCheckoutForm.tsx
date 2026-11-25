@@ -33,8 +33,20 @@
 //      backstop in case the popup is closed forcibly or postMessage is
 //      blocked. Either path triggers the same top-nav to the partner's
 //      returnUrl.
+//
+// Theming: the page arrives already themed from its query params (see
+// lib/checkout/theme.ts). An embedding page can also restyle it at
+// runtime by posting { namespace, type: 'theme', theme, bg, text,
+// accent } to the iframe — typically in reply to our `ready` message.
 
 import { useEffect, useMemo, useState, useRef } from 'react';
+import {
+  parseCheckoutTheme,
+  themeDomProps,
+  themePalette,
+  THEME_PARAMS,
+  type CheckoutTheme,
+} from '@/lib/checkout/theme';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -60,6 +72,8 @@ interface Props {
    * transition their own UI in place after receiving the message).
    */
   disableAutoRedirect: boolean;
+  /** Theme resolved server-side from the checkout URL's query params. */
+  theme: CheckoutTheme;
 }
 
 // All postMessage payloads we exchange (iframe ↔ partner, popup ↔ opener)
@@ -352,7 +366,16 @@ function InnerForm({
     setSubmitting(true);
     setError(null);
 
-    const returnHere = `${window.location.origin}/checkout/${sessionToken}`;
+    // Carry the theme params through a 3DS round-trip so the customer
+    // doesn't come back from their bank to a differently-coloured page.
+    const current = new URLSearchParams(window.location.search);
+    const keep = new URLSearchParams();
+    for (const key of THEME_PARAMS) {
+      const value = current.get(key);
+      if (value) keep.set(key, value);
+    }
+    const query = keep.toString();
+    const returnHere = `${window.location.origin}/checkout/${sessionToken}${query ? `?${query}` : ''}`;
     const result = await confirmCurrent(returnHere);
 
     if (!result.ok) {
@@ -545,11 +568,61 @@ function InnerForm({
   );
 }
 
+// Mirror a theme onto the server-rendered shell (page.tsx). The shell is
+// a server component, so React never re-renders it and these stick.
+function applyThemeToShell(theme: CheckoutTheme) {
+  const root = document.getElementById('dc-checkout-root');
+  if (!root) return;
+  const { style, ...attrs } = themeDomProps(theme);
+  for (const name of ['data-dc-theme', 'data-dc-accent'] as const) {
+    const value = attrs[name];
+    if (value === undefined) root.removeAttribute(name);
+    else root.setAttribute(name, value);
+  }
+  for (const prop of ['--dc-bg', '--dc-fg', '--dc-accent', '--dc-on-accent', 'color-scheme']) {
+    if (style[prop]) root.style.setProperty(prop, style[prop]);
+    else root.style.removeProperty(prop);
+  }
+}
+
 export function HostedCheckoutForm(props: Props) {
   const stripePromise = useMemo<Promise<Stripe | null>>(
     () => loadStripe(props.publishableKey),
     [props.publishableKey],
   );
+
+  const [theme, setTheme] = useState(props.theme);
+  const [prefersDark, setPrefersDark] = useState(false);
+
+  // `auto` follows the device; the shell does this in CSS, Stripe's
+  // fields need it resolved here.
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mq) return;
+    const sync = () => setPrefersDark(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  // Embedding page → iframe: restyle on request. Only our direct parent
+  // is listened to, and the payload goes through the same validation as
+  // the query params, so the worst a message can do is pick colours.
+  useEffect(() => {
+    if (!isInIframe()) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== window.parent) return;
+      const data = e.data;
+      if (!data || data.namespace !== MSG_NAMESPACE || data.type !== 'theme') return;
+      const next = parseCheckoutTheme(data);
+      applyThemeToShell(next);
+      setTheme(next);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  const palette = themePalette(theme, prefersDark);
 
   return (
     <Elements
@@ -557,12 +630,12 @@ export function HostedCheckoutForm(props: Props) {
       options={{
         clientSecret: props.clientSecret,
         appearance: {
-          theme: 'stripe',
+          theme: palette?.dark ? 'night' : 'stripe',
           variables: {
-            colorPrimary: '#6366f1',
-            colorBackground: '#ffffff',
-            colorText: '#171717',
-            colorDanger: '#dc2626',
+            colorPrimary: palette?.accent ?? '#6366f1',
+            colorBackground: palette?.field ?? '#ffffff',
+            colorText: palette?.fg ?? '#171717',
+            colorDanger: palette?.dark ? '#f87171' : '#dc2626',
             fontFamily: 'system-ui, -apple-system, sans-serif',
             spacingUnit: '4px',
             borderRadius: '8px',

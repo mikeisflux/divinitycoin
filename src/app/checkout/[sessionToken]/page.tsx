@@ -9,6 +9,7 @@ import { getStripeClient } from '@/lib/stripe';
 import { getStripeConfig } from '@/lib/config';
 import { logger } from '@/lib/logger';
 import { fireCheckoutWebhookIfNeeded } from '@/lib/checkout/webhook';
+import { parseCheckoutTheme, themeDomProps, type CheckoutTheme } from '@/lib/checkout/theme';
 import { HostedCheckoutForm } from './HostedCheckoutForm';
 import { TerminalRedirect } from './TerminalRedirect';
 
@@ -120,13 +121,22 @@ function appendSessionId(url: string, sessionToken: string): string {
 
 function CheckoutShell({
   session,
+  theme,
   children,
 }: {
   session: { partnerName: string | null; partnerLogoUrl: string | null };
+  theme: CheckoutTheme;
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col">
+    // id + class are the hook for theming: globals.css keys off the
+    // data-dc-* attributes, and HostedCheckoutForm re-applies them when
+    // the embedding page sends a `theme` message.
+    <div
+      id="dc-checkout-root"
+      className="dc-checkout min-h-screen bg-neutral-50 text-neutral-900 flex flex-col"
+      {...themeDomProps(theme)}
+    >
       <header className="bg-white border-b border-neutral-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
@@ -179,9 +189,11 @@ function formatAmount(amountCents: number, currency: string): string {
 export default async function HostedCheckoutPage(
   props: {
     params: Promise<{ sessionToken: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
   }
 ) {
   const params = await props.params;
+  const theme = parseCheckoutTheme(await props.searchParams);
   const data = await loadSession(params.sessionToken);
   if (!data) notFound();
 
@@ -210,7 +222,7 @@ export default async function HostedCheckoutPage(
                               'No charge was made.';
 
     return (
-      <CheckoutShell session={session}>
+      <CheckoutShell session={session} theme={theme}>
         <div className="bg-white rounded-xl border border-neutral-200 p-6 text-center">
           <div
             className={`w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center ${
@@ -271,7 +283,7 @@ export default async function HostedCheckoutPage(
       error,
     });
     return (
-      <CheckoutShell session={session}>
+      <CheckoutShell session={session} theme={theme}>
         <div className="bg-white rounded-xl border border-neutral-200 p-6 text-center">
           <h1 className="text-lg font-semibold text-neutral-900">Checkout unavailable</h1>
           <p className="text-sm text-neutral-600 mt-2">
@@ -286,7 +298,7 @@ export default async function HostedCheckoutPage(
   const amountLabel = isSetup ? null : formatAmount(session.amount ?? 0, session.currency);
 
   return (
-    <CheckoutShell session={session}>
+    <CheckoutShell session={session} theme={theme}>
       <div className="bg-white rounded-xl border border-neutral-200 p-6">
         <div className="mb-6">
           {isSetup ? (
@@ -320,6 +332,7 @@ export default async function HostedCheckoutPage(
           returnUrl={session.returnUrl ?? null}
           cancelUrl={session.cancelUrl ?? null}
           disableAutoRedirect={session.disableAutoRedirect}
+          theme={theme}
         />
       </div>
     </CheckoutShell>
