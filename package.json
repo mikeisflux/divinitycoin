@@ -30,7 +30,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "jszip": "^3.10.1",
-    "next": "^16.4.3",
+    "next": "^16.4.6",
     "nodemailer": "^10.2.1",
     "otplib": "^13.6.0",
     "pdfkit": "^0.15.2",
