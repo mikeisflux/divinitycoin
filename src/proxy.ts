@@ -54,6 +54,41 @@ const NEVER_FLAG_PREFIXES = [
   '/api/internal',
 ];
 
+// ---- Hosted checkout embed allowlist (edge cache) ----
+const FRAME_ANCESTORS_TTL_MS = 60 * 1000;
+let frameAncestorsCache: { origins: string[]; fetchedAt: number } | null = null;
+
+function envFrameAncestors(): string[] {
+  return (process.env.CHECKOUT_FRAME_ANCESTORS || '')
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+async function getFrameAncestorOrigins(request: NextRequest): Promise<string[]> {
+  const now = Date.now();
+  if (frameAncestorsCache && now - frameAncestorsCache.fetchedAt < FRAME_ANCESTORS_TTL_MS) {
+    return frameAncestorsCache.origins;
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const origin = `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+    const res = await fetch(`${origin}/api/checkout/frame-ancestors`, { signal: controller.signal, cache: 'no-store' });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = (await res.json()) as { origins?: unknown };
+      const origins = Array.isArray(data.origins) ? data.origins.filter((o): o is string => typeof o === 'string') : [];
+      frameAncestorsCache = { origins, fetchedAt: now };
+      return origins;
+    }
+  } catch {
+    // fall through to whatever we last knew
+  }
+  if (frameAncestorsCache) return frameAncestorsCache.origins;
+  return envFrameAncestors();
+}
+
 /** ADMIN_IP_ALLOWLIST: comma/space-separated IPv4 addresses or CIDRs. */
 const ADMIN_ALLOWLIST: Array<{ base: number; mask: number }> = (process.env.ADMIN_IP_ALLOWLIST || '')
   .split(/[\s,]+/)
@@ -155,7 +190,7 @@ function reportToFirewall(
   });
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin') || '';
   const host = request.headers.get('host') || '';
@@ -291,20 +326,17 @@ export function proxy(request: NextRequest) {
 
   // Frame embedding policy. Default-deny for everything via
   // X-Frame-Options: DENY. The DC-hosted checkout (/checkout/*) is the
-  // one exception — partners may want to mount it inside their own
-  // page instead of redirecting users to divinitycoin.com. Allowlist
-  // those origins via the CHECKOUT_FRAME_ANCESTORS env var
-  // (whitespace- or comma-separated, e.g. "https://indiecrowdfund.com
-  // https://*.indiecrowdfund.com"). Empty / unset = frame-ancestors
-  // 'none' for /checkout/* too, which behaves identically to DENY.
-  // We use Content-Security-Policy: frame-ancestors here because
-  // X-Frame-Options can't allowlist multiple specific origins.
+  // one exception — partners may mount it inside their own page. The
+  // allowed origins are managed at /admin/settings/checkout-embedding
+  // (SystemConfig CHECKOUT_FRAME_ANCESTORS; the environment variable of
+  // the same name is the fallback). This runs at the edge, with no
+  // database, so the resolved list is fetched from the app and cached
+  // for a minute; a stale copy, then the environment, cover a failed
+  // fetch. Empty = frame-ancestors 'none', which behaves like DENY. CSP
+  // is used because X-Frame-Options cannot allowlist several origins.
   const isHostedCheckoutPath = pathname.startsWith('/checkout/');
   if (isHostedCheckoutPath) {
-    const allowList = (process.env.CHECKOUT_FRAME_ANCESTORS || '')
-      .split(/[\s,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const allowList = await getFrameAncestorOrigins(request);
     const sources = allowList.length > 0
       ? `'self' ${allowList.join(' ')}`
       : `'none'`;

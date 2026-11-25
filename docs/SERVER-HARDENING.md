@@ -18,7 +18,7 @@ None of them paste a secret: values come from `.env` inline.
 | SSH restricted to known addresses | Hetzner host firewall (port 22 allowlist) — the primary control |
 | Admin and partner login throttled | nginx `login` zone, 5/min, burst 3 |
 | Admin account lockout | `loginAdmin()` — 5 failures, 15-minute lock |
-| Security headers | `src/proxy.ts` — HSTS, nosniff, X-Frame-Options DENY, CSP frame-ancestors on `/checkout` |
+| Security headers | `src/proxy.ts` — HSTS, nosniff, X-Frame-Options DENY, CSP frame-ancestors on `/checkout` (allowlist managed at `/admin/settings/checkout-embedding`) |
 | Bot / rate abuse → firewall | `src/proxy.ts` + BotBlock (iptables) |
 | Sensitive path probes 404 | `src/proxy.ts` (`/.env`, `/.git`, `/prisma` …) |
 | Partner API request log | `ApiRequestLog`, every `/internal` call, since `b95f000` |
