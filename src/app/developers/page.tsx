@@ -829,29 +829,6 @@ GET  /internal?action=captures`}</pre>
                     message and the top-nav to <code className="font-mono text-xs">returnUrl</code>
                     behave identically — no mobile-specific code needed on your side.
                   </p>
-                  <p className="text-neutral-600 mb-3">
-                    <strong>Matching your site&apos;s look (optional).</strong> A
-                    cross-origin iframe can&apos;t read your page&apos;s CSS, so tell
-                    the checkout which colours to use by adding query params to the
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkoutUrl</code>:
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">theme=dark</code>
-                    for our built-in dark theme,
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">theme=auto</code>
-                    to follow the visitor&apos;s device setting, or your own colours as
-                    hex without the #:
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">bg</code> (page background),
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">text</code> and
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">accent</code> (pay button).
-                    For example
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">?bg=14110f&amp;text=f5ede6&amp;accent=e11d48</code>.
-                    Card, border and field colours are derived from those; a text
-                    colour too close to the background to read is replaced. With no
-                    params the checkout looks exactly as it always has. To set
-                    colours at runtime instead, post
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">{`{ namespace: "divinitycoin-checkout", type: "theme", bg, text, accent }`}</code>
-                    to the iframe when you receive
-                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">ready</code>.
-                  </p>
                   <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
                     <pre className="text-sm">{`<!-- Minimal partner embed snippet -->
 <iframe
@@ -877,6 +854,117 @@ GET  /internal?action=captures`}</pre>
   });
 </script>`}</pre>
                   </div>
+
+                  <h4 id="checkout-theming" className="font-semibold text-neutral-900 mt-6 mb-2">
+                    Checkout theming (optional)
+                  </h4>
+                  <p className="text-neutral-600 mb-3">
+                    By default the hosted checkout is light. A cross-origin iframe
+                    can&apos;t read your page&apos;s CSS, so to make it match your site
+                    you tell it which colours to use — either with query params on the
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkoutUrl</code>
+                    or with a postMessage at runtime. Both take the same four values,
+                    all optional. With none of them the checkout looks exactly as it
+                    always has, so existing integrations need no change. Theming works
+                    the same whether you embed the checkout or redirect to it.
+                  </p>
+                  <div className="overflow-x-auto mb-3">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-neutral-200 text-left">
+                          <th className="py-2 pr-4 font-semibold text-neutral-900">Param</th>
+                          <th className="py-2 pr-4 font-semibold text-neutral-900">Values</th>
+                          <th className="py-2 font-semibold text-neutral-900">Effect</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-neutral-600">
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4 align-top"><code className="font-mono text-xs">theme</code></td>
+                          <td className="py-2 pr-4 align-top"><code className="font-mono text-xs">light</code> (default), <code className="font-mono text-xs">dark</code>, <code className="font-mono text-xs">auto</code></td>
+                          <td className="py-2 align-top">Built-in preset. <code className="font-mono text-xs">dark</code> is our dark theme; <code className="font-mono text-xs">auto</code> follows the visitor&apos;s device setting (dark mode on → dark). Ignored when <code className="font-mono text-xs">bg</code> is set.</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4 align-top"><code className="font-mono text-xs">bg</code></td>
+                          <td className="py-2 pr-4 align-top">Hex colour</td>
+                          <td className="py-2 align-top">Page background — use the colour of the surface the checkout sits on. The card, borders, dividers, input fields and status messages are all derived from <code className="font-mono text-xs">bg</code> and <code className="font-mono text-xs">text</code>, so these two are enough for a full match.</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4 align-top"><code className="font-mono text-xs">text</code></td>
+                          <td className="py-2 pr-4 align-top">Hex colour</td>
+                          <td className="py-2 align-top">Main text colour. Only used together with <code className="font-mono text-xs">bg</code>. If omitted, or too close to <code className="font-mono text-xs">bg</code> to read (below 4.5:1 contrast), we pick near-black or near-white for you.</td>
+                        </tr>
+                        <tr className="border-b border-neutral-100">
+                          <td className="py-2 pr-4 align-top"><code className="font-mono text-xs">accent</code></td>
+                          <td className="py-2 pr-4 align-top">Hex colour</td>
+                          <td className="py-2 align-top">Pay button, links and focus rings. Button text switches between white and near-black automatically to stay readable. Can be combined with <code className="font-mono text-xs">theme</code> or used on its own.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    Hex colours are 3 or 6 digits. In a URL, leave off the
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">#</code>
+                    (or encode it as
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">%23</code>).
+                    Anything we can&apos;t parse is ignored rather than rejected, so a
+                    bad value falls back to the default look and never breaks a
+                    checkout. The &quot;Divinity Payments&quot; header and footer line
+                    always stay.
+                  </p>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-3 overflow-x-auto">
+                    <pre className="text-sm">{`// Built-in dark theme
+checkoutUrl + '?theme=dark'
+
+// Follow the visitor's light/dark device setting
+checkoutUrl + '?theme=auto'
+
+// Dark theme with your brand colour on the pay button
+checkoutUrl + '?theme=dark&accent=e11d48'
+
+// Your own colours
+checkoutUrl + '?bg=14110f&text=f5ede6&accent=e11d48'`}</pre>
+                  </div>
+                  <p className="text-neutral-600 mb-3">
+                    <strong>Setting colours at runtime.</strong> If your site has its own
+                    light/dark toggle, or you&apos;d rather read the colours off your page
+                    than hard-code them, post a
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">theme</code>
+                    message to the iframe. Send it when you receive
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">ready</code>
+                    (we emit that again after a 3D Secure round-trip) and again whenever
+                    your theme changes. The fields are the same as the query params;
+                    here a leading
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">#</code>
+                    is fine. Each message replaces the previous theme, and it takes
+                    precedence over the query params.
+                  </p>
+                  <div className="bg-neutral-100 p-4 rounded-lg mb-4 overflow-x-auto">
+                    <pre className="text-sm">{`const frame = document.getElementById('dc-checkout');
+
+function sendTheme() {
+  frame.contentWindow.postMessage({
+    namespace: 'divinitycoin-checkout',
+    type: 'theme',
+    bg: '#14110f',      // or theme: 'dark' / 'auto' instead of colours
+    text: '#f5ede6',
+    accent: '#e11d48',
+  }, 'https://divinitycoin.com');
+}
+
+window.addEventListener('message', (e) => {
+  if (e.origin !== 'https://divinitycoin.com') return;
+  if (e.data?.namespace !== 'divinitycoin-checkout') return;
+  if (e.data.type === 'ready') sendTheme();
+});`}</pre>
+                  </div>
+                  <p className="text-neutral-600 mb-3 text-sm">
+                    To avoid a flash of the light theme before your message arrives,
+                    put the same colours on the
+                    <code className="font-mono text-xs bg-neutral-100 px-1 mx-1 rounded-sm">checkoutUrl</code>
+                    as well. On iOS, where the embedded checkout hands off to a
+                    &quot;Continue securely&quot; tab, only the query params carry over
+                    to that tab — another reason to set them.
+                  </p>
 
                   <p className="text-neutral-600 mb-3">
                     DC also fires dedicated session-level events when a hosted
